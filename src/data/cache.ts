@@ -4,13 +4,15 @@ import * as os from 'os';
 import { RateLimitData } from './apiClient';
 
 interface CacheFile {
-  version: 1
+  version: 2
   updatedAt: string
   usageData: {
     utilization5h: number
     utilization7d: number
-    resetIn5h: number
-    resetIn7d: number
+    // Unix timestamps in seconds (absolute, not relative) so that remaining
+    // time can be recalculated correctly after reading a stale cache entry.
+    reset5hAt: number
+    reset7dAt: number
     limitStatus: string
   }
 }
@@ -23,7 +25,7 @@ export async function readCache(): Promise<CacheFile | null> {
   try {
     const content = await fs.readFile(getCachePath(), 'utf-8');
     const parsed = JSON.parse(content) as CacheFile;
-    if (parsed.version !== 1) { return null; }
+    if (parsed.version !== 2) { return null; }  // v1 caches used relative times; reject them
     return parsed;
   } catch {
     return null;
@@ -31,14 +33,16 @@ export async function readCache(): Promise<CacheFile | null> {
 }
 
 export async function writeCache(data: RateLimitData): Promise<void> {
+  const nowSec = Date.now() / 1000;
   const cache: CacheFile = {
-    version: 1,
+    version: 2,
     updatedAt: new Date().toISOString(),
     usageData: {
       utilization5h: data.utilization5h,
       utilization7d: data.utilization7d,
-      resetIn5h: data.resetIn5h,
-      resetIn7d: data.resetIn7d,
+      // Store absolute reset timestamps so remaining time stays correct
+      reset5hAt: nowSec + data.resetIn5h,
+      reset7dAt: nowSec + data.resetIn7d,
       limitStatus: data.limitStatus,
     },
   };

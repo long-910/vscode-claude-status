@@ -96,15 +96,16 @@ export class DataManager {
   private cacheToRateLimitData(usageData: {
     utilization5h: number
     utilization7d: number
-    resetIn5h: number
-    resetIn7d: number
+    reset5hAt: number
+    reset7dAt: number
     limitStatus: string
   }): RateLimitData {
+    const nowSec = Date.now() / 1000;
     return {
       utilization5h: usageData.utilization5h,
       utilization7d: usageData.utilization7d,
-      resetIn5h: usageData.resetIn5h,
-      resetIn7d: usageData.resetIn7d,
+      resetIn5h: Math.max(0, usageData.reset5hAt - nowSec),
+      resetIn7d: Math.max(0, usageData.reset7dAt - nowSec),
       limitStatus: usageData.limitStatus as RateLimitData['limitStatus'],
     };
   }

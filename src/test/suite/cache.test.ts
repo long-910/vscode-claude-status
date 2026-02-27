@@ -3,27 +3,28 @@ import { isCacheValid, getCacheAge } from '../../data/cache';
 
 // Minimal CacheFile shape for testing (without importing private type)
 interface TestCacheFile {
-  version: 1
+  version: 2
   updatedAt: string
   usageData: {
     utilization5h: number
     utilization7d: number
-    resetIn5h: number
-    resetIn7d: number
+    reset5hAt: number
+    reset7dAt: number
     limitStatus: string
   }
 }
 
 function makeCache(ageSeconds: number): TestCacheFile {
   const updatedAt = new Date(Date.now() - ageSeconds * 1000).toISOString();
+  const nowSec = Date.now() / 1000;
   return {
-    version: 1,
+    version: 2,
     updatedAt,
     usageData: {
       utilization5h: 0.5,
       utilization7d: 0.3,
-      resetIn5h: 1800,
-      resetIn7d: 86400,
+      reset5hAt: nowSec + 1800,
+      reset7dAt: nowSec + 86400,
       limitStatus: 'allowed',
     },
   };

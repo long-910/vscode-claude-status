@@ -47,7 +47,7 @@ Click the status bar item to open a rich dashboard panel with:
 - **Current Usage** — colour-coded progress bars for 5 h and 7 d windows
 - **Token Cost** — 5 h / today / 7 d cost calculated from local JSONL data
 - **Project Cost** — per-workspace breakdown (today / 7 days / 30 days)
-- **Prediction** _(planned)_ — burn rate and time-to-exhaustion estimate
+- **Prediction** — burn rate ($/hr), time-to-exhaustion, daily budget tracking
 - **Usage History** _(planned)_ — GitHub-style heatmap + hourly pattern chart
 
 The panel supports light, dark, and high-contrast VS Code themes natively.
@@ -66,13 +66,29 @@ in the dashboard, and the status bar shows the aggregate.
 🤖 5h:78% 7d:84% | PJ:$5.43              ← multi-root aggregate
 ```
 
-### 🔮 Usage Prediction & Budget Alerts *(planned — v0.2.0)*
+### 🔮 Usage Prediction & Budget Alerts
 
-- Current burn rate in $/hr
-- Estimated time until the 5 h rate limit is exhausted
-- Optional daily / weekly budget with configurable alert threshold
+Based on the last 30 minutes of activity, the extension predicts how long until
+the 5 h rate limit is exhausted and warns you before it happens.
 
-### 📅 Usage History Heatmap *(planned — v0.2.0)*
+- **Burn rate** — current consumption in $/hr (rolling 30-minute window)
+- **Time-to-exhaustion** — estimated minutes until the 5 h window is full,
+  capped at the next window reset time
+- **Safety indicator** — "Safe to start heavy task" if > 30 min remains
+- **Daily budget** — set an optional USD cap; progress bar and alerts fire when
+  the configured threshold (default 80 %) is reached
+- **VS Code notifications** — non-blocking warning at ≤ 30 min, error dialog
+  at ≤ 10 min (with "Open Dashboard" action); budget alert fires once per window
+- Notification deduplication — each alert fires at most once per 5 h window;
+  keys are cleared automatically when the window resets
+
+Configure via **Settings → Claude Status** or the command palette:
+
+```
+Claude Status: Set Budget...
+```
+
+### 📅 Usage History Heatmap *(planned)*
 
 - GitHub Contributions-style daily heatmap for the last 30 / 60 / 90 days
 - Hourly usage pattern bar chart — visualise when you use Claude Code most
@@ -126,6 +142,7 @@ The extension activates automatically on VS Code startup (`onStartupFinished`).
 | **Claude Status: Refresh Now** | Force API refresh |
 | **Claude Status: Open Dashboard** | Open dashboard panel |
 | **Claude Status: Toggle % / $ Display** | Switch display mode |
+| **Claude Status: Set Budget…** | Set or disable daily USD budget |
 
 ---
 
@@ -260,12 +277,14 @@ vscode-claude-status/
 │   │   ├── apiClient.ts      # Anthropic API rate-limit header fetcher
 │   │   ├── cache.ts          # disk-backed cache (~/.claude/…cache.json)
 │   │   ├── dataManager.ts    # central data orchestrator (singleton)
-│   │   └── projectCost.ts    # workspace → JSONL mapping + per-project costs
+│   │   ├── projectCost.ts    # workspace → JSONL mapping + per-project costs
+│   │   └── prediction.ts     # burn rate, time-to-exhaustion, budget prediction
 │   ├── webview/
 │   │   └── panel.ts          # WebView dashboard panel (HTML embedded)
 │   └── test/suite/
 │       ├── jsonlReader.test.ts
 │       ├── projectCost.test.ts
+│       ├── prediction.test.ts
 │       ├── cache.test.ts
 │       └── statusBar.test.ts
 ├── docs/                     # detailed feature & architecture specs
@@ -307,9 +326,9 @@ vscode-claude-status/
 | Status bar with % / $ display | ✅ v0.1.0 |
 | WebView dashboard skeleton | ✅ v0.1.0 |
 | Project-level cost tracking | ✅ v0.1.0 |
-| Usage prediction & budget alerts | 🔜 v0.2.0 |
-| Session history heatmap | 🔜 v0.2.0 |
-| VS Code Marketplace publication | 🔜 v0.2.0 |
+| Usage prediction & budget alerts | ✅ v0.2.0 |
+| Session history heatmap | 🔜 v0.3.0 |
+| VS Code Marketplace publication | 🔜 v0.3.0 |
 
 ---
 

@@ -5,7 +5,10 @@ import { readAllUsage, wasJsonlUpdatedRecently } from './jsonlReader';
 import { fetchRateLimitData, RateLimitData } from './apiClient';
 import { readCache, writeCache, isCacheValid, getCacheAge } from './cache';
 import { getAllProjectCosts, ProjectCostData } from './projectCost';
+import { computePrediction, PredictionData } from './prediction';
 import { config } from '../config';
+
+export { PredictionData };
 
 export interface ClaudeUsageData {
   // From API / cache
@@ -40,6 +43,7 @@ export class DataManager {
   private watcher: vscode.FileSystemWatcher | undefined;
   private lastData: ClaudeUsageData | undefined;
   private lastProjectCosts: ProjectCostData[] = [];
+  private lastPrediction: PredictionData | null = null;
 
   private constructor() {}
 
@@ -136,6 +140,8 @@ export class DataManager {
         this.getUsageData(false),
         this.refreshProjectCosts(),
       ]);
+      // Compute prediction before firing so getLastPrediction() is fresh in listeners
+      await this.getPrediction().catch(() => {});
       this._onDidUpdate.fire(data);
     } catch {
       // ignore refresh errors
@@ -148,6 +154,7 @@ export class DataManager {
         this.getUsageData(true),
         this.refreshProjectCosts(),
       ]);
+      await this.getPrediction().catch(() => {});
       this._onDidUpdate.fire(data);
     } catch {
       // ignore refresh errors
@@ -162,6 +169,27 @@ export class DataManager {
     this.watcher = vscode.workspace.createFileSystemWatcher(pattern);
     this.watcher.onDidChange(() => this.refresh());
     this.watcher.onDidCreate(() => this.refresh());
+  }
+
+  async getPrediction(): Promise<PredictionData | null> {
+    if (!this.lastData) { return null; }
+    try {
+      const prediction = await computePrediction(
+        this.lastData.utilization5h,
+        this.lastData.resetIn5h,
+        this.lastData.cost5h,
+        this.lastData.costDay,
+        config.dailyBudget,
+      );
+      this.lastPrediction = prediction;
+      return prediction;
+    } catch {
+      return this.lastPrediction;
+    }
+  }
+
+  getLastPrediction(): PredictionData | null {
+    return this.lastPrediction;
   }
 
   getLastData(): ClaudeUsageData | undefined {

@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+
+# VS Code extension package
+*.vsix
+
+# VS Code test runner (downloads full VS Code binary, ~160 MB)
+.vscode-test/
+
+# Claude Code local project settings (AI assistant runtime data)
+.claude/
+
+# Yeoman generator boilerplate (not useful for contributors)
+vsc-extension-quickstart.md
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/*.log

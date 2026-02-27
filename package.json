@@ -1,0 +1,156 @@
+{
+  "name": "vscode-claude-status",
+  "displayName": "Claude Status",
+  "description": "Claude Code token usage & cost in VSCode status bar",
+  "version": "0.0.1",
+  "publisher": "long-kudo",
+  "engines": {
+    "vscode": "^1.109.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "icon": "images/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/long-910/vscode-claude-status"
+  },
+  "license": "MIT",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "vscode-claude-status.openDashboard",
+        "title": "Claude Status: Open Dashboard"
+      },
+      {
+        "command": "vscode-claude-status.refresh",
+        "title": "Claude Status: Refresh Now"
+      },
+      {
+        "command": "vscode-claude-status.toggleDisplayMode",
+        "title": "Claude Status: Toggle % / $ Display"
+      },
+      {
+        "command": "vscode-claude-status.setBudget",
+        "title": "Claude Status: Set Budget..."
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "vscode-claude-status.toggleDisplayMode",
+        "key": "ctrl+shift+alt+c",
+        "mac": "cmd+shift+alt+c"
+      }
+    ],
+    "configuration": {
+      "title": "Claude Status",
+      "properties": {
+        "claudeStatus.displayMode": {
+          "type": "string",
+          "enum": ["percent", "cost"],
+          "default": "percent",
+          "description": "Status bar display mode: utilization percentage or USD cost."
+        },
+        "claudeStatus.statusBar.alignment": {
+          "type": "string",
+          "enum": ["left", "right"],
+          "default": "left",
+          "description": "Position of the status bar item."
+        },
+        "claudeStatus.statusBar.showProjectCost": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show current project cost in the status bar."
+        },
+        "claudeStatus.cache.ttlSeconds": {
+          "type": "number",
+          "default": 300,
+          "minimum": 60,
+          "maximum": 3600,
+          "description": "Cache TTL in seconds. API is not called more often than this when Claude Code is idle."
+        },
+        "claudeStatus.realtime.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable realtime polling (1 API call every cache.ttlSeconds). Increases API usage."
+        },
+        "claudeStatus.budget.dailyUsd": {
+          "type": ["number", "null"],
+          "default": null,
+          "minimum": 0,
+          "description": "Daily budget in USD. Set to null to disable."
+        },
+        "claudeStatus.budget.weeklyUsd": {
+          "type": ["number", "null"],
+          "default": null,
+          "minimum": 0,
+          "description": "Weekly budget in USD. Set to null to disable."
+        },
+        "claudeStatus.budget.alertThresholdPercent": {
+          "type": "number",
+          "default": 80,
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Show budget warning when usage exceeds this percentage of the budget."
+        },
+        "claudeStatus.notifications.rateLimitWarning": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show notification when rate limit is approaching."
+        },
+        "claudeStatus.notifications.rateLimitWarningThresholdMinutes": {
+          "type": "number",
+          "default": 30,
+          "minimum": 5,
+          "maximum": 120,
+          "description": "Show rate limit warning this many minutes before exhaustion."
+        },
+        "claudeStatus.notifications.budgetWarning": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show notification when budget threshold is exceeded."
+        },
+        "claudeStatus.heatmap.days": {
+          "type": "number",
+          "default": 90,
+          "enum": [30, 60, 90],
+          "description": "Number of days shown in the usage heatmap."
+        },
+        "claudeStatus.credentials.path": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "Custom path to Claude credentials file. Leave null to use default (~/.claude/.credentials.json)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.109.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@typescript-eslint/eslint-plugin": "^8.31.1",
+    "@typescript-eslint/parser": "^8.31.1",
+    "eslint": "^9.25.1",
+    "typescript": "^5.8.3",
+    "ts-loader": "^9.5.2",
+    "webpack": "^5.99.7",
+    "webpack-cli": "^6.0.1",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}

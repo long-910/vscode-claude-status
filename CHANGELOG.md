@@ -9,6 +9,45 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+#### Session History Heatmap — Feature 05
+
+- **`src/webview/heatmap.ts`** (new) — Data aggregation engine:
+  - `getHeatmapData(days)` — reads all projects' JSONL in parallel
+    (`Promise.all`); skips directories/files with `mtime < cutoff` for
+    performance; returns `HeatmapData { daily, hourly, generatedAt }`.
+  - `aggregateByDay(entries, days)` — groups entries by local date key
+    (`YYYY-MM-DD`), fills every day in the window with zeroes for gaps,
+    returns array in ascending date order.
+  - `aggregateByHour(entries, days)` — buckets entries into 24 local-hour
+    slots for the last 30 days, computes `avgCost` and `count` per hour.
+  - Helper functions exported for unit testing.
+- **`src/data/dataManager.ts`** — Added `getHeatmapData()` with a 5-minute
+  in-memory TTL cache and `getLastHeatmapData()` (synchronous).
+  `refresh()` / `forceRefresh()` fire `onDidUpdate` twice: once immediately
+  (fast; usage + prediction), then again when the heatmap finishes in the
+  background (`refreshHeatmapBackground()`). A `heatmapPending` guard
+  prevents concurrent recomputes.
+- **`src/webview/panel.ts`** — Full heatmap section in the dashboard:
+  - **Daily heatmap** — CSS grid (`grid-template-rows: repeat(7, 12px);
+    grid-auto-flow: column`) with day-of-week padding for correct alignment,
+    month labels, five green intensity levels (l0–l4) based on cost relative
+    to the window maximum, hover tooltip showing date + cost + message count.
+  - **Hourly bar chart** — `<canvas id="hourlyChart">` rendered by
+    Chart.js 4.4.0 loaded from `cdn.jsdelivr.net`; respects VS Code CSS
+    variables for foreground and progress-bar colours; previous chart
+    instance is destroyed before re-render to prevent leaks.
+  - Chart.js CDN script tag added (nonce-gated, allowed by existing CSP).
+  - `HeatmapData` placeholder type replaced with real import from
+    `dataManager`; `sendUpdate()` passes `getLastHeatmapData()`.
+  - On WebView `ready`, a background heatmap load is triggered if no cached
+    data is available, followed by a second `sendUpdate` when complete.
+- **`src/test/suite/heatmap.test.ts`** (new) — Unit tests for pure functions:
+  `aggregateByDay` (length, zero-fill, cost accumulation, date format, sort
+  order) and `aggregateByHour` (length, hour indices, avg computation, window
+  cutoff).
+
 ---
 
 ## [0.2.0] — 2026-02-28

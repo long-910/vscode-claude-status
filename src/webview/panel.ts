@@ -1,16 +1,13 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
-import { DataManager, ClaudeUsageData, ProjectCostData, PredictionData } from '../data/dataManager';
+import { DataManager, ClaudeUsageData, ProjectCostData, PredictionData, HeatmapData } from '../data/dataManager';
 import { config } from '../config';
-
-// Placeholder type for feature 05
-type HeatmapData = Record<string, unknown> | null;
 
 interface DashboardMessage {
   usage: ClaudeUsageData;
   projectCosts: ProjectCostData[];
   prediction: PredictionData | null;
-  heatmap: HeatmapData;
+  heatmap: HeatmapData | null;
 }
 
 function generateNonce(): string {
@@ -183,6 +180,55 @@ function getWebviewContent(nonce: string): string {
 
     @keyframes spin { to { transform: rotate(360deg); } }
     .spinning { display: inline-block; animation: spin 1s linear infinite; }
+
+    /* ---- Heatmap ---- */
+    .heatmap-container { overflow-x: auto; padding-bottom: 4px; }
+    .hm-header {
+      display: flex;
+      gap: 2px;
+      margin-bottom: 2px;
+    }
+    .hm-col-label {
+      width: 12px;
+      flex-shrink: 0;
+      font-size: 0.6em;
+      color: var(--vscode-descriptionForeground);
+      text-align: center;
+      overflow: hidden;
+    }
+    .heatmap-grid {
+      display: grid;
+      grid-template-rows: repeat(7, 12px);
+      grid-auto-flow: column;
+      grid-auto-columns: 12px;
+      gap: 2px;
+    }
+    .hm-cell {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      cursor: default;
+    }
+    .hm-cell.l-empty,
+    .hm-cell.l0 { background-color: var(--vscode-editor-background); border: 1px solid var(--vscode-panel-border); }
+    .hm-cell.l1 { background-color: #0e4429; }
+    .hm-cell.l2 { background-color: #006d32; }
+    .hm-cell.l3 { background-color: #26a641; }
+    .hm-cell.l4 { background-color: #39d353; }
+    .heatmap-legend {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.8em;
+      margin-top: 6px;
+      color: var(--vscode-descriptionForeground);
+    }
+    .heatmap-legend .hm-cell { display: inline-block; flex-shrink: 0; }
+    .hourly-title {
+      font-size: 0.8em;
+      color: var(--vscode-descriptionForeground);
+      margin: 12px 0 4px;
+    }
   </style>
 </head>
 <body>
@@ -265,6 +311,7 @@ function getWebviewContent(nonce: string): string {
 
   <div class="footer" id="footer">Last updated: —</div>
 
+  <script nonce="${nonce}" src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
 
@@ -485,6 +532,141 @@ function getWebviewContent(nonce: string): string {
       budgetConfigOpen = false;
     }
 
+    // ---- Heatmap -----------------------------------------------------------
+    let hourlyChart = null;
+
+    function getCostLevel(cost, maxCost) {
+      if (cost === 0 || maxCost === 0) { return 0; }
+      const r = cost / maxCost;
+      if (r < 0.25) { return 1; }
+      if (r < 0.50) { return 2; }
+      if (r < 0.75) { return 3; }
+      return 4;
+    }
+
+    function updateHeatmap(heatmap) {
+      const el = document.getElementById('heatmap-content');
+      const daysEl = document.getElementById('heatmap-days');
+
+      if (!heatmap || !heatmap.daily || heatmap.daily.length === 0) {
+        el.innerHTML = '<div class="placeholder">No usage history</div>';
+        return;
+      }
+
+      const daily = heatmap.daily;
+      const hourly = heatmap.hourly || [];
+      if (daysEl) { daysEl.textContent = daily.length; }
+
+      const maxCost = Math.max(...daily.map(d => d.cost), 0.001);
+
+      // Day-of-week offset for first cell (0=Sun … 6=Sat)
+      // Use noon to avoid UTC boundary shifting the date
+      const firstDow = new Date(daily[0].date + 'T12:00:00').getDay();
+      const allCells = [...Array(firstDow).fill(null), ...daily];
+      const numCols = Math.ceil(allCells.length / 7);
+
+      // Month header (one label per column-week)
+      let headerHtml = '';
+      let lastMonth = -1;
+      for (let col = 0; col < numCols; col++) {
+        let label = '';
+        for (let row = 0; row < 7; row++) {
+          const cell = allCells[col * 7 + row];
+          if (cell) {
+            const d = new Date(cell.date + 'T12:00:00');
+            const m = d.getMonth();
+            if (m !== lastMonth && (d.getDate() <= 7 || col === 0)) {
+              label = d.toLocaleString('default', { month: 'short' });
+              lastMonth = m;
+            }
+            break;
+          }
+        }
+        headerHtml += '<div class="hm-col-label">' + (label ? esc(label) : '') + '</div>';
+      }
+
+      // Grid cells
+      let gridHtml = '';
+      for (let i = 0; i < firstDow; i++) {
+        gridHtml += '<div class="hm-cell l-empty"></div>';
+      }
+      for (const day of daily) {
+        const level = getCostLevel(day.cost, maxCost);
+        const costStr = day.cost.toFixed(3);
+        const sessions = day.sessionCount > 0 ? ' (' + day.sessionCount + ' msgs)' : '';
+        gridHtml += '<div class="hm-cell l' + level +
+          '" title="' + esc(day.date + ': $' + costStr + sessions) + '"></div>';
+      }
+
+      // Legend
+      const legendHtml =
+        '<div class="heatmap-legend">Less ' +
+        '<div class="hm-cell l0"></div>' +
+        '<div class="hm-cell l1"></div>' +
+        '<div class="hm-cell l2"></div>' +
+        '<div class="hm-cell l3"></div>' +
+        '<div class="hm-cell l4"></div>' +
+        ' More</div>';
+
+      el.innerHTML =
+        '<div class="heatmap-container">' +
+        '<div class="hm-header">' + headerHtml + '</div>' +
+        '<div class="heatmap-grid">' + gridHtml + '</div>' +
+        '</div>' +
+        legendHtml +
+        '<div class="hourly-title">Avg cost by hour of day (last 30 days)</div>' +
+        '<canvas id="hourlyChart" height="80"></canvas>';
+
+      // Hourly bar chart (Chart.js)
+      if (hourly.length > 0 && typeof Chart !== 'undefined') {
+        if (hourlyChart) {
+          try { hourlyChart.destroy(); } catch { /* ignore */ }
+          hourlyChart = null;
+        }
+        const canvas = document.getElementById('hourlyChart');
+        if (canvas) {
+          const style = getComputedStyle(document.body);
+          const fg = style.getPropertyValue('--vscode-editor-foreground').trim() || '#cccccc';
+          const bar = style.getPropertyValue('--vscode-progressBar-background').trim() || '#007acc';
+          hourlyChart = new Chart(canvas, {
+            type: 'bar',
+            data: {
+              labels: Array.from({ length: 24 }, (_, i) => i + 'h'),
+              datasets: [{
+                data: hourly.map(h => h.avgCost),
+                backgroundColor: bar,
+                borderWidth: 0,
+              }],
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: ctx => {
+                      const h = hourly[ctx.dataIndex];
+                      return '$' + ctx.parsed.y.toFixed(4) + ' avg (' + h.count + ' msgs)';
+                    },
+                  },
+                },
+              },
+              scales: {
+                x: {
+                  ticks: { color: fg, font: { size: 10 } },
+                  grid: { display: false },
+                },
+                y: {
+                  ticks: { color: fg, font: { size: 10 } },
+                  beginAtZero: true,
+                },
+              },
+            },
+          });
+        }
+      }
+    }
+
     // Minimal HTML escape to prevent XSS from data strings
     function esc(str) {
       return String(str)
@@ -502,7 +684,7 @@ function getWebviewContent(nonce: string): string {
         updateUsage(msg.data.usage, currentMode);
         updateProjectCosts(msg.data.projectCosts);
         updatePrediction(msg.data.prediction, msg.data.usage);
-        // Heatmap rendering: Feature 05
+        if (msg.data.heatmap) { updateHeatmap(msg.data.heatmap); }
       } else if (msg.type === 'setDisplayMode') {
         currentMode = msg.mode;
         if (lastData) { updateUsage(lastData.usage, currentMode); }
@@ -568,8 +750,15 @@ export class DashboardPanel {
   private handleMessage(msg: { type: string; amount?: number | null }): void {
     switch (msg.type) {
       case 'ready':
-        // Send current data immediately when WebView signals it's ready
+        // Fast first update (usage + prediction, cached heatmap or null)
         this.dataManager.getUsageData().then(data => this.sendUpdate(data)).catch(() => {});
+        // Trigger heatmap computation; send a second update when ready
+        if (!this.dataManager.getLastHeatmapData()) {
+          this.dataManager.getHeatmapData().then(() => {
+            const data = this.dataManager.getLastData();
+            if (data) { this.sendUpdate(data).catch(() => {}); }
+          }).catch(() => {});
+        }
         break;
 
       case 'refresh':
@@ -596,13 +785,14 @@ export class DashboardPanel {
 
   private async sendUpdate(usage: ClaudeUsageData): Promise<void> {
     const prediction = await this.dataManager.getPrediction();
+    const heatmap = this.dataManager.getLastHeatmapData();
     const message: { type: string; data: DashboardMessage } = {
       type: 'update',
       data: {
         usage,
         projectCosts: this.dataManager.getLastProjectCosts(),
         prediction,
-        heatmap: null,       // Feature 05
+        heatmap,
       },
     };
     this.panel.webview.postMessage(message);

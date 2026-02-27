@@ -48,7 +48,7 @@ Click the status bar item to open a rich dashboard panel with:
 - **Token Cost** — 5 h / today / 7 d cost calculated from local JSONL data
 - **Project Cost** — per-workspace breakdown (today / 7 days / 30 days)
 - **Prediction** — burn rate ($/hr), time-to-exhaustion, daily budget tracking
-- **Usage History** _(planned)_ — GitHub-style heatmap + hourly pattern chart
+- **Usage History** — GitHub-style daily heatmap + hourly pattern bar chart
 
 The panel supports light, dark, and high-contrast VS Code themes natively.
 
@@ -88,10 +88,20 @@ Configure via **Settings → Claude Status** or the command palette:
 Claude Status: Set Budget...
 ```
 
-### 📅 Usage History Heatmap *(planned)*
+### 📅 Usage History Heatmap
 
-- GitHub Contributions-style daily heatmap for the last 30 / 60 / 90 days
-- Hourly usage pattern bar chart — visualise when you use Claude Code most
+Understand your long-term usage patterns at a glance.
+
+- **Daily heatmap** — GitHub Contributions-style grid for the last 30 / 60 / 90 days;
+  green intensity reflects daily spend; hover any cell for exact date and cost
+- **Hourly bar chart** — average cost per hour of day (last 30 days), rendered
+  with Chart.js; shows when you typically use Claude Code most heavily
+- All data read from local JSONL only (no API call); files older than the window
+  are skipped by `mtime` for performance; parallel reads via `Promise.all`
+- Heatmap computes in the background after the fast usage/prediction update
+  so the status bar is never blocked
+
+Number of days is configurable via `claudeStatus.heatmap.days` (30 / 60 / 90).
 
 ---
 
@@ -280,11 +290,13 @@ vscode-claude-status/
 │   │   ├── projectCost.ts    # workspace → JSONL mapping + per-project costs
 │   │   └── prediction.ts     # burn rate, time-to-exhaustion, budget prediction
 │   ├── webview/
-│   │   └── panel.ts          # WebView dashboard panel (HTML embedded)
+│   │   ├── panel.ts          # WebView dashboard panel (HTML embedded)
+│   │   └── heatmap.ts        # heatmap data aggregation (daily + hourly)
 │   └── test/suite/
 │       ├── jsonlReader.test.ts
 │       ├── projectCost.test.ts
 │       ├── prediction.test.ts
+│       ├── heatmap.test.ts
 │       ├── cache.test.ts
 │       └── statusBar.test.ts
 ├── docs/                     # detailed feature & architecture specs
@@ -327,7 +339,7 @@ vscode-claude-status/
 | WebView dashboard skeleton | ✅ v0.1.0 |
 | Project-level cost tracking | ✅ v0.1.0 |
 | Usage prediction & budget alerts | ✅ v0.2.0 |
-| Session history heatmap | 🔜 v0.3.0 |
+| Session history heatmap | ✅ (unreleased) |
 | VS Code Marketplace publication | 🔜 v0.3.0 |
 
 ---

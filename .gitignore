@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+
+# VS Code extension package
+*.vsix
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/*.log

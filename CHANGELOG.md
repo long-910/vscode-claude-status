@@ -7,6 +7,26 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+---
+
+## [0.3.1] — 2026-02-28
+
+### Changed
+
+- **`README.md`** — split into user-facing content only; removed How It Works,
+  CI/CD, and Development sections; fixed Marketplace install section
+  (removed "coming soon" label)
+- **`README.ja.md`** — full sync with English README in the same structure
+- **`DEVELOPMENT.md`** (new) — dedicated developer guide containing:
+  data flow, JSONL format, project path mapping, token cost formula,
+  CI/CD workflows, release procedure, local setup, project structure,
+  and architecture diagram
+- **`CLAUDE.md`** — added rule: never push directly to `main`; always open a PR
+
+---
+
 ## [0.3.0] — 2026-02-28
 
 ### Added
@@ -201,6 +221,7 @@ and project-level cost tracking.
 
 ---
 
+[0.3.1]: https://github.com/long-910/vscode-claude-status/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/long-910/vscode-claude-status/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/long-910/vscode-claude-status/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/long-910/vscode-claude-status/releases/tag/v0.1.0

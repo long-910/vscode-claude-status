@@ -17,6 +17,7 @@ Reference implementation: [claude-tmux-status](https://github.com/long-910/claud
 
 ## ⛔ Non-Negotiable Rules
 
+- **NEVER** push directly to `main` — always open a Pull Request
 - **NEVER** use `localStorage` or `sessionStorage` in WebView
 - **NEVER** make API calls more than once per 5 minutes when Claude Code is idle
 - **NEVER** hardcode file paths — always use `os.homedir()` equivalents
@@ -136,3 +137,8 @@ chore: update dependencies
 docs: update ARCHITECTURE.md
 test: add prediction engine tests
 ```
+
+## Changelog Convention
+
+- **ALWAYS** keep `## [Unreleased]` as the first section in `CHANGELOG.md`
+- When releasing, move `[Unreleased]` content into a new `## [X.Y.Z] — YYYY-MM-DD` section, then restore an empty `## [Unreleased]` above it

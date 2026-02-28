@@ -6,9 +6,10 @@ import { fetchRateLimitData, RateLimitData } from './apiClient';
 import { readCache, writeCache, isCacheValid, getCacheAge } from './cache';
 import { getAllProjectCosts, ProjectCostData } from './projectCost';
 import { computePrediction, PredictionData } from './prediction';
+import { getHeatmapData as computeHeatmapData, HeatmapData } from '../webview/heatmap';
 import { config } from '../config';
 
-export { PredictionData };
+export { PredictionData, HeatmapData };
 
 export interface ClaudeUsageData {
   // From API / cache
@@ -44,6 +45,10 @@ export class DataManager {
   private lastData: ClaudeUsageData | undefined;
   private lastProjectCosts: ProjectCostData[] = [];
   private lastPrediction: PredictionData | null = null;
+  private lastHeatmapData: HeatmapData | null = null;
+  private heatmapComputedAt = 0;
+  private readonly heatmapTtlMs = 5 * 60 * 1000; // 5-minute in-memory TTL
+  private heatmapPending = false;
 
   private constructor() {}
 
@@ -140,9 +145,11 @@ export class DataManager {
         this.getUsageData(false),
         this.refreshProjectCosts(),
       ]);
-      // Compute prediction before firing so getLastPrediction() is fresh in listeners
       await this.getPrediction().catch(() => {});
       this._onDidUpdate.fire(data);
+
+      // Heatmap is slow — compute in background, then fire a second update
+      this.refreshHeatmapBackground();
     } catch {
       // ignore refresh errors
     }
@@ -155,10 +162,24 @@ export class DataManager {
         this.refreshProjectCosts(),
       ]);
       await this.getPrediction().catch(() => {});
+      // Invalidate heatmap cache to force recompute on next access
+      this.heatmapComputedAt = 0;
       this._onDidUpdate.fire(data);
+
+      this.refreshHeatmapBackground();
     } catch {
       // ignore refresh errors
     }
+  }
+
+  private refreshHeatmapBackground(): void {
+    if (this.heatmapPending) { return; }
+    this.heatmapPending = true;
+    this.getHeatmapData().then(() => {
+      this.heatmapPending = false;
+      const freshData = this.lastData;
+      if (freshData) { this._onDidUpdate.fire(freshData); }
+    }).catch(() => { this.heatmapPending = false; });
   }
 
   startWatching(): void {
@@ -190,6 +211,25 @@ export class DataManager {
 
   getLastPrediction(): PredictionData | null {
     return this.lastPrediction;
+  }
+
+  async getHeatmapData(): Promise<HeatmapData | null> {
+    const now = Date.now();
+    if (this.lastHeatmapData && now - this.heatmapComputedAt < this.heatmapTtlMs) {
+      return this.lastHeatmapData;
+    }
+    try {
+      const data = await computeHeatmapData(config.heatmapDays);
+      this.lastHeatmapData = data;
+      this.heatmapComputedAt = now;
+      return data;
+    } catch {
+      return this.lastHeatmapData; // return stale on error
+    }
+  }
+
+  getLastHeatmapData(): HeatmapData | null {
+    return this.lastHeatmapData;
   }
 
   getLastData(): ClaudeUsageData | undefined {

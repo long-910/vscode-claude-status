@@ -5,6 +5,8 @@
 [![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/long-kudo.vscode-claude-status?style=flat-square&logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=long-kudo.vscode-claude-status)
 [![License: MIT](https://img.shields.io/github/license/long-910/vscode-claude-status?style=flat-square)](LICENSE)
 [![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.109.0-007ACC?style=flat-square)](https://code.visualstudio.com/)
+[![CI](https://github.com/long-910/vscode-claude-status/actions/workflows/ci.yml/badge.svg)](https://github.com/long-910/vscode-claude-status/actions/workflows/ci.yml)
+[![Release](https://github.com/long-910/vscode-claude-status/actions/workflows/release.yml/badge.svg)](https://github.com/long-910/vscode-claude-status/actions/workflows/release.yml)
 
 🌐 [English](README.md) | [日本語](README.ja.md)
 
@@ -210,6 +212,68 @@ Claude Codeは、すべての非英数字文字を `-` に置換してワーク�
 | Output | $15.00 |
 | Cache read | $0.30 |
 | Cache creation | $3.75 |
+
+---
+
+## CI / CD
+
+このリポジトリでは2つの GitHub Actions ワークフローを使用しています。
+
+### CI (`ci.yml`) — Lint・ビルド・テスト
+
+`main` への **push** および **プルリクエスト** ごとに実行されます。
+
+```
+push / pull_request → main
+  └── matrix: ubuntu-latest / macos-latest / windows-latest
+        ├── npm ci
+        ├── npm run lint
+        ├── npm run compile
+        └── npm test  （Linux: ヘッドレス VSCode 用に xvfb-run）
+```
+
+3つのプラットフォームすべてがパスしないと PR はマージできません。
+
+### Release (`release.yml`) — パッケージ化 & 公開
+
+**バージョンタグ**（`v*`）をプッシュすると実行されます（例: `git tag v0.2.0 && git push --tags`）。
+
+```
+push tag v*
+  ├── npm ci
+  ├── npm run lint
+  ├── npm run compile
+  ├── npm test  （xvfb-run）
+  ├── vsce package  →  *.vsix
+  ├── CHANGELOG.md から最新バージョンのリリースノートを抽出
+  ├── GitHub Release を作成  （.vsix を添付、タグに "-" を含む場合はプレリリース）
+  └── VS Marketplace に公開  （VSCE_PAT シークレットが必要）
+```
+
+#### 必要なシークレット
+
+| シークレット | 説明 |
+|-------------|------|
+| `VSCE_PAT` | [VS Marketplace](https://marketplace.visualstudio.com/) 公開用の Personal Access Token |
+
+`GITHUB_TOKEN` は GitHub Actions が自動的に提供するため、設定不要です。
+
+#### リリース手順（ステップバイステップ）
+
+1. すべての変更を `main` にマージし、CI がグリーンであることを確認する。
+2. `CHANGELOG.md` を更新 — `## [X.Y.Z]` セクションにリリースノートを追加する。
+3. `package.json` の `"version"` をそれに合わせて更新する。
+4. コミット: `git commit -m "chore: release vX.Y.Z"`
+5. タグを付けてプッシュ:
+   ```bash
+   git tag vX.Y.Z
+   git push origin main --tags
+   ```
+6. Release ワークフローが自動実行 — 数分以内に GitHub Release が作成され、
+   拡張機能が Marketplace に公開されます。
+
+> **プレリリース**: タグに `-` を含む場合（例: `v0.2.0-beta.1`）は、GitHub と
+> Marketplace の両方で自動的にプレリリース扱いになります。
 
 ---
 

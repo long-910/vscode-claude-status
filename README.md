@@ -404,7 +404,7 @@ vscode-claude-status/
 | Project-level cost tracking | ✅ v0.1.0 |
 | Usage prediction & budget alerts | ✅ v0.2.0 |
 | Session history heatmap | ✅ v0.3.0 |
-| VS Code Marketplace publication | 🔜 v0.3.0 |
+| VS Code Marketplace publication | ✅ v0.3.0 |
 
 ---
 

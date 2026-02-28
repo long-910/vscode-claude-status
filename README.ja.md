@@ -70,7 +70,6 @@ VS Code ステータスバーにピン留めされたリアルタイム使用状
 - **安全性インジケーター** — 30分以上余裕がある場合は「重いタスクを開始しても安全」と表示
 - **日次予算** — 任意のUSD上限を設定可能；設定した閾値（デフォルト80%）に達するとプログレスバーとアラートが表示
 - **VS Code通知** — ≤30分でノンブロッキング警告、≤10分で「ダッシュボードを開く」アクション付きエラーダイアログ；予算アラートはウィンドウにつき1回
-- 通知の重複排除 — 各アラートは5時間ウィンドウにつき最大1回；ウィンドウリセット時に自動クリア
 
 **設定 → Claude Status** またはコマンドパレットから設定可能：
 
@@ -82,10 +81,8 @@ Claude Status: Set Budget...
 
 長期的な使用パターンを一目で把握。
 
-- **日次ヒートマップ** — 直近30/60/90日間のGitHub Contributions スタイルのグリッド；日々の支出を緑の濃淡で表示；セルをホバーすると正確な日付とコストを確認可能
-- **時間帯別バーチャート** — 時間帯ごとの平均コスト（直近30日間）をChart.jsでレンダリング；いつClaudeCodeを最も多く使用しているかを把握
-- ローカルJSONLのみから読み取り（APIコールなし）；`mtime` でウィンドウ外のファイルをスキップしてパフォーマンスを向上；`Promise.all` による並列読み取り
-- ヒートマップは高速な使用量/予測更新の後にバックグラウンドで計算されるため、ステータスバーがブロックされることはない
+- **日次ヒートマップ** — 直近30/60/90日間のGitHub Contributionsスタイルのグリッド；日々の支出を緑の濃淡で表示；セルをホバーすると正確な日付とコストを確認可能
+- **時間帯別バーチャート** — 時間帯ごとの平均コスト（直近30日間）；いつClaude Codeを最も多く使用しているかを把握
 
 表示日数は `claudeStatus.heatmap.days`（30/60/90）で設定可能。
 
@@ -175,205 +172,6 @@ npm run package       # → vscode-claude-status-*.vsix
 
 ---
 
-## 仕組み
-
-### データフロー
-
-```
-Claude CodeがJSONLファイルを更新
-  → FileWatcherが変更を検出
-    → DataManager.refresh()
-      → JsonlReaderがトークンコストを集計   （ローカル、即時）
-      → ApiClientがレート制限ヘッダーを取得 （1回のAPIコール、その後キャッシュ）
-      → StatusBar & Dashboardが更新
-```
-
-Claude Codeがアイドル状態の場合、拡張機能はローカルキャッシュからのみ読み取ります — Claude Codeが再びアクティブになる（JSONLが最近更新された）まで APIコールは行われません。
-
-### JSOLフォーマット（Claude Code v2.1.xで確認済み）
-
-```jsonc
-// ~/.claude/projects/<project-hash>/<session-uuid>.jsonl
-{
-  "type": "assistant",
-  "timestamp": "2026-02-28T10:23:45.123Z",
-  "cwd": "/home/user/my-project",
-  "message": {
-    "usage": {
-      "input_tokens": 1234,
-      "output_tokens": 567,
-      "cache_read_input_tokens": 8900,
-      "cache_creation_input_tokens": 450
-    }
-  }
-}
-```
-
-### プロジェクトパスマッピング
-
-Claude Codeは、すべての非英数字文字を `-` に置換してワークスペースパスをディレクトリ名にエンコードします：
-
-```
-/home/user/sb_git/my-app
-  → ~/.claude/projects/-home-user-sb-git-my-app/
-```
-
-拡張機能はこれをStrategy 1として使用し、エッジケースにはJSONLの `cwd` フィールドをスキャンするStrategy 2にフォールバックします。
-
-### トークンコスト計算式
-
-コストは **Claude Sonnet 4.x** 料金を使用して計算されます（[claude-tmux-status](https://github.com/long-910/claude-tmux-status) と同じ）：
-
-| トークン種別 | $/1Mトークン |
-|------------|------------|
-| Input | $3.00 |
-| Output | $15.00 |
-| Cache read | $0.30 |
-| Cache creation | $3.75 |
-
----
-
-## CI / CD
-
-このリポジトリでは2つの GitHub Actions ワークフローを使用しています。
-
-### CI (`ci.yml`) — Lint・ビルド・テスト
-
-`main` への **push** および **プルリクエスト** ごとに実行されます。
-
-```
-push / pull_request → main
-  └── matrix: ubuntu-latest / macos-latest / windows-latest
-        ├── npm ci
-        ├── npm run lint
-        ├── npm run compile
-        └── npm test  （Linux: ヘッドレス VSCode 用に xvfb-run）
-```
-
-3つのプラットフォームすべてがパスしないと PR はマージできません。
-
-### Release (`release.yml`) — パッケージ化 & 公開
-
-**バージョンタグ**（`v*`）をプッシュすると実行されます（例: `git tag v0.3.0 && git push --tags`）。
-
-```
-push tag v*
-  ├── npm ci
-  ├── npm run lint
-  ├── npm run compile
-  ├── npm test  （xvfb-run）
-  ├── vsce package  →  *.vsix
-  ├── CHANGELOG.md から最新バージョンのリリースノートを抽出
-  ├── GitHub Release を作成  （.vsix を添付、タグに "-" を含む場合はプレリリース）
-  └── VS Marketplace に公開  （VSCE_PAT シークレットが必要）
-```
-
-#### 必要なシークレット
-
-| シークレット | 説明 |
-|-------------|------|
-| `VSCE_PAT` | [VS Marketplace](https://marketplace.visualstudio.com/) 公開用の Personal Access Token |
-
-`GITHUB_TOKEN` は GitHub Actions が自動的に提供するため、設定不要です。
-
-#### リリース手順（ステップバイステップ）
-
-1. すべての変更を `main` にマージし、CI がグリーンであることを確認する。
-2. `CHANGELOG.md` を更新 — `## [X.Y.Z]` セクションにリリースノートを追加する。
-3. `package.json` の `"version"` をそれに合わせて更新する。
-4. コミット: `git commit -m "chore: release vX.Y.Z"`
-5. タグを付けてプッシュ:
-   ```bash
-   git tag vX.Y.Z
-   git push origin main --tags
-   ```
-6. Release ワークフローが自動実行 — 数分以内に GitHub Release が作成され、
-   拡張機能が Marketplace に公開されます。
-
-> **プレリリース**: タグに `-` を含む場合（例: `v0.3.0-beta.1`）は、GitHub と
-> Marketplace の両方で自動的にプレリリース扱いになります。
-
----
-
-## 開発
-
-### セットアップ
-
-```bash
-git clone https://github.com/long-910/vscode-claude-status.git
-cd vscode-claude-status
-npm install
-```
-
-### コマンド
-
-```bash
-npm run compile        # webpackバンドル（開発用）
-npm run watch          # ウォッチモード
-npm run compile-tests  # テストファイルをout/にコンパイル
-npm run lint           # ESLint
-npm test               # フルテストスイート
-npm run package        # 本番用.vsix
-```
-
-VS Codeで **F5** を押してExtension Development Hostを起動。
-
-### プロジェクト構成
-
-```
-vscode-claude-status/
-├── src/
-│   ├── extension.ts          # activate / deactivate
-│   ├── config.ts             # 型付き設定ラッパー
-│   ├── statusBar.ts          # ステータスバーアイテム + ラベル/ツールチップビルダー
-│   ├── data/
-│   │   ├── jsonlReader.ts    # JSONLパーサー + トークンコスト集計
-│   │   ├── apiClient.ts      # Anthropic APIレート制限ヘッダー取得
-│   │   ├── cache.ts          # ディスクバックキャッシュ（~/.claude/…cache.json）
-│   │   ├── dataManager.ts    # 中央データオーケストレーター（シングルトン）
-│   │   ├── projectCost.ts    # ワークスペース → JSOLマッピング + プロジェクト別コスト
-│   │   └── prediction.ts     # 消費率、枯渇までの時間、予算予測
-│   ├── webview/
-│   │   ├── panel.ts          # WebViewダッシュボードパネル（HTML組み込み）
-│   │   └── heatmap.ts        # ヒートマップデータ集計（日次 + 時間帯別）
-│   └── test/suite/
-│       ├── jsonlReader.test.ts
-│       ├── projectCost.test.ts
-│       ├── prediction.test.ts
-│       ├── heatmap.test.ts
-│       ├── cache.test.ts
-│       └── statusBar.test.ts
-├── docs/                     # 詳細な機能・アーキテクチャ仕様
-├── CLAUDE.md                 # AIアシスタント実装ガイダンス
-├── CHANGELOG.md
-└── package.json
-```
-
-### アーキテクチャ
-
-```
-┌──────────────────────────────────────────────────────┐
-│                 VS Code Extension Host               │
-│                                                      │
-│  StatusBar   DashboardPanel   FileWatcher(JSONL)     │
-│      └────────────┴──────────────────┘               │
-│                   │                                  │
-│           ┌───────▼───────┐                          │
-│           │  DataManager  │  （シングルトン）           │
-│           └───────┬───────┘                          │
-│                   │                                  │
-│      ┌────────────┼────────────┐                     │
-│      │            │            │                     │
-│ JsonlReader   ApiClient     Cache                    │
-│ ProjectCost  (rate headers) (disk)                   │
-└──────────────────────────────────────────────────────┘
-          │
-  ~/.claude/projects/
-    <hash>/<session>.jsonl
-```
-
----
-
 ## ロードマップ
 
 | 機能 | 状態 |
@@ -397,13 +195,7 @@ vscode-claude-status/
 
 ## コントリビュート
 
-コントリビューションを歓迎します。
-作業を始める前に、コーディング規約と実装順序について [CLAUDE.md](CLAUDE.md) をお読みください。
-
-1. リポジトリをフォーク
-2. ブランチを作成: `git checkout -b feat/my-feature`
-3. `npm run lint && npm run compile-tests` を実行 — コミット前にクリーンである必要があります
-4. プルリクエストを提出
+コントリビューションを歓迎します。セットアップ手順・アーキテクチャ・リリース手順については [DEVELOPMENT.md](DEVELOPMENT.md) をご覧ください。
 
 ---
 

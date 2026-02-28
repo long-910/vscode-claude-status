@@ -19,7 +19,7 @@
 
 It reads session data from `~/.claude/projects/` locally (no extra network calls)
 and queries the Anthropic API at most once per 5 minutes to fetch rate-limit
-utilization headers.  All token costs are calculated client-side using current
+utilization headers. All token costs are calculated client-side using current
 Claude Sonnet 4.x pricing.
 
 ---
@@ -81,8 +81,6 @@ the 5 h rate limit is exhausted and warns you before it happens.
   the configured threshold (default 80 %) is reached
 - **VS Code notifications** — non-blocking warning at ≤ 30 min, error dialog
   at ≤ 10 min (with "Open Dashboard" action); budget alert fires once per window
-- Notification deduplication — each alert fires at most once per 5 h window;
-  keys are cleared automatically when the window resets
 
 Configure via **Settings → Claude Status** or the command palette:
 
@@ -96,12 +94,8 @@ Understand your long-term usage patterns at a glance.
 
 - **Daily heatmap** — GitHub Contributions-style grid for the last 30 / 60 / 90 days;
   green intensity reflects daily spend; hover any cell for exact date and cost
-- **Hourly bar chart** — average cost per hour of day (last 30 days), rendered
-  with Chart.js; shows when you typically use Claude Code most heavily
-- All data read from local JSONL only (no API call); files older than the window
-  are skipped by `mtime` for performance; parallel reads via `Promise.all`
-- Heatmap computes in the background after the fast usage/prediction update
-  so the status bar is never blocked
+- **Hourly bar chart** — average cost per hour of day (last 30 days); shows when
+  you typically use Claude Code most heavily
 
 Number of days is configurable via `claudeStatus.heatmap.days` (30 / 60 / 90).
 
@@ -118,7 +112,7 @@ Number of days is configurable via `claudeStatus.heatmap.days` (30 / 60 / 90).
 
 ## Installation
 
-### VS Code Marketplace *(coming soon)*
+### VS Code Marketplace
 
 Search **"Claude Status"** in the Extensions panel, or:
 
@@ -191,209 +185,6 @@ All settings are under the `claudeStatus` namespace in VS Code Settings.
 
 ---
 
-## How It Works
-
-### Data Flow
-
-```
-JSONL file updated by Claude Code
-  → FileWatcher detects change
-    → DataManager.refresh()
-      → JsonlReader aggregates token costs   (local, instant)
-      → ApiClient fetches rate-limit headers (1 API call, then cached)
-      → StatusBar & Dashboard update
-```
-
-When Claude Code is idle the extension reads only from the local cache — no API
-calls are made until Claude Code becomes active again (JSONL modified recently).
-
-### JSONL Format (verified against Claude Code v2.1.x)
-
-```jsonc
-// ~/.claude/projects/<project-hash>/<session-uuid>.jsonl
-{
-  "type": "assistant",
-  "timestamp": "2026-02-28T10:23:45.123Z",
-  "cwd": "/home/user/my-project",
-  "message": {
-    "usage": {
-      "input_tokens": 1234,
-      "output_tokens": 567,
-      "cache_read_input_tokens": 8900,
-      "cache_creation_input_tokens": 450
-    }
-  }
-}
-```
-
-### Project Path Mapping
-
-Claude Code encodes the workspace path into a directory name by replacing every
-non-alphanumeric character with `-`:
-
-```
-/home/user/sb_git/my-app
-  → ~/.claude/projects/-home-user-sb-git-my-app/
-```
-
-The extension uses this as Strategy 1, falling back to scanning JSONL `cwd`
-fields for edge cases (Strategy 2).
-
-### Token Cost Formula
-
-Costs are calculated using **Claude Sonnet 4.x** pricing (same as
-[claude-tmux-status](https://github.com/long-910/claude-tmux-status)):
-
-| Token type | $/1 M tokens |
-|------------|-------------|
-| Input | $3.00 |
-| Output | $15.00 |
-| Cache read | $0.30 |
-| Cache creation | $3.75 |
-
----
-
-## CI / CD
-
-This repository uses two GitHub Actions workflows.
-
-### CI (`ci.yml`) — Lint, Build & Test
-
-Triggered on every **push** and **pull request** to `main`.
-
-```
-push / pull_request → main
-  └── matrix: ubuntu-latest / macos-latest / windows-latest
-        ├── npm ci
-        ├── npm run lint
-        ├── npm run compile
-        └── npm test  (Linux: xvfb-run for headless VSCode)
-```
-
-All three platforms must pass before a PR can be merged.
-
-### Release (`release.yml`) — Package & Publish
-
-Triggered when a **version tag** (`v*`) is pushed (e.g. `git tag v0.2.0 && git push --tags`).
-
-```
-push tag v*
-  ├── npm ci
-  ├── npm run lint
-  ├── npm run compile
-  ├── npm test  (xvfb-run)
-  ├── vsce package  →  *.vsix
-  ├── Extract release notes from CHANGELOG.md
-  ├── Create GitHub Release  (attaches .vsix, marks pre-release if tag contains "-")
-  └── Publish to VS Marketplace  (requires VSCE_PAT secret)
-```
-
-#### Required Secrets
-
-| Secret | Description |
-|--------|-------------|
-| `VSCE_PAT` | Personal Access Token for [VS Marketplace](https://marketplace.visualstudio.com/) publishing |
-
-`GITHUB_TOKEN` is provided automatically by GitHub Actions and needs no configuration.
-
-#### Release Flow (step by step)
-
-1. Merge all changes to `main` and make sure CI is green.
-2. Update `CHANGELOG.md` — add a `## [X.Y.Z]` section with release notes.
-3. Bump `"version"` in `package.json` to match.
-4. Commit: `git commit -m "chore: release vX.Y.Z"`
-5. Tag and push:
-   ```bash
-   git tag vX.Y.Z
-   git push origin main --tags
-   ```
-6. The Release workflow runs automatically — GitHub Release is created and the
-   extension is published to the Marketplace within a few minutes.
-
-> **Pre-release**: Tags containing `-` (e.g. `v0.2.0-beta.1`) are automatically
-> marked as pre-release on GitHub and published with `--pre-release` to the Marketplace.
-
----
-
-## Development
-
-### Setup
-
-```bash
-git clone https://github.com/long-910/vscode-claude-status.git
-cd vscode-claude-status
-npm install
-```
-
-### Commands
-
-```bash
-npm run compile        # webpack bundle (development)
-npm run watch          # watch mode
-npm run compile-tests  # compile test files to out/
-npm run lint           # ESLint
-npm test               # full test suite
-npm run package        # production .vsix
-```
-
-Press **F5** in VS Code to launch the Extension Development Host.
-
-### Project Structure
-
-```
-vscode-claude-status/
-├── src/
-│   ├── extension.ts          # activate / deactivate
-│   ├── config.ts             # typed settings wrapper
-│   ├── statusBar.ts          # status bar item + label / tooltip builders
-│   ├── data/
-│   │   ├── jsonlReader.ts    # JSONL parser + token cost aggregator
-│   │   ├── apiClient.ts      # Anthropic API rate-limit header fetcher
-│   │   ├── cache.ts          # disk-backed cache (~/.claude/…cache.json)
-│   │   ├── dataManager.ts    # central data orchestrator (singleton)
-│   │   ├── projectCost.ts    # workspace → JSONL mapping + per-project costs
-│   │   └── prediction.ts     # burn rate, time-to-exhaustion, budget prediction
-│   ├── webview/
-│   │   ├── panel.ts          # WebView dashboard panel (HTML embedded)
-│   │   └── heatmap.ts        # heatmap data aggregation (daily + hourly)
-│   └── test/suite/
-│       ├── jsonlReader.test.ts
-│       ├── projectCost.test.ts
-│       ├── prediction.test.ts
-│       ├── heatmap.test.ts
-│       ├── cache.test.ts
-│       └── statusBar.test.ts
-├── docs/                     # detailed feature & architecture specs
-├── CLAUDE.md                 # AI assistant implementation guidance
-├── CHANGELOG.md
-└── package.json
-```
-
-### Architecture
-
-```
-┌──────────────────────────────────────────────────────┐
-│                 VS Code Extension Host               │
-│                                                      │
-│  StatusBar   DashboardPanel   FileWatcher(JSONL)     │
-│      └────────────┴──────────────────┘               │
-│                   │                                  │
-│           ┌───────▼───────┐                          │
-│           │  DataManager  │  (singleton)              │
-│           └───────┬───────┘                          │
-│                   │                                  │
-│      ┌────────────┼────────────┐                     │
-│      │            │            │                     │
-│ JsonlReader   ApiClient     Cache                    │
-│ ProjectCost  (rate headers) (disk)                   │
-└──────────────────────────────────────────────────────┘
-          │
-  ~/.claude/projects/
-    <hash>/<session>.jsonl
-```
-
----
-
 ## Roadmap
 
 | Feature | Status |
@@ -417,13 +208,8 @@ vscode-claude-status/
 
 ## Contributing
 
-Contributions are welcome.
-Please read [CLAUDE.md](CLAUDE.md) for coding conventions and implementation order before starting work.
-
-1. Fork the repository
-2. Create a branch: `git checkout -b feat/my-feature`
-3. Run `npm run lint && npm run compile-tests` — must be clean before committing
-4. Submit a pull request
+Contributions are welcome. See [DEVELOPMENT.md](DEVELOPMENT.md) for setup instructions,
+architecture overview, and release procedures.
 
 ---
 

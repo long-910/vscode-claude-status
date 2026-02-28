@@ -137,3 +137,8 @@ chore: update dependencies
 docs: update ARCHITECTURE.md
 test: add prediction engine tests
 ```
+
+## Changelog Convention
+
+- **ALWAYS** keep `## [Unreleased]` as the first section in `CHANGELOG.md`
+- When releasing, move `[Unreleased]` content into a new `## [X.Y.Z] — YYYY-MM-DD` section, then restore an empty `## [Unreleased]` above it

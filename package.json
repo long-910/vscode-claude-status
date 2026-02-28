@@ -2,7 +2,7 @@
   "name": "vscode-claude-status",
   "displayName": "Claude Status",
   "description": "Claude Code token usage & cost in VSCode status bar",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "long-kudo",
   "engines": {
     "vscode": "^1.109.0"

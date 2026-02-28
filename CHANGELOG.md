@@ -7,7 +7,7 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [0.3.0] — 2026-02-28
 
 ### Added
 
@@ -97,11 +97,6 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **`src/test/suite/prediction.test.ts`** (new) — Unit tests for pure functions:
   `calculateBurnRate` (zero-entry edge case, positive rate) and
   `buildRecommendation` (all four severity levels).
-
-### Planned — v0.3.0
-- Session history heatmap (GitHub Contributions-style, 30/60/90 days)
-- Hourly usage pattern bar chart
-- VS Code Marketplace publication
 
 ---
 
@@ -206,6 +201,6 @@ and project-level cost tracking.
 
 ---
 
-[Unreleased]: https://github.com/long-910/vscode-claude-status/compare/v0.2.0...HEAD
+[0.3.0]: https://github.com/long-910/vscode-claude-status/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/long-910/vscode-claude-status/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/long-910/vscode-claude-status/releases/tag/v0.1.0

@@ -5,6 +5,8 @@
 [![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/long-kudo.vscode-claude-status?style=flat-square&logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=long-kudo.vscode-claude-status)
 [![License: MIT](https://img.shields.io/github/license/long-910/vscode-claude-status?style=flat-square)](LICENSE)
 [![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.109.0-007ACC?style=flat-square)](https://code.visualstudio.com/)
+[![CI](https://github.com/long-910/vscode-claude-status/actions/workflows/ci.yml/badge.svg)](https://github.com/long-910/vscode-claude-status/actions/workflows/ci.yml)
+[![Release](https://github.com/long-910/vscode-claude-status/actions/workflows/release.yml/badge.svg)](https://github.com/long-910/vscode-claude-status/actions/workflows/release.yml)
 
 🌐 [English](README.md) | [日本語](README.ja.md)
 
@@ -221,6 +223,68 @@ Costs are calculated using **Claude Sonnet 4.x** pricing (same as
 | Output | $15.00 |
 | Cache read | $0.30 |
 | Cache creation | $3.75 |
+
+---
+
+## CI / CD
+
+This repository uses two GitHub Actions workflows.
+
+### CI (`ci.yml`) — Lint, Build & Test
+
+Triggered on every **push** and **pull request** to `main`.
+
+```
+push / pull_request → main
+  └── matrix: ubuntu-latest / macos-latest / windows-latest
+        ├── npm ci
+        ├── npm run lint
+        ├── npm run compile
+        └── npm test  (Linux: xvfb-run for headless VSCode)
+```
+
+All three platforms must pass before a PR can be merged.
+
+### Release (`release.yml`) — Package & Publish
+
+Triggered when a **version tag** (`v*`) is pushed (e.g. `git tag v0.2.0 && git push --tags`).
+
+```
+push tag v*
+  ├── npm ci
+  ├── npm run lint
+  ├── npm run compile
+  ├── npm test  (xvfb-run)
+  ├── vsce package  →  *.vsix
+  ├── Extract release notes from CHANGELOG.md
+  ├── Create GitHub Release  (attaches .vsix, marks pre-release if tag contains "-")
+  └── Publish to VS Marketplace  (requires VSCE_PAT secret)
+```
+
+#### Required Secrets
+
+| Secret | Description |
+|--------|-------------|
+| `VSCE_PAT` | Personal Access Token for [VS Marketplace](https://marketplace.visualstudio.com/) publishing |
+
+`GITHUB_TOKEN` is provided automatically by GitHub Actions and needs no configuration.
+
+#### Release Flow (step by step)
+
+1. Merge all changes to `main` and make sure CI is green.
+2. Update `CHANGELOG.md` — add a `## [X.Y.Z]` section with release notes.
+3. Bump `"version"` in `package.json` to match.
+4. Commit: `git commit -m "chore: release vX.Y.Z"`
+5. Tag and push:
+   ```bash
+   git tag vX.Y.Z
+   git push origin main --tags
+   ```
+6. The Release workflow runs automatically — GitHub Release is created and the
+   extension is published to the Marketplace within a few minutes.
+
+> **Pre-release**: Tags containing `-` (e.g. `v0.2.0-beta.1`) are automatically
+> marked as pre-release on GitHub and published with `--pre-release` to the Marketplace.
 
 ---
 

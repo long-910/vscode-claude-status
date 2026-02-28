@@ -9,9 +9,57 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Planned — v0.2.0
-- Usage prediction: burn rate ($/hr) and time-to-exhaustion estimate
-- Daily / weekly budget with configurable alert threshold
+---
+
+## [0.2.0] — 2026-02-28
+
+### Added
+
+#### Usage Prediction & Budget Alerts — Feature 04
+
+- **`src/data/prediction.ts`** (new) — Prediction engine with three exported
+  pure functions (`calculateBurnRate`, `buildRecommendation`) and a main async
+  entry point (`computePrediction`):
+  - Reads the last 30-minute JSONL window to compute a burn rate in USD/hour.
+  - Estimates time until the 5 h rate-limit window is exhausted:
+    derives total capacity from `cost5h / utilization5h`, then divides
+    remaining capacity by current burn rate; result is capped at `resetIn5h`
+    so the prediction is never beyond the next window reset.
+  - Returns `safeToStartHeavyTask: true` when > 30 minutes remain.
+  - Optional daily budget: computes `budgetRemaining` and `budgetExhaustionTime`
+    from `costToday` and burn rate.
+- **`src/data/dataManager.ts`** — Added `getPrediction()` (computes fresh,
+  caches result) and `getLastPrediction()` (returns cached value synchronously).
+  `refresh()` / `forceRefresh()` now call `getPrediction()` before firing
+  `onDidUpdate`, so notification listeners always see an up-to-date prediction.
+- **`src/config.ts`** — Added `setDailyBudget(value: number | null)` method.
+- **`src/webview/panel.ts`** — Replaced placeholder `PredictionData` type with
+  the real import from `dataManager`.  `sendUpdate()` is now `async` and calls
+  `getPrediction()` on each update.  The Prediction card in the dashboard now
+  shows:
+  - Burn rate row (`$X.XX/hr`)
+  - Rate-limit exhaustion alert (info / warning / error styling by severity)
+  - Daily budget progress bar + exhaustion time (when budget is set)
+  - Collapsible budget input form ("⚙ Set daily budget" / "⚙ Configure budget")
+  - Recommendation text
+  The `setBudget` message handler now calls `config.setDailyBudget()` and
+  triggers `forceRefresh()` instead of a no-op placeholder.
+- **`src/extension.ts`** — Notification system:
+  - `notifiedKeys` `Set<string>` deduplicates alerts within a session window.
+  - `checkWindowReset()` clears keys when `resetIn5h` jumps by > 1 h (window
+    reset detected).
+  - `checkAndNotify()` fires `showWarningMessage` at ≤ threshold minutes,
+    `showErrorMessage` with "Open Dashboard" action at ≤ 10 min; marks key
+    **before** `await` to prevent duplicate dialogs.
+  - Budget warning fires once when `budgetRemaining / dailyBudget` falls below
+    `(100 − alertThresholdPercent) %`.
+  - `vscode-claude-status.setBudget` command now opens an `InputBox` with
+    validation; empty input disables the budget, a number saves it.
+- **`src/test/suite/prediction.test.ts`** (new) — Unit tests for pure functions:
+  `calculateBurnRate` (zero-entry edge case, positive rate) and
+  `buildRecommendation` (all four severity levels).
+
+### Planned — v0.3.0
 - Session history heatmap (GitHub Contributions-style, 30/60/90 days)
 - Hourly usage pattern bar chart
 - VS Code Marketplace publication
@@ -81,7 +129,7 @@ and project-level cost tracking.
   - `vscode-claude-status.openDashboard` — open / reveal dashboard panel.
   - `vscode-claude-status.refresh` — force immediate API + JSONL refresh.
   - `vscode-claude-status.toggleDisplayMode` — toggle `%` ↔ `$` mode.
-  - `vscode-claude-status.setBudget` — (placeholder, v0.2.0).
+  - `vscode-claude-status.setBudget` — set or disable daily budget via InputBox.
 - Keyboard shortcut: `Ctrl+Shift+Alt+C` (`⌘⇧⌥C` on macOS) for toggle.
 - 60-second render timer for stale-age display even when JSONL is unchanged.
 - Workspace folder change listener re-fetches project costs automatically.
@@ -119,5 +167,6 @@ and project-level cost tracking.
 
 ---
 
-[Unreleased]: https://github.com/long-910/vscode-claude-status/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/long-910/vscode-claude-status/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/long-910/vscode-claude-status/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/long-910/vscode-claude-status/releases/tag/v0.1.0

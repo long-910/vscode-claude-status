@@ -1,16 +1,15 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
-import { DataManager, ClaudeUsageData, ProjectCostData } from '../data/dataManager';
+import { DataManager, ClaudeUsageData, ProjectCostData, PredictionData } from '../data/dataManager';
 import { config } from '../config';
 
-// Placeholder types for features 04–05 (will be replaced with real types)
-type PredictionData = Record<string, unknown> | null;
+// Placeholder type for feature 05
 type HeatmapData = Record<string, unknown> | null;
 
 interface DashboardMessage {
   usage: ClaudeUsageData;
   projectCosts: ProjectCostData[];
-  prediction: PredictionData;
+  prediction: PredictionData | null;
   heatmap: HeatmapData;
 }
 
@@ -125,6 +124,50 @@ function getWebviewContent(nonce: string): string {
     .cost-label { color: var(--vscode-descriptionForeground); }
 
     .prediction-row { padding: 3px 0; font-size: 0.95em; }
+
+    .alert {
+      padding: 6px 8px;
+      border-radius: 3px;
+      margin: 6px 0;
+      font-size: 0.9em;
+    }
+    .alert.warning {
+      background: var(--vscode-inputValidation-warningBackground);
+      border: 1px solid var(--vscode-inputValidation-warningBorder);
+    }
+    .alert.error {
+      background: var(--vscode-inputValidation-errorBackground);
+      border: 1px solid var(--vscode-inputValidation-errorBorder);
+    }
+
+    .budget-configure {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      font-size: 0.9em;
+    }
+    .budget-configure input {
+      background: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+      border: 1px solid var(--vscode-input-border);
+      padding: 3px 6px;
+      border-radius: 2px;
+      width: 80px;
+      font-size: 0.9em;
+    }
+    .budget-configure label { color: var(--vscode-descriptionForeground); }
+    .configure-link {
+      background: none;
+      border: none;
+      color: var(--vscode-textLink-foreground);
+      cursor: pointer;
+      padding: 0;
+      font-size: 0.85em;
+      text-decoration: underline;
+    }
+    .configure-link:hover { opacity: 0.8; }
 
     .placeholder {
       color: var(--vscode-descriptionForeground);
@@ -333,18 +376,113 @@ function getWebviewContent(nonce: string): string {
       el.innerHTML = html;
     }
 
-    function updatePrediction(prediction) {
+    let budgetConfigOpen = false;
+
+    function fmtTime(isoStr) {
+      if (!isoStr) { return '—'; }
+      const d = new Date(isoStr);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function updatePrediction(prediction, usage) {
       const el = document.getElementById('prediction-content');
       if (!prediction) {
         el.innerHTML = '<div class="placeholder">No prediction data</div>';
         return;
       }
-      let html = '<div class="prediction-row">Burn rate: $' + prediction.currentBurnRate.toFixed(2) + '/hr</div>';
-      if (prediction.estimatedExhaustionIn !== null) {
-        html += '<div class="prediction-row">⚠ At this rate, 5h limit in ~' + fmt(prediction.estimatedExhaustionIn) + '</div>';
+
+      let html = '';
+
+      // Burn rate
+      if (prediction.currentBurnRate > 0) {
+        html += '<div class="cost-row"><span class="cost-label">Burn rate</span>' +
+          '<span>$' + prediction.currentBurnRate.toFixed(2) + '/hr</span></div>';
+      } else {
+        html += '<div class="cost-row"><span class="cost-label">Burn rate</span>' +
+          '<span class="placeholder">Calculating…</span></div>';
       }
-      html += '<div class="prediction-row">💡 ' + esc(prediction.recommendation) + '</div>';
+
+      // Rate limit exhaustion alert
+      if (prediction.estimatedExhaustionIn !== null) {
+        const atTime = fmtTime(prediction.estimatedExhaustionTime);
+        if (prediction.estimatedExhaustionIn < 600) {
+          html += '<div class="alert error">⛔ 5h limit in ~' +
+            fmt(prediction.estimatedExhaustionIn) + ' (at ' + atTime + ')</div>';
+        } else if (prediction.estimatedExhaustionIn < 1800) {
+          html += '<div class="alert warning">⚠️ 5h limit in ~' +
+            fmt(prediction.estimatedExhaustionIn) + ' (at ' + atTime + ')</div>';
+        } else {
+          html += '<div class="prediction-row">5h limit in ~' +
+            fmt(prediction.estimatedExhaustionIn) + ' (at ' + atTime + ')</div>';
+        }
+      }
+
+      // Daily budget section
+      if (prediction.budgetRemaining !== null && usage) {
+        const spent = usage.costDay;
+        const total = spent + prediction.budgetRemaining;
+        const usedPct = total > 0 ? Math.min(100, (spent / total) * 100) : 0;
+        const fillClass = usedPct >= 80 ? ' error' : usedPct >= 60 ? ' warning' : '';
+
+        html += '<div class="progress-row" style="margin-top:8px">' +
+          '<div class="progress-labels">' +
+          '<span>Daily budget</span>' +
+          '<span>$' + spent.toFixed(2) + ' / $' + total.toFixed(2) +
+          ' (' + Math.round(usedPct) + '%)</span>' +
+          '</div>' +
+          '<div class="progress-track"><div class="progress-fill' + fillClass + '" style="width:' +
+          usedPct.toFixed(1) + '%"></div></div>' +
+          '</div>';
+
+        if (prediction.budgetExhaustionTime) {
+          const atBudget = fmtTime(prediction.budgetExhaustionTime);
+          if (prediction.budgetRemaining === 0) {
+            html += '<div class="alert error">💸 Daily budget exhausted</div>';
+          } else if (usedPct >= 80) {
+            html += '<div class="alert warning">💸 Budget exhausted ~' +
+              atBudget + ' at this rate</div>';
+          }
+        }
+
+        html += '<button class="configure-link" onclick="toggleBudgetConfig()">⚙ Configure budget</button>';
+      } else {
+        html += '<button class="configure-link" onclick="toggleBudgetConfig()">⚙ Set daily budget</button>';
+      }
+
+      // Recommendation
+      html += '<div class="prediction-row" style="margin-top:8px">💡 ' +
+        esc(prediction.recommendation) + '</div>';
+
+      // Budget input form (toggled)
+      html += '<div class="budget-configure" id="budget-form" style="display:' +
+        (budgetConfigOpen ? 'flex' : 'none') + '">' +
+        '<label>Daily budget ($):</label>' +
+        '<input type="number" id="budget-input" min="0" step="5" placeholder="e.g. 20">' +
+        '<button onclick="saveBudget()">Save</button>' +
+        '<button onclick="clearBudget()">Disable</button>' +
+        '</div>';
+
       el.innerHTML = html;
+    }
+
+    function toggleBudgetConfig() {
+      budgetConfigOpen = !budgetConfigOpen;
+      const form = document.getElementById('budget-form');
+      if (form) { form.style.display = budgetConfigOpen ? 'flex' : 'none'; }
+    }
+
+    function saveBudget() {
+      const input = document.getElementById('budget-input');
+      const val = parseFloat(input ? input.value : '');
+      if (!isNaN(val) && val >= 0) {
+        vscode.postMessage({ type: 'setBudget', amount: val });
+        budgetConfigOpen = false;
+      }
+    }
+
+    function clearBudget() {
+      vscode.postMessage({ type: 'setBudget', amount: null });
+      budgetConfigOpen = false;
     }
 
     // Minimal HTML escape to prevent XSS from data strings
@@ -363,7 +501,7 @@ function getWebviewContent(nonce: string): string {
         lastData = msg.data;
         updateUsage(msg.data.usage, currentMode);
         updateProjectCosts(msg.data.projectCosts);
-        updatePrediction(msg.data.prediction);
+        updatePrediction(msg.data.prediction, msg.data.usage);
         // Heatmap rendering: Feature 05
       } else if (msg.type === 'setDisplayMode') {
         currentMode = msg.mode;
@@ -408,7 +546,7 @@ export class DashboardPanel {
 
     // Push data updates to the WebView
     this.disposables.push(
-      dataManager.onDidUpdate(data => this.sendUpdate(data))
+      dataManager.onDidUpdate(data => { this.sendUpdate(data).catch(() => {}); })
     );
 
     // Clean up when panel is closed
@@ -427,12 +565,13 @@ export class DashboardPanel {
     DashboardPanel.instance?.dispose();
   }
 
-  private handleMessage(msg: { type: string; amount?: number }): void {
+  private handleMessage(msg: { type: string; amount?: number | null }): void {
     switch (msg.type) {
       case 'ready':
         // Send current data immediately when WebView signals it's ready
         this.dataManager.getUsageData().then(data => this.sendUpdate(data)).catch(() => {});
         break;
+
       case 'refresh':
         this.dataManager.forceRefresh().catch(() => {});
         break;
@@ -443,21 +582,26 @@ export class DashboardPanel {
         }).catch(() => {});
         break;
       }
-      case 'setBudget':
-        if (typeof msg.amount === 'number') {
-          config.setDisplayMode('cost').catch(() => {}); // placeholder until Feature 04
+      case 'setBudget': {
+        const amount = msg.amount;
+        if (amount === null || typeof amount === 'number') {
+          config.setDailyBudget(typeof amount === 'number' ? amount : null)
+            .then(() => this.dataManager.forceRefresh())
+            .catch(() => {});
         }
         break;
+      }
     }
   }
 
-  private sendUpdate(usage: ClaudeUsageData): void {
+  private async sendUpdate(usage: ClaudeUsageData): Promise<void> {
+    const prediction = await this.dataManager.getPrediction();
     const message: { type: string; data: DashboardMessage } = {
       type: 'update',
       data: {
         usage,
         projectCosts: this.dataManager.getLastProjectCosts(),
-        prediction: null,    // Feature 04
+        prediction,
         heatmap: null,       // Feature 05
       },
     };

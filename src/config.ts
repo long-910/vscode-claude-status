@@ -60,6 +60,10 @@ export class ExtensionConfig {
   async setDisplayMode(mode: 'percent' | 'cost'): Promise<void> {
     await this.cfg.update('displayMode', mode, vscode.ConfigurationTarget.Global);
   }
+
+  async setDailyBudget(value: number | null): Promise<void> {
+    await this.cfg.update('budget.dailyUsd', value, vscode.ConfigurationTarget.Global);
+  }
 }
 
 export const config = new ExtensionConfig();

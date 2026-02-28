@@ -61,8 +61,7 @@ jobs:
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           # v0.1.0-beta.1 のように - を含むタグは prerelease 扱い
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }} 
 
       - name: Publish to VS Marketplace
         uses: HaaLeo/publish-vscode-extension@v2

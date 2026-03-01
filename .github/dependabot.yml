@@ -31,13 +31,27 @@ updates:
       - "long-910"
 
     groups:
+      # minor/patch は1つのPRにまとめる
       minor-and-patch:
         update-types:
           - "minor"
           - "patch"
+      # major も1つのPRにまとめる（ignore 対象外のもの）
+      major:
+        update-types:
+          - "major"
 
     ignore:
+      # VSCode API — extension の engines.vscode に合わせて手動管理
       - dependency-name: "@types/vscode"
+        update-types: ["version-update:semver-major"]
+      # Node.js 型定義 — VSCode 内蔵 Node バージョンに合わせて手動管理
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # ESLint major — 破壊的変更を含むため手動でマイグレーション
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@typescript-eslint/*"
         update-types: ["version-update:semver-major"]
 
   # ================================
@@ -68,7 +82,11 @@ updates:
       - "long-910"
 
     groups:
+      # minor/patch と major をそれぞれ1つのPRにまとめる
       actions-minor-and-patch:
         update-types:
           - "minor"
           - "patch"
+      actions-major:
+        update-types:
+          - "major"

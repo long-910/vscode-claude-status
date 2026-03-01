@@ -7,6 +7,7 @@
 [![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.109.0-007ACC?style=flat-square)](https://code.visualstudio.com/)
 [![CI](https://github.com/long-910/vscode-claude-status/actions/workflows/ci.yml/badge.svg)](https://github.com/long-910/vscode-claude-status/actions/workflows/ci.yml)
 [![Release](https://github.com/long-910/vscode-claude-status/actions/workflows/release.yml/badge.svg)](https://github.com/long-910/vscode-claude-status/actions/workflows/release.yml)
+[![Sponsor](https://img.shields.io/badge/Sponsor-GitHub-pink?logo=github)](https://github.com/sponsors/long-910)
 
 🌐 [English](README.md) | [日本語](README.ja.md)
 
@@ -195,7 +196,7 @@ npm run package       # → vscode-claude-status-*.vsix
 
 ## コントリビュート
 
-コントリビューションを歓迎します。セットアップ手順・アーキテクチャ・リリース手順については [DEVELOPMENT.md](DEVELOPMENT.md) をご覧ください。
+コントリビューションを歓迎します。セットアップ手順・アーキテクチャ・リリース手順については [CONTRIBUTING.md](CONTRIBUTING.md) をご覧ください。
 
 ---
 

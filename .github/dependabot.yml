@@ -1,0 +1,74 @@
+version: 2
+
+updates:
+  # ================================
+  # 📦 npm (VSCode Extension本体)
+  # ================================
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "Asia/Tokyo"
+
+    open-pull-requests-limit: 5
+
+    versioning-strategy: auto
+
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+
+    labels:
+      - "dependencies"
+      - "npm"
+
+    reviewers:
+      - "long-910"
+
+    assignees:
+      - "long-910"
+
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+    ignore:
+      - dependency-name: "@types/vscode"
+        update-types: ["version-update:semver-major"]
+
+  # ================================
+  # ⚙ GitHub Actions
+  # ================================
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "Asia/Tokyo"
+
+    open-pull-requests-limit: 3
+
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+
+    labels:
+      - "dependencies"
+      - "github-actions"
+
+    reviewers:
+      - "long-910"
+
+    assignees:
+      - "long-910"
+
+    groups:
+      actions-minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"

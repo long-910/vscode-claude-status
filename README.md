@@ -7,6 +7,7 @@
 [![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.109.0-007ACC?style=flat-square)](https://code.visualstudio.com/)
 [![CI](https://github.com/long-910/vscode-claude-status/actions/workflows/ci.yml/badge.svg)](https://github.com/long-910/vscode-claude-status/actions/workflows/ci.yml)
 [![Release](https://github.com/long-910/vscode-claude-status/actions/workflows/release.yml/badge.svg)](https://github.com/long-910/vscode-claude-status/actions/workflows/release.yml)
+[![Sponsor](https://img.shields.io/badge/Sponsor-GitHub-pink?logo=github)](https://github.com/sponsors/long-910)
 
 🌐 [English](README.md) | [日本語](README.ja.md)
 
@@ -208,7 +209,7 @@ All settings are under the `claudeStatus` namespace in VS Code Settings.
 
 ## Contributing
 
-Contributions are welcome. See [DEVELOPMENT.md](DEVELOPMENT.md) for setup instructions,
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions,
 architecture overview, and release procedures.
 
 ---

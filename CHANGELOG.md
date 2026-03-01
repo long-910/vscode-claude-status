@@ -11,6 +11,38 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.3.2] — 2026-03-01
+
+### Added
+
+- **`CONTRIBUTING.md`** (new) — consolidated developer guide replacing
+  `DEVELOPMENT.md`; covers local setup, project structure, architecture,
+  data flow, JSONL format, token cost formula, CI/CD workflows, release
+  procedure, and feature spec index.
+- **`.github/dependabot.yml`** (new) — Dependabot configuration for automatic
+  dependency updates: npm (weekly, Monday 03:00 JST) and GitHub Actions (weekly,
+  Monday 03:00 JST); minor/patch updates grouped; `@types/vscode` major bumps
+  ignored; PRs assigned to `long-910` with `dependencies` labels.
+- **`package.json`** — Added `sponsor.url` (`https://github.com/sponsors/long-910`)
+  and `bugs.url` fields for VS Code Marketplace display.
+
+### Changed
+
+- **`README.md`** / **`README.ja.md`** — Added GitHub Sponsors badge; Contributing
+  section now links to `CONTRIBUTING.md`.
+- **`package.json`** — Formatted `enum` arrays to multi-line JSON style
+  (cosmetic; no functional change).
+- **`.gitignore`** — Added `*Zone.Identifier` to suppress Windows/WSL
+  alternate data stream files from being tracked.
+
+### Removed
+
+- **`DEVELOPMENT.md`** — content fully migrated to `CONTRIBUTING.md`.
+- **`vsc-extension-quickstart.md`** — VS Code scaffold template, superseded
+  by project-specific documentation.
+
+---
+
 ## [0.3.1] — 2026-02-28
 
 ### Changed
@@ -221,6 +253,7 @@ and project-level cost tracking.
 
 ---
 
+[0.3.2]: https://github.com/long-910/vscode-claude-status/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/long-910/vscode-claude-status/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/long-910/vscode-claude-status/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/long-910/vscode-claude-status/compare/v0.1.0...v0.2.0

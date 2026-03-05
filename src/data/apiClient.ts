@@ -10,12 +10,41 @@ interface ClaudeCredentials {
   }
 }
 
+export type ClaudeProvider = 'claude-ai' | 'aws-bedrock' | 'api-key' | 'unknown';
+
 export interface RateLimitData {
   utilization5h: number
   utilization7d: number
   resetIn5h: number
   resetIn7d: number
   limitStatus: 'allowed' | 'allowed_warning' | 'denied'
+  has7dLimit: boolean
+}
+
+export async function detectProvider(customCredPath?: string | null): Promise<ClaudeProvider> {
+  // 1. Check for OAuth credentials (Claude.ai subscription)
+  try {
+    await readCredentials(customCredPath);
+    return 'claude-ai';
+  } catch {
+    // No valid OAuth token — check other providers
+  }
+
+  // 2. Check for AWS Bedrock-specific env vars
+  if (
+    process.env['ANTHROPIC_BEDROCK_BASE_URL'] ??
+    process.env['AWS_BEDROCK_RUNTIME_URL'] ??
+    process.env['CLAUDE_AWS_REGION']
+  ) {
+    return 'aws-bedrock';
+  }
+
+  // 3. Check for direct Anthropic API key
+  if (process.env['ANTHROPIC_API_KEY']) {
+    return 'api-key';
+  }
+
+  return 'unknown';
 }
 
 async function readCredentials(customPath?: string | null): Promise<string> {
@@ -54,6 +83,9 @@ export async function fetchRateLimitData(customCredPath?: string | null): Promis
   // Status header value is "allowed" or "denied" (not a boolean)
   const status5h = response.headers.get('anthropic-ratelimit-unified-5h-status');
 
+  // 7d limit is only present on Claude.ai Max plans — detect by header presence
+  const has7dLimit = reset7dStr !== null;
+
   // Reset values are Unix timestamps in seconds (not ISO date strings)
   const nowSec = Date.now() / 1000;
   const resetIn5h = reset5hStr ? Math.max(0, parseInt(reset5hStr, 10) - nowSec) : 0;
@@ -62,11 +94,11 @@ export async function fetchRateLimitData(customCredPath?: string | null): Promis
   let limitStatus: 'allowed' | 'allowed_warning' | 'denied';
   if (status5h === 'denied') {
     limitStatus = 'denied';
-  } else if (util5h >= 0.75 || util7d >= 0.75) {
+  } else if (util5h >= 0.75 || (has7dLimit && util7d >= 0.75)) {
     limitStatus = 'allowed_warning';
   } else {
     limitStatus = 'allowed';
   }
 
-  return { utilization5h: util5h, utilization7d: util7d, resetIn5h, resetIn7d, limitStatus };
+  return { utilization5h: util5h, utilization7d: util7d, resetIn5h, resetIn7d, limitStatus, has7dLimit };
 }

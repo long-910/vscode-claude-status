@@ -95,6 +95,19 @@ All settings are under the `claudeStatus` namespace in VSCode settings.
     "type": ["string", "null"],
     "default": null,
     "description": "Custom path to Claude credentials file. Leave null to use default (~/.claude/.credentials.json)."
+  },
+
+  "claudeStatus.claudeProvider": {
+    "type": "string",
+    "enum": ["auto", "claude-ai", "aws-bedrock", "api-key"],
+    "enumDescriptions": [
+      "Auto-detect: checks credentials file, then AWS/API key environment variables.",
+      "Claude.ai subscription — shows rate limit utilization (5h window, 7d window if available).",
+      "AWS Bedrock — no rate limits, shows token cost only.",
+      "Anthropic API key — no rate limits, shows token cost only."
+    ],
+    "default": "auto",
+    "description": "Claude provider type. Controls whether rate limit percentages or cost is shown in the status bar."
   }
 }
 ```

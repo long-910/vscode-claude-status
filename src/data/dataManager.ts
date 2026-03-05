@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
 import { readAllUsage, wasJsonlUpdatedRecently } from './jsonlReader';
-import { fetchRateLimitData, RateLimitData } from './apiClient';
+import { fetchRateLimitData, detectProvider, RateLimitData, ClaudeProvider } from './apiClient';
 import { readCache, writeCache, isCacheValid, getCacheAge } from './cache';
 import { getAllProjectCosts, ProjectCostData } from './projectCost';
 import { computePrediction, PredictionData } from './prediction';
@@ -28,10 +28,14 @@ export interface ClaudeUsageData {
   tokensCacheRead5h: number
   tokensCacheCreate5h: number
 
+  // Rate limit metadata
+  has7dLimit: boolean      // false for plans without a 7d window or non-Claude.ai providers
+  providerType: ClaudeProvider
+
   // Metadata
   lastUpdated: Date
   cacheAge: number
-  dataSource: 'api' | 'cache' | 'stale' | 'no-credentials' | 'no-data'
+  dataSource: 'api' | 'cache' | 'stale' | 'no-credentials' | 'no-data' | 'local-only'
 }
 
 export { ProjectCostData };
@@ -62,26 +66,40 @@ export class DataManager {
   async getUsageData(forceRefresh = false): Promise<ClaudeUsageData> {
     const [localUsage, cache] = await Promise.all([readAllUsage(), readCache()]);
 
+    // Determine provider type (user config or auto-detection)
+    const configuredProvider = config.claudeProvider;
+    const providerType: ClaudeProvider = configuredProvider === 'auto'
+      ? await detectProvider(config.credentialsPath)
+      : configuredProvider;
+
     let rateLimitData: RateLimitData | null = null;
     let dataSource: ClaudeUsageData['dataSource'] = 'no-data';
 
-    if (forceRefresh || (await this.shouldCallApi(cache))) {
-      try {
-        rateLimitData = await fetchRateLimitData(config.credentialsPath);
-        await writeCache(rateLimitData);
-        dataSource = 'api';
-      } catch {
-        // credentials missing or network error — fall back to cache
-        if (cache) {
-          rateLimitData = this.cacheToRateLimitData(cache.usageData);
-          dataSource = isCacheValid(cache, config.cacheTtlSeconds) ? 'cache' : 'stale';
-        } else {
-          dataSource = 'no-credentials';
+    if (providerType === 'claude-ai') {
+      // Fetch rate limits from Anthropic API
+      if (forceRefresh || (await this.shouldCallApi(cache))) {
+        try {
+          rateLimitData = await fetchRateLimitData(config.credentialsPath);
+          await writeCache(rateLimitData);
+          dataSource = 'api';
+        } catch {
+          // credentials missing or network error — fall back to cache
+          if (cache) {
+            rateLimitData = this.cacheToRateLimitData(cache.usageData);
+            dataSource = isCacheValid(cache, config.cacheTtlSeconds) ? 'cache' : 'stale';
+          } else {
+            dataSource = 'no-credentials';
+          }
         }
+      } else if (cache) {
+        rateLimitData = this.cacheToRateLimitData(cache.usageData);
+        dataSource = isCacheValid(cache, config.cacheTtlSeconds) ? 'cache' : 'stale';
       }
-    } else if (cache) {
-      rateLimitData = this.cacheToRateLimitData(cache.usageData);
-      dataSource = isCacheValid(cache, config.cacheTtlSeconds) ? 'cache' : 'stale';
+    } else {
+      // AWS Bedrock / API key / unknown — no rate limit API call
+      // Show cost-only if we have local JSONL data, otherwise "not logged in"
+      const hasCostData = localUsage.cost7d > 0 || localUsage.cost5h > 0;
+      dataSource = hasCostData ? 'local-only' : 'no-credentials';
     }
 
     const cacheAge = cache ? getCacheAge(cache) : 0;
@@ -92,6 +110,8 @@ export class DataManager {
       resetIn5h: rateLimitData?.resetIn5h ?? 0,
       resetIn7d: rateLimitData?.resetIn7d ?? 0,
       limitStatus: rateLimitData?.limitStatus ?? 'allowed',
+      has7dLimit: rateLimitData?.has7dLimit ?? false,
+      providerType,
       ...localUsage,
       lastUpdated: new Date(),
       cacheAge,
@@ -116,6 +136,8 @@ export class DataManager {
       resetIn5h: Math.max(0, usageData.reset5hAt - nowSec),
       resetIn7d: Math.max(0, usageData.reset7dAt - nowSec),
       limitStatus: usageData.limitStatus as RateLimitData['limitStatus'],
+      // Derive from cached reset timestamp: non-zero means a 7d limit exists
+      has7dLimit: usageData.reset7dAt > 0,
     };
   }
 

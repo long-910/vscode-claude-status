@@ -9,6 +9,8 @@ function makeData(overrides: Partial<ClaudeUsageData> = {}): ClaudeUsageData {
     resetIn5h: 3600,
     resetIn7d: 86400,
     limitStatus: 'allowed',
+    has7dLimit: true,
+    providerType: 'claude-ai',
     cost5h: 1.23,
     costDay: 2.50,
     cost7d: 10.00,

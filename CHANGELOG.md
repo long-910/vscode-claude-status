@@ -11,6 +11,47 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.3.3] — 2026-03-05
+
+### Added
+
+- **Multi-provider support** — the extension now handles AWS Bedrock and direct
+  API key users in addition to Claude.ai subscriptions:
+  - **Auto-detection** (`claudeStatus.claudeProvider: "auto"`, default) — checks
+    for an OAuth credentials file first; if absent, inspects environment variables
+    (`ANTHROPIC_BEDROCK_BASE_URL`, `AWS_BEDROCK_RUNTIME_URL`, `CLAUDE_AWS_REGION`
+    for Bedrock; `ANTHROPIC_API_KEY` for API key); falls back to cost-only display
+    when local JSONL data is available, or `Not logged in` when no data exists.
+  - **Explicit provider setting** (`claudeStatus.claudeProvider`) — can be set to
+    `"claude-ai"`, `"aws-bedrock"`, or `"api-key"` to skip auto-detection.
+  - AWS Bedrock / API key users: rate-limit percentages are hidden; status bar
+    always shows token cost (`5h:$0.15 7d:$0.42`) computed from local JSONL.
+- **`has7dLimit` detection** — the 7 d utilization window is now detected at
+  runtime from the presence of `anthropic-ratelimit-unified-7d-reset` response
+  header. Plans that only expose a 5 h window (e.g. certain Claude.ai tiers)
+  will show only `5h:X%` without a 7 d column.
+- **`claudeStatus.claudeProvider`** setting added to `package.json` contributes
+  (enum: `"auto"` | `"claude-ai"` | `"aws-bedrock"` | `"api-key"`, default `"auto"`).
+
+### Changed
+
+- **`src/data/apiClient.ts`** — `RateLimitData` gains `has7dLimit: boolean`;
+  `fetchRateLimitData` sets it from header presence; `allowed_warning` no longer
+  triggers on 7 d utilization when `has7dLimit` is false; new exported
+  `detectProvider()` performs credential + env-var probing.
+- **`src/data/dataManager.ts`** — `ClaudeUsageData` gains `has7dLimit` and
+  `providerType`; `dataSource` union extended with `'local-only'`; `getUsageData`
+  skips API rate-limit call for non-claude-ai providers.
+- **`src/statusBar.ts`** — `buildLabel` forces cost mode for non-claude-ai
+  providers and omits 7 d column when `has7dLimit` is false; `buildTooltip`
+  shows rate-limit bars only for claude-ai and adapts header for other providers;
+  `applyColor` skips warning/error colours for non-claude-ai providers.
+- **`src/config.ts`** — added `claudeProvider` getter.
+- **`src/test/suite/statusBar.test.ts`** — `makeData` helper updated with
+  `has7dLimit: true` and `providerType: 'claude-ai'` defaults.
+
+---
+
 ## [0.3.2] — 2026-03-01
 
 ### Added
@@ -253,6 +294,7 @@ and project-level cost tracking.
 
 ---
 
+[0.3.3]: https://github.com/long-910/vscode-claude-status/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/long-910/vscode-claude-status/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/long-910/vscode-claude-status/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/long-910/vscode-claude-status/compare/v0.2.0...v0.3.0

@@ -38,10 +38,12 @@ Real-time usage summary pinned to the VS Code status bar.
 
 | State | Example |
 |-------|---------|
-| Normal (% mode) | `🤖 5h:45% 7d:62%` |
+| Normal (% mode, Claude.ai Max) | `🤖 5h:45% 7d:62%` |
 | Warning ≥ 75% | `🤖 5h:78%⚠ 7d:84%⚠` |
 | Rate limit hit | `🤖 5h:100%✗` |
+| 5h-only plan (no 7d window) | `🤖 5h:45%` |
 | Cost mode | `🤖 5h:$14.21 7d:$53.17` |
+| AWS Bedrock / API key (cost only) | `🤖 5h:$0.15 7d:$0.42` |
 | With project cost | `🤖 5h:78% 7d:84% \| my-app:$3.21` |
 | Stale cache | `🤖 5h:78% 7d:84% [10m ago]` |
 | Not logged in | `🤖 Not logged in` |
@@ -110,9 +112,41 @@ Number of days is configurable via `claudeStatus.heatmap.days` (30 / 60 / 90).
 ## Requirements
 
 - **VS Code** 1.109 or newer
-- **Claude Code CLI** installed and authenticated (`claude login`)
-  — this creates `~/.claude/.credentials.json` used for API calls
-- **Claude Code sessions** — the extension reads `~/.claude/projects/**/*.jsonl`
+- **Claude Code CLI** with active sessions — the extension reads
+  `~/.claude/projects/**/*.jsonl` for token cost data
+
+**Authentication is optional** depending on your provider:
+
+| Provider | Authentication | Display |
+|----------|---------------|---------|
+| Claude.ai subscription | `claude login` (creates `~/.claude/.credentials.json`) | Rate-limit % + cost |
+| AWS Bedrock | AWS credentials (env vars or `~/.aws/`) | Cost only |
+| Anthropic API key | `ANTHROPIC_API_KEY` env var | Cost only |
+
+---
+
+## Plan Compatibility
+
+> **Note:** This extension is developed and tested by the author on a
+> **Claude.ai Pro plan** (which provides both 5 h and 7 d rate-limit windows).
+>
+> Other plans and providers — including AWS Bedrock, direct API key, Claude.ai
+> Free, and any plan that exposes only a 5 h window — are supported on a
+> best-effort basis via auto-detection. If you encounter unexpected behaviour on
+> your plan, please [open an issue](https://github.com/long-910/vscode-claude-status/issues)
+> and include your plan type. We will investigate and add support promptly.
+
+**Behaviour by plan type:**
+
+| Plan | Rate-limit display | 7d window |
+|------|--------------------|-----------|
+| Claude.ai Pro / Max (5h + 7d) | `5h:45% 7d:32%` | ✅ |
+| Claude.ai Pro / any 5h-only tier | `5h:45%` | auto-hidden |
+| AWS Bedrock | cost only (`5h:$0.15 7d:$0.42`) | N/A |
+| Anthropic API key | cost only | N/A |
+
+If auto-detection does not work for your setup, set `claudeStatus.claudeProvider`
+explicitly in VS Code Settings.
 
 ---
 
@@ -177,6 +211,7 @@ All settings are under the `claudeStatus` namespace in VS Code Settings.
 | `claudeStatus.notifications.budgetWarning` | `boolean` | `true` | Warn when budget threshold exceeded |
 | `claudeStatus.heatmap.days` | `30 \| 60 \| 90` | `90` | Days shown in usage heatmap |
 | `claudeStatus.credentials.path` | `string \| null` | `null` | Custom credentials file path |
+| `claudeStatus.claudeProvider` | `"auto"` \| `"claude-ai"` \| `"aws-bedrock"` \| `"api-key"` | `"auto"` | Provider type (auto-detect or explicit) |
 
 ```jsonc
 // Example: settings.json
@@ -185,7 +220,9 @@ All settings are under the `claudeStatus` namespace in VS Code Settings.
   "claudeStatus.cache.ttlSeconds": 120,
   "claudeStatus.budget.dailyUsd": 5.00,
   "claudeStatus.budget.alertThresholdPercent": 80,
-  "claudeStatus.statusBar.showProjectCost": true
+  "claudeStatus.statusBar.showProjectCost": true,
+  // For AWS Bedrock users — skip OAuth detection, show cost only:
+  "claudeStatus.claudeProvider": "aws-bedrock"
 }
 ```
 

@@ -34,10 +34,12 @@ VS Code ステータスバーにピン留めされたリアルタイム使用状
 
 | 状態 | 表示例 |
 |------|--------|
-| 通常（%モード） | `🤖 5h:45% 7d:62%` |
+| 通常（%モード、Claude.ai Max） | `🤖 5h:45% 7d:62%` |
 | 警告 ≥75% | `🤖 5h:78%⚠ 7d:84%⚠` |
 | レート制限到達 | `🤖 5h:100%✗` |
+| 5時間のみのプラン（7dウィンドウなし） | `🤖 5h:45%` |
 | コストモード | `🤖 5h:$14.21 7d:$53.17` |
+| AWS Bedrock / APIキー（コストのみ） | `🤖 5h:$0.15 7d:$0.42` |
 | プロジェクトコスト付き | `🤖 5h:78% 7d:84% \| my-app:$3.21` |
 | キャッシュ古い | `🤖 5h:78% 7d:84% [10m ago]` |
 | 未ログイン | `🤖 Not logged in` |
@@ -97,9 +99,35 @@ Claude Status: Set Budget...
 ## 必要条件
 
 - **VS Code** 1.109以降
-- **Claude Code CLI** インストール済みで認証済み（`claude login`）
-  — APIコール用の `~/.claude/.credentials.json` が作成されます
-- **Claude Codeセッション** — 拡張機能は `~/.claude/projects/**/*.jsonl` を読み取ります
+- **Claude Code CLI** とアクティブなセッション — 拡張機能は
+  `~/.claude/projects/**/*.jsonl` からトークンコストデータを読み取ります
+
+**認証はプロバイダーによって任意です：**
+
+| プロバイダー | 認証方法 | 表示内容 |
+|-------------|---------|---------|
+| Claude.ai サブスクリプション | `claude login`（`~/.claude/.credentials.json` が作成される） | レート制限 % + コスト |
+| AWS Bedrock | AWS認証情報（環境変数または `~/.aws/`） | コストのみ |
+| Anthropic APIキー | `ANTHROPIC_API_KEY` 環境変数 | コストのみ |
+
+---
+
+## プラン互換性
+
+> **注意：** この拡張機能は、作者が **Claude.ai Pro プラン**（5時間・7日間の両レート制限ウィンドウを持つ）で開発・テストしています。
+>
+> AWS Bedrock、直接APIキー、Claude.ai Free、5時間ウィンドウのみのプランなど、その他のプランやプロバイダーは自動検出によるベストエフォートでサポートされています。お使いのプランで予期しない動作が発生した場合は、[Issueを開いて](https://github.com/long-910/vscode-claude-status/issues)プランの種類をお知らせください。迅速に対応します。
+
+**プランタイプ別の動作：**
+
+| プラン | レート制限表示 | 7dウィンドウ |
+|--------|-------------|------------|
+| Claude.ai Pro / Max（5h + 7d） | `5h:45% 7d:32%` | ✅ |
+| Claude.ai Pro / 5hのみのプラン | `5h:45%` | 自動非表示 |
+| AWS Bedrock | コストのみ（`5h:$0.15 7d:$0.42`） | N/A |
+| Anthropic APIキー | コストのみ | N/A |
+
+自動検出がうまく機能しない場合は、VS Code設定で `claudeStatus.claudeProvider` を明示的に設定してください。
 
 ---
 
@@ -164,6 +192,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | `claudeStatus.notifications.budgetWarning` | `boolean` | `true` | 予算閾値超過時に警告 |
 | `claudeStatus.heatmap.days` | `30 \| 60 \| 90` | `90` | 使用ヒートマップに表示する日数 |
 | `claudeStatus.credentials.path` | `string \| null` | `null` | カスタム認証情報ファイルパス |
+| `claudeStatus.claudeProvider` | `"auto"` \| `"claude-ai"` \| `"aws-bedrock"` \| `"api-key"` | `"auto"` | プロバイダータイプ（自動検出または明示的指定） |
 
 ```jsonc
 // 設定例: settings.json
@@ -172,7 +201,9 @@ npm run package       # → vscode-claude-status-*.vsix
   "claudeStatus.cache.ttlSeconds": 120,
   "claudeStatus.budget.dailyUsd": 5.00,
   "claudeStatus.budget.alertThresholdPercent": 80,
-  "claudeStatus.statusBar.showProjectCost": true
+  "claudeStatus.statusBar.showProjectCost": true,
+  // AWS Bedrockユーザー — OAuth検出をスキップし、コストのみ表示：
+  "claudeStatus.claudeProvider": "aws-bedrock"
 }
 ```
 

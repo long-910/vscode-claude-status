@@ -32,7 +32,7 @@ function truncateName(name: string): string {
 }
 
 export function buildLabel(data: ClaudeUsageData, projectCosts: ProjectCostData[] = []): string {
-  const { dataSource, utilization5h, utilization7d, limitStatus, cost5h, cost7d, cacheAge } = data;
+  const { dataSource, utilization5h, utilization7d, limitStatus, cost5h, cost7d, cacheAge, has7dLimit, providerType } = data;
   const displayMode = config.displayMode;
 
   if (dataSource === 'no-credentials') {
@@ -45,21 +45,29 @@ export function buildLabel(data: ClaudeUsageData, projectCosts: ProjectCostData[
   const isStale = dataSource === 'stale';
   const staleSuffix = isStale ? ` [${Math.round(cacheAge / 60)}m ago]` : '';
 
+  // Non-Claude.ai providers (Bedrock, API key, local-only) always use cost mode
+  const useCostMode = providerType !== 'claude-ai' || dataSource === 'local-only' || displayMode === 'cost';
+
   let part5h: string;
   let part7d: string;
 
-  if (displayMode === 'cost') {
+  if (useCostMode) {
     part5h = `5h:$${cost5h.toFixed(2)}`;
     part7d = ` 7d:$${cost7d.toFixed(2)}`;
   } else {
+    // percent mode — Claude.ai only
     if (limitStatus === 'denied') {
       part5h = `5h:100%✗`;
       part7d = '';
     } else {
       const warn5h = utilization5h >= 0.75 ? '⚠' : '';
-      const warn7d = utilization7d >= 0.75 ? '⚠' : '';
       part5h = `5h:${formatPercent(utilization5h)}${warn5h}`;
-      part7d = ` 7d:${formatPercent(utilization7d)}${warn7d}`;
+      if (has7dLimit) {
+        const warn7d = utilization7d >= 0.75 ? '⚠' : '';
+        part7d = ` 7d:${formatPercent(utilization7d)}${warn7d}`;
+      } else {
+        part7d = '';
+      }
     }
   }
 
@@ -85,7 +93,7 @@ export function buildTooltip(data: ClaudeUsageData, projectCosts: ProjectCostDat
   const {
     utilization5h, utilization7d, resetIn5h, resetIn7d,
     cost5h, costDay, cost7d, tokensIn5h, tokensOut5h,
-    cacheAge, dataSource,
+    cacheAge, dataSource, has7dLimit, providerType,
   } = data;
 
   if (dataSource === 'no-credentials') {
@@ -95,22 +103,36 @@ export function buildTooltip(data: ClaudeUsageData, projectCosts: ProjectCostDat
     return 'No usage data found.\nClick to open dashboard →';
   }
 
-  const bar5h = buildBar(utilization5h, 8);
-  const bar7d = buildBar(utilization7d, 8);
   const lastUpdated = cacheAge < 60 ? 'just now' : `${Math.round(cacheAge / 60)}m ago`;
+  const lines: string[] = [];
 
-  const lines = [
-    'Claude Code Usage',
-    '─────────────────────────────',
-    `5h window:   ${formatPercent(utilization5h)} [${bar5h}] resets in ${formatDuration(resetIn5h)}`,
-    `7d window:   ${formatPercent(utilization7d)} [${bar7d}] resets in ${formatDuration(resetIn7d)}`,
-    '',
+  if (providerType === 'claude-ai') {
+    // Rate limit section — only for Claude.ai subscriptions
+    const bar5h = buildBar(utilization5h, 8);
+    lines.push(
+      'Claude Code Usage',
+      '─────────────────────────────',
+      `5h window:   ${formatPercent(utilization5h)} [${bar5h}] resets in ${formatDuration(resetIn5h)}`,
+    );
+    if (has7dLimit) {
+      const bar7d = buildBar(utilization7d, 8);
+      lines.push(`7d window:   ${formatPercent(utilization7d)} [${bar7d}] resets in ${formatDuration(resetIn7d)}`);
+    }
+    lines.push('');
+  } else {
+    const providerLabel = providerType === 'aws-bedrock' ? 'AWS Bedrock'
+      : providerType === 'api-key' ? 'API Key'
+      : 'Claude Code';
+    lines.push(`Claude Code (${providerLabel})`, '─────────────────────────────', '');
+  }
+
+  lines.push(
     'Token Cost (local)',
     '─────────────────────────────',
     `5h:   in:${formatTokens(tokensIn5h)} out:${formatTokens(tokensOut5h)}  $${cost5h.toFixed(2)}`,
     `day:  $${costDay.toFixed(2)}`,
     `7d:   $${cost7d.toFixed(2)}`,
-  ];
+  );
 
   if (projectCosts.length > 0) {
     lines.push('');
@@ -125,7 +147,7 @@ export function buildTooltip(data: ClaudeUsageData, projectCosts: ProjectCostDat
 }
 
 function applyColor(item: vscode.StatusBarItem, data: ClaudeUsageData): void {
-  const { limitStatus, dataSource } = data;
+  const { limitStatus, dataSource, providerType } = data;
 
   if (dataSource === 'no-credentials') {
     item.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
@@ -136,6 +158,13 @@ function applyColor(item: vscode.StatusBarItem, data: ClaudeUsageData): void {
   if (dataSource === 'stale') {
     item.backgroundColor = undefined;
     item.color = new vscode.ThemeColor('descriptionForeground');
+    return;
+  }
+
+  // Non-Claude.ai providers don't have rate limits — no warning/error colors
+  if (providerType !== 'claude-ai') {
+    item.backgroundColor = undefined;
+    item.color = undefined;
     return;
   }
 

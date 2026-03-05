@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import type { ClaudeProvider } from './data/apiClient';
 
 export class ExtensionConfig {
   private get cfg() {
@@ -55,6 +56,10 @@ export class ExtensionConfig {
 
   get credentialsPath(): string | null {
     return this.cfg.get('credentials.path', null);
+  }
+
+  get claudeProvider(): 'auto' | ClaudeProvider {
+    return this.cfg.get('claudeProvider', 'auto');
   }
 
   async setDisplayMode(mode: 'percent' | 'cost'): Promise<void> {

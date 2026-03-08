@@ -33,12 +33,26 @@ export interface AggregatedUsage {
   tokensCacheCreate5h: number
 }
 
-export function calculateCost(usage: TokenUsage): number {
+export interface TokenPricing {
+  inputPerMillion: number
+  outputPerMillion: number
+  cacheReadPerMillion: number
+  cacheCreatePerMillion: number
+}
+
+export const DEFAULT_PRICING: TokenPricing = {
+  inputPerMillion: 3.00,
+  outputPerMillion: 15.00,
+  cacheReadPerMillion: 0.30,
+  cacheCreatePerMillion: 3.75,
+};
+
+export function calculateCost(usage: TokenUsage, pricing: TokenPricing = DEFAULT_PRICING): number {
   return (
-    ((usage.input_tokens || 0) / 1_000_000) * 3.00 +
-    ((usage.output_tokens || 0) / 1_000_000) * 15.00 +
-    ((usage.cache_read_input_tokens || 0) / 1_000_000) * 0.30 +
-    ((usage.cache_creation_input_tokens || 0) / 1_000_000) * 3.75
+    ((usage.input_tokens || 0) / 1_000_000) * pricing.inputPerMillion +
+    ((usage.output_tokens || 0) / 1_000_000) * pricing.outputPerMillion +
+    ((usage.cache_read_input_tokens || 0) / 1_000_000) * pricing.cacheReadPerMillion +
+    ((usage.cache_creation_input_tokens || 0) / 1_000_000) * pricing.cacheCreatePerMillion
   );
 }
 
@@ -101,7 +115,7 @@ async function readJsonlFile(filePath: string): Promise<JsonlEntry[]> {
   return entries;
 }
 
-export async function readAllUsage(): Promise<AggregatedUsage> {
+export async function readAllUsage(pricing: TokenPricing = DEFAULT_PRICING): Promise<AggregatedUsage> {
   const now = Date.now();
   const window5h = 5 * 3600 * 1000;
   const window7d = 7 * 24 * 3600 * 1000;
@@ -127,7 +141,7 @@ export async function readAllUsage(): Promise<AggregatedUsage> {
 
       const usage = entry.message?.usage;
       if (!usage) { continue; }
-      const cost = calculateCost(usage);
+      const cost = calculateCost(usage, pricing);
 
       const age = now - ts;
       if (age <= window7d) {

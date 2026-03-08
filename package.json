@@ -85,10 +85,15 @@
           "maximum": 3600,
           "description": "Cache TTL in seconds. API is not called more often than this when Claude Code is idle."
         },
+        "claudeStatus.rateLimitApi.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable fetching rate-limit utilization (5h/7d %) from the Anthropic API. When disabled, only local token cost is shown (no rate-limit percentages). Default: true — API consumption is negligible because calls are made only when Claude Code is actively running."
+        },
         "claudeStatus.realtime.enabled": {
           "type": "boolean",
           "default": false,
-          "description": "Enable realtime polling (1 API call every cache.ttlSeconds). Increases API usage."
+          "description": "Poll the rate-limit API every cache.ttlSeconds regardless of Claude Code activity. Requires rateLimitApi.enabled to be true. Increases API usage."
         },
         "claudeStatus.budget.dailyUsd": {
           "type": [
@@ -166,6 +171,30 @@
           ],
           "default": "auto",
           "description": "Claude provider type. Controls whether rate limit percentages or cost is shown in the status bar."
+        },
+        "claudeStatus.pricing.inputPerMillion": {
+          "type": "number",
+          "default": 3.00,
+          "minimum": 0,
+          "description": "Cost per 1M input tokens in USD. Default: $3.00 (Claude Sonnet 4.x). Update this if Anthropic changes pricing."
+        },
+        "claudeStatus.pricing.outputPerMillion": {
+          "type": "number",
+          "default": 15.00,
+          "minimum": 0,
+          "description": "Cost per 1M output tokens in USD. Default: $15.00 (Claude Sonnet 4.x). Update this if Anthropic changes pricing."
+        },
+        "claudeStatus.pricing.cacheReadPerMillion": {
+          "type": "number",
+          "default": 0.30,
+          "minimum": 0,
+          "description": "Cost per 1M cache-read tokens in USD. Default: $0.30 (Claude Sonnet 4.x). Update this if Anthropic changes pricing."
+        },
+        "claudeStatus.pricing.cacheCreatePerMillion": {
+          "type": "number",
+          "default": 3.75,
+          "minimum": 0,
+          "description": "Cost per 1M cache-creation tokens in USD. Default: $3.75 (Claude Sonnet 4.x). Update this if Anthropic changes pricing."
         }
       }
     }

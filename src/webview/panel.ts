@@ -239,6 +239,7 @@ function getWebviewContent(nonce: string): string {
     <div class="header-actions">
       <button id="btn-refresh">↻ Refresh</button>
       <button id="btn-toggle">$ / %</button>
+      <button id="btn-settings">⚙</button>
     </div>
   </div>
 
@@ -254,7 +255,7 @@ function getWebviewContent(nonce: string): string {
         <div class="progress-fill" id="usage-5h-fill" style="width:0%"></div>
       </div>
     </div>
-    <div class="progress-row">
+    <div class="progress-row" id="usage-7d-row">
       <div class="progress-labels">
         <span>7d window</span>
         <span id="usage-7d-label">—</span>
@@ -332,6 +333,10 @@ function getWebviewContent(nonce: string): string {
       vscode.postMessage({ type: 'toggleMode' });
     });
 
+    document.getElementById('btn-settings').addEventListener('click', () => {
+      vscode.postMessage({ type: 'openSettings' });
+    });
+
     function setRefreshing(value) {
       refreshing = value;
       const btn = document.getElementById('btn-refresh');
@@ -357,30 +362,51 @@ function getWebviewContent(nonce: string): string {
 
     function updateUsage(usage, mode) {
       const denied = usage.limitStatus === 'denied';
-      const warn5h = usage.utilization5h >= 0.75 ? ' ⚠' : '';
-      const warn7d = usage.utilization7d >= 0.75 ? ' ⚠' : '';
-      const deniedFlag = denied ? '✗' : '';
+      const isClaudeAi = usage.providerType === 'claude-ai';
+      const useCostMode = !isClaudeAi || usage.dataSource === 'local-only' || mode === 'cost';
+      const show7d = usage.has7dLimit && isClaudeAi;
 
-      if (mode === 'cost') {
+      // Show/hide 7d row
+      const row7d = document.getElementById('usage-7d-row');
+      if (row7d) { row7d.style.display = show7d ? '' : 'none'; }
+
+      if (useCostMode) {
+        const resetSuffix5h = isClaudeAi && usage.resetIn5h > 0
+          ? ' — resets in ' + fmt(usage.resetIn5h) : '';
         document.getElementById('usage-5h-label').textContent =
-          '$' + usage.cost5h.toFixed(2) + ' — resets in ' + fmt(usage.resetIn5h);
-        document.getElementById('usage-7d-label').textContent =
-          '$' + usage.cost7d.toFixed(2) + ' — resets in ' + fmt(usage.resetIn7d);
+          '$' + usage.cost5h.toFixed(2) + resetSuffix5h;
+        if (show7d) {
+          document.getElementById('usage-7d-label').textContent =
+            '$' + usage.cost7d.toFixed(2) + ' — resets in ' + fmt(usage.resetIn7d);
+        }
       } else {
+        // percent mode — claude-ai only
+        const warn5h = usage.utilization5h >= 0.75 ? ' ⚠' : '';
+        const deniedFlag = denied ? '✗' : '';
         document.getElementById('usage-5h-label').textContent =
           pct(usage.utilization5h) + warn5h + deniedFlag + ' — resets in ' + fmt(usage.resetIn5h);
-        document.getElementById('usage-7d-label').textContent =
-          pct(usage.utilization7d) + warn7d + ' — resets in ' + fmt(usage.resetIn7d);
+        if (show7d) {
+          const warn7d = usage.utilization7d >= 0.75 ? ' ⚠' : '';
+          document.getElementById('usage-7d-label').textContent =
+            pct(usage.utilization7d) + warn7d + ' — resets in ' + fmt(usage.resetIn7d);
+        }
       }
 
       const fill5h = document.getElementById('usage-5h-fill');
-      fill5h.style.width = Math.min(100, usage.utilization5h * 100) + '%';
-      fill5h.className = 'progress-fill' +
-        (denied ? ' error' : usage.utilization5h >= 0.75 ? ' warning' : '');
+      if (isClaudeAi) {
+        fill5h.style.width = Math.min(100, usage.utilization5h * 100) + '%';
+        fill5h.className = 'progress-fill' +
+          (denied ? ' error' : usage.utilization5h >= 0.75 ? ' warning' : '');
+      } else {
+        fill5h.style.width = '0%';
+        fill5h.className = 'progress-fill';
+      }
 
-      const fill7d = document.getElementById('usage-7d-fill');
-      fill7d.style.width = Math.min(100, usage.utilization7d * 100) + '%';
-      fill7d.className = 'progress-fill' + (usage.utilization7d >= 0.75 ? ' warning' : '');
+      if (show7d) {
+        const fill7d = document.getElementById('usage-7d-fill');
+        fill7d.style.width = Math.min(100, usage.utilization7d * 100) + '%';
+        fill7d.className = 'progress-fill' + (usage.utilization7d >= 0.75 ? ' warning' : '');
+      }
 
       document.getElementById('cost-5h').textContent  = '$' + usage.cost5h.toFixed(2);
       document.getElementById('cost-day').textContent = '$' + usage.costDay.toFixed(2);
@@ -764,6 +790,9 @@ export class DashboardPanel {
 
       case 'refresh':
         this.dataManager.forceRefresh().catch(() => {});
+        break;
+      case 'openSettings':
+        vscode.commands.executeCommand('workbench.action.openSettings', 'claudeStatus');
         break;
       case 'toggleMode': {
         const next = config.displayMode === 'percent' ? 'cost' : 'percent';

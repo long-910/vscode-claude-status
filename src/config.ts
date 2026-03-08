@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { ClaudeProvider } from './data/apiClient';
+import type { TokenPricing } from './data/jsonlReader';
 
 export class ExtensionConfig {
   private get cfg() {
@@ -24,6 +25,10 @@ export class ExtensionConfig {
 
   get realtimeEnabled(): boolean {
     return this.cfg.get('realtime.enabled', false);
+  }
+
+  get rateLimitApiEnabled(): boolean {
+    return this.cfg.get('rateLimitApi.enabled', true);
   }
 
   get dailyBudget(): number | null {
@@ -60,6 +65,15 @@ export class ExtensionConfig {
 
   get claudeProvider(): 'auto' | ClaudeProvider {
     return this.cfg.get('claudeProvider', 'auto');
+  }
+
+  get tokenPricing(): TokenPricing {
+    return {
+      inputPerMillion:      this.cfg.get('pricing.inputPerMillion', 3.00),
+      outputPerMillion:     this.cfg.get('pricing.outputPerMillion', 15.00),
+      cacheReadPerMillion:  this.cfg.get('pricing.cacheReadPerMillion', 0.30),
+      cacheCreatePerMillion: this.cfg.get('pricing.cacheCreatePerMillion', 3.75),
+    };
   }
 
   async setDisplayMode(mode: 'percent' | 'cost'): Promise<void> {

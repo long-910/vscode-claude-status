@@ -64,7 +64,7 @@ export class DataManager {
   }
 
   async getUsageData(forceRefresh = false): Promise<ClaudeUsageData> {
-    const [localUsage, cache] = await Promise.all([readAllUsage(), readCache()]);
+    const [localUsage, cache] = await Promise.all([readAllUsage(config.tokenPricing), readCache()]);
 
     // Determine provider type (user config or auto-detection)
     const configuredProvider = config.claudeProvider;
@@ -75,7 +75,7 @@ export class DataManager {
     let rateLimitData: RateLimitData | null = null;
     let dataSource: ClaudeUsageData['dataSource'] = 'no-data';
 
-    if (providerType === 'claude-ai') {
+    if (providerType === 'claude-ai' && config.rateLimitApiEnabled) {
       // Fetch rate limits from Anthropic API
       if (forceRefresh || (await this.shouldCallApi(cache))) {
         try {
@@ -95,9 +95,12 @@ export class DataManager {
         rateLimitData = this.cacheToRateLimitData(cache.usageData);
         dataSource = isCacheValid(cache, config.cacheTtlSeconds) ? 'cache' : 'stale';
       }
+    } else if (providerType === 'claude-ai' && cache) {
+      // API disabled by user but cache exists — show stale rate limit data with age indicator
+      rateLimitData = this.cacheToRateLimitData(cache.usageData);
+      dataSource = 'stale';
     } else {
-      // AWS Bedrock / API key / unknown — no rate limit API call
-      // Show cost-only if we have local JSONL data, otherwise "not logged in"
+      // Non-claude-ai provider, or no cache — cost only from local JSONL
       const hasCostData = localUsage.cost7d > 0 || localUsage.cost5h > 0;
       dataSource = hasCostData ? 'local-only' : 'no-credentials';
     }
@@ -151,7 +154,7 @@ export class DataManager {
 
   async refreshProjectCosts(): Promise<void> {
     try {
-      this.lastProjectCosts = await getAllProjectCosts();
+      this.lastProjectCosts = await getAllProjectCosts(config.tokenPricing);
     } catch {
       this.lastProjectCosts = [];
     }

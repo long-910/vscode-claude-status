@@ -39,8 +39,8 @@ Only one panel instance at a time. If already open, `panel.reveal()`.
 ">
 ```
 
-`nonce` is a random UUID generated per panel creation. All inline `<script>` tags
-must include `nonce="${nonce}"`.
+`nonce` is a random 16-byte hex string generated per panel creation (`crypto.randomBytes(16).toString('hex')`).
+All inline `<script>` tags must include `nonce="${nonce}"`.
 
 ---
 
@@ -48,7 +48,7 @@ must include `nonce="${nonce}"`.
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│  Claude Code Usage            [↻ Refresh] [$ / %]    │
+│  Claude Code Usage    [↻ Refresh] [$ / %] [⚙]       │
 │                                                      │
 │  ┌─────────────────────────────────────────────────┐ │
 │  │  CURRENT USAGE                                  │ │
@@ -82,6 +82,14 @@ must include `nonce="${nonce}"`.
 └──────────────────────────────────────────────────────┘
 ```
 
+### Header Buttons
+
+| Button | Action |
+|--------|--------|
+| `↻ Refresh` | Force-refresh data (API + JSONL); shows spinner while loading |
+| `$ / %` | Toggle between cost and percent display mode |
+| `⚙` | Open VSCode settings filtered to `claudeStatus` |
+
 ---
 
 ## Theme Integration
@@ -103,15 +111,13 @@ body {
   padding: 12px;
 }
 
-.progress-bar-fill {
+.progress-fill {
   background-color: var(--vscode-progressBar-background);
 }
-
-.progress-bar-fill.warning {
+.progress-fill.warning {
   background-color: var(--vscode-editorWarning-foreground);
 }
-
-.progress-bar-fill.error {
+.progress-fill.error {
   background-color: var(--vscode-editorError-foreground);
 }
 
@@ -123,10 +129,8 @@ button {
   cursor: pointer;
   border-radius: 2px;
 }
-
-button:hover {
-  background-color: var(--vscode-button-hoverBackground);
-}
+button:hover { background-color: var(--vscode-button-hoverBackground); }
+button:disabled { opacity: 0.5; cursor: default; }
 ```
 
 ---
@@ -141,9 +145,9 @@ panel.webview.postMessage({
   type: 'update',
   data: {
     usage: ClaudeUsageData,
-    projectCost: ProjectCostData | null,
-    prediction: PredictionData,
-    heatmap: HeatmapData,
+    projectCosts: ProjectCostData[],   // array (multi-root aware)
+    prediction: PredictionData | null,
+    heatmap: HeatmapData | null,
   }
 })
 
@@ -158,18 +162,35 @@ panel.webview.postMessage({
 
 ```typescript
 // In WebView JS:
-vscode.postMessage({ type: 'refresh' })
-vscode.postMessage({ type: 'toggleMode' })
-vscode.postMessage({ type: 'setBudget', amount: 50.0 })
-vscode.postMessage({ type: 'ready' })   // sent on DOMContentLoaded
+vscode.postMessage({ type: 'ready' })           // sent on DOMContentLoaded
+vscode.postMessage({ type: 'refresh' })          // user clicks ↻ Refresh
+vscode.postMessage({ type: 'toggleMode' })       // user clicks $ / %
+vscode.postMessage({ type: 'setBudget', amount: 50.0 })  // user saves budget
+vscode.postMessage({ type: 'openSettings' })     // user clicks ⚙
 
-// In extension:
+// In extension handler:
 panel.webview.onDidReceiveMessage(msg => {
   switch (msg.type) {
-    case 'refresh': dataManager.refresh(true); break
-    case 'toggleMode': config.toggleDisplayMode(); break
-    case 'setBudget': config.setBudget(msg.amount); break
-    case 'ready': panel.webview.postMessage({ type: 'update', data: ... }); break
+    case 'ready':
+      // send initial data
+      sendUpdate(lastData)
+      break
+    case 'refresh':
+      dataManager.forceRefresh()
+      break
+    case 'toggleMode': {
+      const next = config.displayMode === 'percent' ? 'cost' : 'percent'
+      config.setDisplayMode(next).then(() => {
+        panel.webview.postMessage({ type: 'setDisplayMode', mode: next })
+      })
+      break
+    }
+    case 'setBudget':
+      config.setDailyBudget(msg.amount).then(() => dataManager.forceRefresh())
+      break
+    case 'openSettings':
+      vscode.commands.executeCommand('workbench.action.openSettings', 'claudeStatus')
+      break
   }
 })
 ```
@@ -181,8 +202,8 @@ panel.webview.onDidReceiveMessage(msg => {
 Pure CSS — no external library needed:
 
 ```html
-<div class="progress-container">
-  <div class="progress-label">
+<div class="progress-row">
+  <div class="progress-labels">
     <span>5h window</span>
     <span>78% — resets in 2h 47m</span>
   </div>
@@ -211,11 +232,19 @@ Pure CSS — no external library needed:
 ## Refresh Behavior
 
 When user clicks "↻ Refresh":
-1. Show spinner on button
+1. Show spinner on button (`<span class="spinning">⟳</span>`, button disabled)
 2. Send `{ type: 'refresh' }` to extension
-3. Extension calls `DataManager.refresh(forceApi=true)`
+3. Extension calls `DataManager.forceRefresh()`
 4. `onDidUpdate` fires → extension posts `{ type: 'update', data: ... }`
-5. WebView receives and re-renders
-6. Remove spinner
+5. WebView receives update → re-renders → removes spinner
 
-Spinner: replace button text with `⟳` + CSS animation, restore after update received.
+The heatmap is computed in background after the initial update fires a second `onDidUpdate`.
+The WebView re-renders heatmap when it receives this second update.
+
+---
+
+## Heatmap In-Memory Cache
+
+`DataManager.getHeatmapData()` caches the computed result in memory for 5 minutes
+(`heatmapTtlMs = 5 * 60 * 1000`) to avoid re-reading all JSONL on every refresh.
+`forceRefresh()` invalidates the heatmap cache (`heatmapComputedAt = 0`).

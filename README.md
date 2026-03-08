@@ -25,8 +25,24 @@
 
 It reads session data from `~/.claude/projects/` locally (no extra network calls)
 and queries the Anthropic API at most once per 5 minutes to fetch rate-limit
-utilization headers. All token costs are calculated client-side using current
-Claude Sonnet 4.x pricing.
+utilization headers. All token costs are calculated client-side using configurable
+per-token rates (defaults: Claude Sonnet 4.x pricing).
+
+> [!NOTE]
+> **API calls are minimal and only happen while Claude Code is active.**
+> The rate-limit API call fires only when a JSONL file was recently updated —
+> when you stop using Claude Code, the extension stops calling the API entirely.
+> Each call uses ≈ 9 tokens of `claude-haiku-4-5` (≈ $0.00013).
+> Typical cost with default settings: **< $0.01 / month**.
+> Set `claudeStatus.rateLimitApi.enabled: false` to stop all new API calls.
+> If a prior cache exists, the last-fetched rate-limit % is still shown with a `[Xm ago]`
+> staleness indicator. Without any cache, the display falls back to cost-only.
+
+> [!WARNING]
+> **Cost figures are estimates.** Default rates are based on Anthropic's publicly
+> announced pricing at the time of implementation and may not reflect future changes.
+> If pricing changes, update the `claudeStatus.pricing.*` settings to match the
+> latest rates on the [Anthropic pricing page](https://www.anthropic.com/pricing).
 
 ---
 
@@ -202,7 +218,8 @@ All settings are under the `claudeStatus` namespace in VS Code Settings.
 | `claudeStatus.statusBar.alignment` | `"left"` \| `"right"` | `"left"` | Status bar position |
 | `claudeStatus.statusBar.showProjectCost` | `boolean` | `true` | Show project cost in status bar |
 | `claudeStatus.cache.ttlSeconds` | `number` (60–3600) | `300` | API cache TTL in seconds |
-| `claudeStatus.realtime.enabled` | `boolean` | `false` | Poll API every TTL seconds |
+| `claudeStatus.rateLimitApi.enabled` | `boolean` | `true` | Fetch rate-limit % from Anthropic API. When disabled, no new API calls are made; cached % is still shown with a staleness indicator (`[Xm ago]`) if available |
+| `claudeStatus.realtime.enabled` | `boolean` | `false` | Poll rate-limit API every TTL seconds (requires `rateLimitApi.enabled`) |
 | `claudeStatus.budget.dailyUsd` | `number \| null` | `null` | Daily budget in USD (`null` = disabled) |
 | `claudeStatus.budget.weeklyUsd` | `number \| null` | `null` | Weekly budget in USD |
 | `claudeStatus.budget.alertThresholdPercent` | `number` (1–100) | `80` | Budget alert threshold % |
@@ -212,6 +229,10 @@ All settings are under the `claudeStatus` namespace in VS Code Settings.
 | `claudeStatus.heatmap.days` | `30 \| 60 \| 90` | `90` | Days shown in usage heatmap |
 | `claudeStatus.credentials.path` | `string \| null` | `null` | Custom credentials file path |
 | `claudeStatus.claudeProvider` | `"auto"` \| `"claude-ai"` \| `"aws-bedrock"` \| `"api-key"` | `"auto"` | Provider type (auto-detect or explicit) |
+| `claudeStatus.pricing.inputPerMillion` | `number` | `3.00` | USD per 1M input tokens |
+| `claudeStatus.pricing.outputPerMillion` | `number` | `15.00` | USD per 1M output tokens |
+| `claudeStatus.pricing.cacheReadPerMillion` | `number` | `0.30` | USD per 1M cache-read tokens |
+| `claudeStatus.pricing.cacheCreatePerMillion` | `number` | `3.75` | USD per 1M cache-creation tokens |
 
 ```jsonc
 // Example: settings.json
@@ -222,7 +243,14 @@ All settings are under the `claudeStatus` namespace in VS Code Settings.
   "claudeStatus.budget.alertThresholdPercent": 80,
   "claudeStatus.statusBar.showProjectCost": true,
   // For AWS Bedrock users — skip OAuth detection, show cost only:
-  "claudeStatus.claudeProvider": "aws-bedrock"
+  "claudeStatus.claudeProvider": "aws-bedrock",
+  // Disable new rate-limit API calls (cached % still shown with staleness indicator):
+  // "claudeStatus.rateLimitApi.enabled": false,
+  // If Anthropic changes pricing, update these values to match:
+  "claudeStatus.pricing.inputPerMillion": 3.00,
+  "claudeStatus.pricing.outputPerMillion": 15.00,
+  "claudeStatus.pricing.cacheReadPerMillion": 0.30,
+  "claudeStatus.pricing.cacheCreatePerMillion": 3.75
 }
 ```
 

@@ -13,119 +13,111 @@ This is the most differentiated feature from the tmux version.
 ## Workspace Detection
 
 ```typescript
-async function getCurrentProjectDir(): Promise<string | null> {
-  const folders = vscode.workspace.workspaceFolders
-  if (!folders || folders.length === 0) return null
+async function getAllProjectCosts(pricing: TokenPricing): Promise<ProjectCostData[]> {
+  const folders = vscode.workspace.workspaceFolders ?? []
+  if (folders.length === 0) return []
 
-  // Use the first workspace folder (primary project)
-  const workspacePath = folders[0].uri.fsPath
-  return workspacePathToProjectDir(workspacePath)
+  const results = await Promise.all(
+    folders.map(async folder => {
+      const workspacePath = folder.uri.fsPath
+      const projectDir = await workspacePathToProjectDir(workspacePath)
+      if (!projectDir) return null
+      const projectName = path.basename(workspacePath)
+      return getProjectCostForDir(projectDir, projectName, pricing)
+    })
+  )
+
+  return results
+    .filter((r): r is ProjectCostData => r !== null)
+    .sort((a, b) => b.costToday - a.costToday)
 }
 ```
 
 ### Path Mapping Logic
 
-```typescript
-import * as path from 'path'
-import * as os from 'os'
-import * as fs from 'fs/promises'
+Claude Code converts workspace paths by replacing **every non-alphanumeric character** with `-`:
 
-async function workspacePathToProjectDir(workspacePath: string): Promise<string | null> {
+```
+/home/user/sb_git/my-app  →  -home-user-sb-git-my-app
+```
+
+```typescript
+export function workspacePathToHash(workspacePath: string): string {
+  return workspacePath.replace(/[^a-zA-Z0-9]/g, '-')  // NOT just '/'
+}
+
+export async function workspacePathToProjectDir(workspacePath: string): Promise<string | null> {
   const claudeProjectsDir = path.join(os.homedir(), '.claude', 'projects')
 
   // Strategy 1: Direct path conversion (Claude Code's known scheme)
-  // /home/user/my-app → -home-user-my-app
-  const hash = workspacePath.replace(/\//g, '-')
+  const hash = workspacePathToHash(workspacePath)
   const candidate = path.join(claudeProjectsDir, hash)
   if (await dirExists(candidate)) return candidate
 
-  // Strategy 2: Scan all project dirs and match by content
-  // (fallback for edge cases or future Claude Code versions)
-  const dirs = await fs.readdir(claudeProjectsDir)
-  for (const dir of dirs) {
-    const projectPath = path.join(claudeProjectsDir, dir)
-    // Check if any JSONL in this dir references the workspace path
-    const matched = await dirMatchesWorkspace(projectPath, workspacePath)
-    if (matched) return projectPath
+  // Strategy 2: Scan all project dirs and match by top-level cwd field in JSONL
+  try {
+    const dirs = await fs.readdir(claudeProjectsDir)
+    for (const dir of dirs) {
+      const projectPath = path.join(claudeProjectsDir, dir)
+      if (!(await dirExists(projectPath))) continue
+      if (await dirMatchesWorkspace(projectPath, workspacePath)) return projectPath
+    }
+  } catch {
+    // graceful degradation if projects dir is unreadable
   }
 
   return null
 }
 
 async function dirMatchesWorkspace(projectDir: string, workspacePath: string): Promise<boolean> {
-  // Read first few lines of any JSONL to check for cwd field
+  // Check top-level cwd field in first 30 lines of any JSONL in the directory
   try {
     const files = await fs.readdir(projectDir)
     const jsonlFile = files.find(f => f.endsWith('.jsonl'))
     if (!jsonlFile) return false
+
     const content = await fs.readFile(path.join(projectDir, jsonlFile), 'utf-8')
-    const firstLine = content.split('\n')[0]
-    const parsed = JSON.parse(firstLine)
-    return parsed.cwd === workspacePath
+    const lines = content.split('\n').filter(Boolean).slice(0, 30)
+    for (const line of lines) {
+      try {
+        const obj = JSON.parse(line) as Record<string, unknown>
+        if (obj.cwd === workspacePath) return true
+      } catch { /* skip malformed lines */ }
+    }
+    return false
   } catch {
     return false
   }
 }
 ```
 
-> **Note:** Verify the actual JSONL structure during implementation.
-> The `cwd` field may not exist. Adjust Strategy 2 accordingly.
-
 ---
 
 ## Cost Aggregation
 
+> [!WARNING]
+> Token costs shown here are **estimates only**, calculated from Anthropic's
+> publicly announced pricing at the time of implementation.
+> Rates may change — update `claudeStatus.pricing.*` settings if needed.
+> See [DATA.md](../DATA.md) for the full rate table.
+
 ```typescript
-async function getProjectCost(projectDir: string): Promise<ProjectCostData> {
-  const now = Date.now()
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
-
-  let costToday = 0
-  let cost7d = 0
-  let cost30d = 0
-  let sessionCount = 0
-  let lastActive: Date | null = null
-
-  const files = await fs.readdir(projectDir)
-  for (const file of files) {
-    if (!file.endsWith('.jsonl')) continue
-
-    const content = await fs.readFile(path.join(projectDir, file), 'utf-8')
-    const lines = content.split('\n').filter(Boolean)
-
-    for (const line of lines) {
-      try {
-        const entry = JSON.parse(line)
-        if (!entry.timestamp) continue
-
-        const ts = new Date(entry.timestamp)
-        const cost = entry.costUSD ?? calculateCost(entry.usage ?? {})
-        const ageMs = now - ts.getTime()
-
-        if (ts >= todayStart) costToday += cost
-        if (ageMs < 7 * 24 * 3600 * 1000) cost7d += cost
-        if (ageMs < 30 * 24 * 3600 * 1000) cost30d += cost
-
-        if (!lastActive || ts > lastActive) lastActive = ts
-      } catch {
-        // skip malformed lines
-      }
-    }
-    sessionCount++
-  }
-
-  return {
-    projectName: path.basename(vscode.workspace.workspaceFolders![0].uri.fsPath),
-    projectPath: projectDir,
-    costToday,
-    cost7d,
-    cost30d,
-    sessionCount,
-    lastActive: lastActive ?? new Date(0),
-  }
+async function getProjectCostForDir(
+  projectDir: string,
+  projectName: string,
+  pricing: TokenPricing
+): Promise<ProjectCostData> {
+  // Reads all .jsonl files in the directory
+  // Parses type === 'assistant' entries only
+  // Usage is at entry.message.usage (NOT entry.usage; no costUSD field)
+  // Accumulates: costToday, cost7d, cost30d, sessionCount, lastActive
 }
 ```
+
+Key points:
+- `sessionCount` = number of `.jsonl` files in the project directory
+- `lastActive` = most recent timestamp across all entries
+- Cost always calculated from tokens via `calculateCost(usage, pricing)`
 
 ---
 
@@ -133,8 +125,14 @@ async function getProjectCost(projectDir: string): Promise<ProjectCostData> {
 
 When a workspace is open, append project cost to the status bar label:
 
+**Single workspace:**
 ```
 🤖 5h:78% 7d:84% | my-app:$3.21
+```
+
+**Multi-root workspace (aggregated):**
+```
+🤖 5h:78% 7d:84% | PJ:$5.43
 ```
 
 When no workspace is open (e.g., untitled window):
@@ -144,9 +142,7 @@ When no workspace is open (e.g., untitled window):
 
 The project name is truncated to 12 characters if longer:
 ```typescript
-const shortName = projectName.length > 12
-  ? projectName.slice(0, 11) + '…'
-  : projectName
+const shortName = name.length > 12 ? name.slice(0, 11) + '…' : name
 ```
 
 ---
@@ -155,33 +151,16 @@ const shortName = projectName.length > 12
 
 When VSCode has multiple workspace folders open (`vscode.workspace.workspaceFolders.length > 1`):
 
-- Show aggregate cost of ALL open projects in status bar: `PJ:$5.43`
+- Show **aggregate** cost of ALL open projects in status bar: `PJ:$5.43`
 - In WebView, show each project as a separate card with its own cost breakdown
-- Order by `costToday` descending
-
-```typescript
-async function getAllProjectCosts(): Promise<ProjectCostData[]> {
-  const folders = vscode.workspace.workspaceFolders ?? []
-  const results = await Promise.all(
-    folders.map(async folder => {
-      const projectDir = await workspacePathToProjectDir(folder.uri.fsPath)
-      if (!projectDir) return null
-      return getProjectCost(projectDir)
-    })
-  )
-  return results
-    .filter((r): r is ProjectCostData => r !== null)
-    .sort((a, b) => b.costToday - a.costToday)
-}
-```
+- Results are sorted by `costToday` descending
 
 ---
 
 ## Update Trigger
 
 Project cost is recalculated:
-- On FileWatcher JSONL change (same trigger as global refresh)
-- On `vscode.workspace.onDidChangeWorkspaceFolders` event
-- On WebView panel open
+- On FileWatcher JSONL change (same trigger as global refresh, via `DataManager.refresh()`)
+- On WebView panel open (via `DataManager.refreshProjectCosts()`)
 
 No API call is needed — project cost is derived entirely from local JSONL files.

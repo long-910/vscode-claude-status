@@ -22,7 +22,23 @@
 
 **vscode-claude-status** は、エディタを離れることなく [Claude Code](https://claude.ai/code) の使用状況をリアルタイムで監視できる Visual Studio Code 拡張機能です。
 
-`~/.claude/projects/` からローカルでセッションデータを読み取り（追加のネットワーク呼び出しなし）、レート制限の使用率ヘッダーを取得するために最大5分に1回だけ Anthropic API に問い合わせます。トークンコストはすべて現在の Claude Sonnet 4.x 料金を使用してクライアント側で計算されます。
+`~/.claude/projects/` からローカルでセッションデータを読み取り、レート制限の使用率ヘッダーを取得するために最大5分に1回だけ Anthropic API に問い合わせます。トークンコストはすべて設定可能なレートを使用してクライアント側で計算されます（デフォルト: Claude Sonnet 4.x 料金）。
+
+> [!NOTE]
+> **APIコールは微量かつ Claude Code の使用中のみ発生します。**
+> レート制限取得のAPIコールは JSONL が最近更新されたとき（= Claude Code 使用中）にのみ発火します。
+> Claude Code を使っていない間はAPIコールは一切行われません。
+> 1回あたり約9トークン（`claude-haiku-4-5`）、≈ $0.00013。
+> デフォルト設定での月間目安コスト：**$0.01 未満**。
+> `claudeStatus.rateLimitApi.enabled: false` で新規APIコールを停止できます。
+> キャッシュが存在する場合は最終取得時の利用率 % が `[Xm ago]` 付きで表示され続けます。
+> キャッシュがない場合はコスト表示のみにフォールバックします。
+
+> [!WARNING]
+> **コスト表示は概算です。** デフォルトのレートは実装時点の Anthropic 公開料金をもとにしており、
+> 料金変更を即座に反映しない可能性があります。
+> 料金が変更された場合は `claudeStatus.pricing.*` 設定を更新してください。
+> 最新の料金は [Anthropic 料金ページ](https://www.anthropic.com/pricing) でご確認ください。
 
 ---
 
@@ -183,7 +199,8 @@ npm run package       # → vscode-claude-status-*.vsix
 | `claudeStatus.statusBar.alignment` | `"left"` \| `"right"` | `"left"` | ステータスバーの位置 |
 | `claudeStatus.statusBar.showProjectCost` | `boolean` | `true` | ステータスバーにプロジェクトコストを表示 |
 | `claudeStatus.cache.ttlSeconds` | `number` (60–3600) | `300` | APIキャッシュTTL（秒） |
-| `claudeStatus.realtime.enabled` | `boolean` | `false` | TTL秒ごとにAPIをポーリング |
+| `claudeStatus.rateLimitApi.enabled` | `boolean` | `true` | レート制限%をAnthropicAPIから取得。`false` で新規APIコール停止。キャッシュがあれば `[Xm ago]` 付きで % を継続表示 |
+| `claudeStatus.realtime.enabled` | `boolean` | `false` | TTL秒ごとにAPIをポーリング（`rateLimitApi.enabled` が必要） |
 | `claudeStatus.budget.dailyUsd` | `number \| null` | `null` | 日次予算（USD）（`null` = 無効） |
 | `claudeStatus.budget.weeklyUsd` | `number \| null` | `null` | 週次予算（USD） |
 | `claudeStatus.budget.alertThresholdPercent` | `number` (1–100) | `80` | 予算アラート閾値（%） |
@@ -193,6 +210,10 @@ npm run package       # → vscode-claude-status-*.vsix
 | `claudeStatus.heatmap.days` | `30 \| 60 \| 90` | `90` | 使用ヒートマップに表示する日数 |
 | `claudeStatus.credentials.path` | `string \| null` | `null` | カスタム認証情報ファイルパス |
 | `claudeStatus.claudeProvider` | `"auto"` \| `"claude-ai"` \| `"aws-bedrock"` \| `"api-key"` | `"auto"` | プロバイダータイプ（自動検出または明示的指定） |
+| `claudeStatus.pricing.inputPerMillion` | `number` | `3.00` | 入力トークン 1M あたりの USD 単価 |
+| `claudeStatus.pricing.outputPerMillion` | `number` | `15.00` | 出力トークン 1M あたりの USD 単価 |
+| `claudeStatus.pricing.cacheReadPerMillion` | `number` | `0.30` | キャッシュ読み取りトークン 1M あたりの USD 単価 |
+| `claudeStatus.pricing.cacheCreatePerMillion` | `number` | `3.75` | キャッシュ作成トークン 1M あたりの USD 単価 |
 
 ```jsonc
 // 設定例: settings.json
@@ -203,7 +224,14 @@ npm run package       # → vscode-claude-status-*.vsix
   "claudeStatus.budget.alertThresholdPercent": 80,
   "claudeStatus.statusBar.showProjectCost": true,
   // AWS Bedrockユーザー — OAuth検出をスキップし、コストのみ表示：
-  "claudeStatus.claudeProvider": "aws-bedrock"
+  "claudeStatus.claudeProvider": "aws-bedrock",
+  // 新規レート制限APIコールを停止（キャッシュがあれば % を staleness 表示継続）：
+  // "claudeStatus.rateLimitApi.enabled": false,
+  // Anthropicが料金を変更した場合は以下を更新してください：
+  "claudeStatus.pricing.inputPerMillion": 3.00,
+  "claudeStatus.pricing.outputPerMillion": 15.00,
+  "claudeStatus.pricing.cacheReadPerMillion": 0.30,
+  "claudeStatus.pricing.cacheCreatePerMillion": 3.75
 }
 ```
 

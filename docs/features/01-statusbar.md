@@ -9,35 +9,52 @@ Lightweight, non-blocking, updates automatically.
 
 ## Display Format
 
-### Normal mode
+### Percent mode (claude-ai provider, `displayMode: "percent"`)
+
 ```
-🤖 5h:78% 7d:84% | PJ:$3.21
+🤖 5h:78% 7d:84% | my-app:$3.21
 ```
 
 ### Warning mode (≥75% utilization)
 ```
-🤖 5h:78%⚠ 7d:84%⚠ | PJ:$3.21
+🤖 5h:78%⚠ 7d:84%⚠ | my-app:$3.21
 ```
 
 ### Denied (limit reached)
 ```
-🤖 5h:100%✗ | PJ:$3.21
+🤖 5h:100%✗ | my-app:$3.21
 ```
 
-### No cache yet (initial state)
+### Stale data (cache expired, or `rateLimitApi.enabled: false` with cached data)
+```
+🤖 5h:78% 7d:84% [32m ago] | my-app:$3.21
+```
+
+### Cost mode (non-claude-ai provider, or `displayMode: "cost"`)
+```
+🤖 5h:$14.21 7d:$53.17 | my-app:$3.21
+```
+
+### No data yet (initial state)
 ```
 🤖 Claude: run refresh
-```
-
-### Stale data (Claude idle, cache expired)
-```
-🤖 5h:78% [32m ago] | PJ:$3.21
 ```
 
 ### No credentials
 ```
 🤖 Not logged in
 ```
+
+---
+
+## Provider Behavior
+
+| Provider | Rate % shown | Mode |
+|----------|-------------|------|
+| `claude-ai`, API enabled | Yes | percent (default) or cost |
+| `claude-ai`, API disabled, cache exists | Yes (stale) | percent with `[Xm ago]` |
+| `claude-ai`, API disabled, no cache | No | cost only |
+| `aws-bedrock` / `api-key` / `unknown` | No | cost only (always) |
 
 ---
 
@@ -48,14 +65,15 @@ const statusBarItem = vscode.window.createStatusBarItem(
   vscode.StatusBarAlignment.Left,
   100  // priority — appears near left side
 )
+statusBarItem.name = 'Claude Code Usage'  // for screen readers
 statusBarItem.command = 'vscode-claude-status.openDashboard'
-statusBarItem.tooltip = buildTooltip(data)  // see Tooltip section
+statusBarItem.tooltip = buildTooltip(data)
 ```
 
 ### Position
 
-Left side of status bar, priority 100 (between language selector area and git info).
-Configurable via `claudeStatus.statusBar.alignment` setting ('left' | 'right').
+Left side of status bar, priority 100.
+Configurable via `claudeStatus.statusBar.alignment` setting (`'left'` | `'right'`).
 
 ---
 
@@ -63,22 +81,36 @@ Configurable via `claudeStatus.statusBar.alignment` setting ('left' | 'right').
 
 Use VSCode theme color IDs (not hardcoded hex):
 
-| State | Color ID |
-|-------|----------|
-| Normal (< 75%) | `statusBar.foreground` (default, no change) |
-| Warning (≥ 75%) | `statusBarItem.warningBackground` |
-| Denied (100%) | `statusBarItem.errorBackground` |
-| Stale data | `statusBar.foreground` with dimmed opacity via color `#888888` |
-| No credentials | `statusBarItem.errorBackground` |
+| State | Background | Foreground |
+|-------|-----------|------------|
+| Normal (< 75%) | — | — (default) |
+| Warning (≥ 75%) | `statusBarItem.warningBackground` | `statusBarItem.warningForeground` |
+| Denied (100%) | `statusBarItem.errorBackground` | `statusBarItem.errorForeground` |
+| Stale data | — | `descriptionForeground` (dimmed) |
+| No credentials | `statusBarItem.errorBackground` | `statusBarItem.errorForeground` |
+| Non-claude-ai | — | — (default) |
 
 ```typescript
-function applyColor(item: vscode.StatusBarItem, status: LimitStatus, isStale: boolean) {
-  if (isStale) {
+function applyColor(item: vscode.StatusBarItem, data: ClaudeUsageData): void {
+  const { limitStatus, dataSource, providerType } = data
+
+  if (dataSource === 'no-credentials') {
+    item.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground')
+    item.color = new vscode.ThemeColor('statusBarItem.errorForeground')
+    return
+  }
+  if (dataSource === 'stale') {
     item.backgroundColor = undefined
     item.color = new vscode.ThemeColor('descriptionForeground')
     return
   }
-  switch (status) {
+  // Non-claude-ai providers: no warning/error colors
+  if (providerType !== 'claude-ai') {
+    item.backgroundColor = undefined
+    item.color = undefined
+    return
+  }
+  switch (limitStatus) {
     case 'denied':
       item.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground')
       item.color = new vscode.ThemeColor('statusBarItem.errorForeground')
@@ -98,6 +130,7 @@ function applyColor(item: vscode.StatusBarItem, status: LimitStatus, isStale: bo
 
 ## Tooltip (hover text)
 
+### Claude.ai provider
 ```
 Claude Code Usage
 ─────────────────────────────
@@ -107,11 +140,26 @@ Claude Code Usage
 Token Cost (local)
 ─────────────────────────────
 5h:   in:38.5K out:127.8K  $14.21
-day:  in:38.5K out:127.8K  $14.21
-7d:   in:80.0K out:468.9K  $53.17
+day:  $14.21
+7d:   $53.17
 
 Project: my-app
   Today: $3.21  |  7d: $18.45
+
+Last updated: just now
+Click to open dashboard →
+```
+
+### Non-claude-ai provider (e.g. AWS Bedrock)
+```
+Claude Code (AWS Bedrock)
+─────────────────────────────
+
+Token Cost (local)
+─────────────────────────────
+5h:   in:38.5K out:127.8K  $14.21
+day:  $14.21
+7d:   $53.17
 
 Last updated: just now
 Click to open dashboard →
@@ -128,31 +176,31 @@ Build with `\n`-separated string. VSCode renders tooltip as plain text.
 | Extension activation | Read cache → update immediately |
 | JSONL file change (FileWatcher) | `DataManager.refresh()` → update |
 | Timer (every 60 seconds) | Re-render from cache (no API call) |
-| User clicks "Refresh" in WebView | `DataManager.refresh(forceApi=true)` → update |
+| User clicks "↻ Refresh" in WebView | `DataManager.forceRefresh()` → update |
 
 Timer implementation:
 ```typescript
 const timer = setInterval(() => {
-  dataManager.getUsageData().then(data => statusBar.update(data))
+  dataManager.refresh().catch(() => {})
 }, 60_000)
-// Register for disposal: context.subscriptions.push({ dispose: () => clearInterval(timer) })
+context.subscriptions.push({ dispose: () => clearInterval(timer) })
 ```
 
 ---
 
 ## Display Toggle (Cost Mode)
 
-Command: `vscode-claude-status.toggleCostMode`  
+Command: `vscode-claude-status.toggleDisplayMode`
 Keyboard: `Ctrl+Shift+Alt+C` (default, configurable)
 
 In cost mode, replace utilization percentage with dollar amount:
 ```
-🤖 5h:$14.21 7d:$53.17 | PJ:$3.21
+🤖 5h:$14.21 7d:$53.17 | my-app:$3.21
 ```
 
 Toggle state is persisted in `vscode.workspace.getConfiguration()`:
 ```typescript
-config.update('claudeStatus.displayMode', 'cost', vscode.ConfigurationTarget.Global)
+config.setDisplayMode('cost')  // → claudeStatus.displayMode
 ```
 
 ---

@@ -4,6 +4,47 @@ All settings are under the `claudeStatus` namespace in VSCode settings.
 
 ---
 
+## Quick Reference — Plan × Settings Matrix
+
+What the status bar and dashboard show, depending on your Claude plan and key settings.
+
+### Step 1 — Identify your provider
+
+| You use… | `claudeProvider` (auto-detected) |
+|----------|----------------------------------|
+| Claude.ai subscription (Pro / Max) | `claude-ai` |
+| AWS Bedrock | `aws-bedrock` |
+| Anthropic API key (`ANTHROPIC_API_KEY`) | `api-key` |
+
+### Step 2 — What you see
+
+| Provider | Plan tier | `rateLimitApi.enabled` | `displayMode` | Status bar | Rate limit bars in dashboard |
+|----------|-----------|----------------------|---------------|------------|------------------------------|
+| `claude-ai` | Max (5h + 7d windows) | `true` (default) | `percent` (default) | `🤖 5h:78% 7d:84%` | ✅ Both windows |
+| `claude-ai` | Pro/other (5h only) | `true` (default) | `percent` (default) | `🤖 5h:78%` | ✅ 5h only |
+| `claude-ai` | any | `true` (default) | `cost` | `🤖 5h:$14.21 7d:$53.17` | ✅ Shown (bars hidden in label) |
+| `claude-ai` | any | `false` + cache exists | `percent` | `🤖 5h:78% [10m ago]` | ⚠️ Stale (dimmed) |
+| `claude-ai` | any | `false` + no cache | any | `🤖 5h:$0.00 7d:$0.00` | ❌ Not shown |
+| `aws-bedrock` | — | — | — | `🤖 5h:$14.21 7d:$53.17` | ❌ Not shown (no rate limits) |
+| `api-key` | — | — | — | `🤖 5h:$14.21 7d:$53.17` | ❌ Not shown (no rate limits) |
+
+### Step 3 — Recommended settings per use case
+
+| Use case | Recommended settings |
+|----------|----------------------|
+| Claude.ai — see live % in real time | `rateLimitApi.enabled: true`, `displayMode: "percent"` (defaults) |
+| Claude.ai — prefer cost over % | `displayMode: "cost"` |
+| Claude.ai — offline / no outbound HTTPS | `rateLimitApi.enabled: false` (cached % still shown if previously fetched) |
+| AWS Bedrock / API key | No extra config needed — cost mode is automatic |
+| Track spending against a budget | Set `budget.dailyUsd` in dashboard or settings |
+
+> **Note on stale data:** When `rateLimitApi.enabled: false`, the extension never makes
+> new API calls but still shows the last-fetched rate limit % with a `[Xm ago]` indicator
+> so you know how old the data is. The % only disappears if there is no cache at all
+> (e.g. first run with API disabled).
+
+---
+
 ## Full Settings Schema (`package.json` contributes.configuration)
 
 ```json
@@ -36,10 +77,16 @@ All settings are under the `claudeStatus` namespace in VSCode settings.
     "description": "Cache TTL in seconds. API is not called more often than this when Claude Code is idle."
   },
 
+  "claudeStatus.rateLimitApi.enabled": {
+    "type": "boolean",
+    "default": true,
+    "description": "Enable fetching rate-limit utilization (5h/7d %) from the Anthropic API. When disabled, no new API calls are made. If a prior cache exists, the cached percentages are still shown with a stale-age indicator (e.g. '[10m ago]'). If no cache exists, only local token cost is shown. API consumption is negligible by default because calls are made only when Claude Code is actively running."
+  },
+
   "claudeStatus.realtime.enabled": {
     "type": "boolean",
     "default": false,
-    "description": "Enable realtime polling (1 API call every cache.ttlSeconds). Increases API usage."
+    "description": "Poll the rate-limit API every cache.ttlSeconds regardless of Claude Code activity. Requires rateLimitApi.enabled to be true. Increases API usage."
   },
 
   "claudeStatus.budget.dailyUsd": {
@@ -108,6 +155,32 @@ All settings are under the `claudeStatus` namespace in VSCode settings.
     ],
     "default": "auto",
     "description": "Claude provider type. Controls whether rate limit percentages or cost is shown in the status bar."
+  },
+
+  // --- Token pricing (user-adjustable when Anthropic changes rates) ---
+  "claudeStatus.pricing.inputPerMillion": {
+    "type": "number",
+    "default": 3.00,
+    "minimum": 0,
+    "description": "Cost per 1M input tokens in USD. Default: $3.00 (Claude Sonnet 4.x)."
+  },
+  "claudeStatus.pricing.outputPerMillion": {
+    "type": "number",
+    "default": 15.00,
+    "minimum": 0,
+    "description": "Cost per 1M output tokens in USD. Default: $15.00 (Claude Sonnet 4.x)."
+  },
+  "claudeStatus.pricing.cacheReadPerMillion": {
+    "type": "number",
+    "default": 0.30,
+    "minimum": 0,
+    "description": "Cost per 1M cache-read tokens in USD. Default: $0.30 (Claude Sonnet 4.x)."
+  },
+  "claudeStatus.pricing.cacheCreatePerMillion": {
+    "type": "number",
+    "default": 3.75,
+    "minimum": 0,
+    "description": "Cost per 1M cache-creation tokens in USD. Default: $3.75 (Claude Sonnet 4.x)."
   }
 }
 ```
@@ -160,26 +233,38 @@ Always access settings through a typed wrapper to avoid magic strings:
 ```typescript
 // src/config.ts
 export class ExtensionConfig {
-  private get config() {
+  private get cfg() {
     return vscode.workspace.getConfiguration('claudeStatus')
   }
 
   get displayMode(): 'percent' | 'cost' {
-    return this.config.get('displayMode', 'percent')
+    return this.cfg.get('displayMode', 'percent')
   }
 
   get cacheTtlSeconds(): number {
-    return this.config.get('cache.ttlSeconds', 300)
+    return this.cfg.get('cache.ttlSeconds', 300)
+  }
+
+  get rateLimitApiEnabled(): boolean {
+    return this.cfg.get('rateLimitApi.enabled', true)
   }
 
   get dailyBudget(): number | null {
-    return this.config.get('budget.dailyUsd', null)
+    return this.cfg.get('budget.dailyUsd', null)
+  }
+
+  get claudeProvider(): 'auto' | ClaudeProvider {
+    return this.cfg.get('claudeProvider', 'auto')
   }
 
   // ... etc
 
   async setDisplayMode(mode: 'percent' | 'cost'): Promise<void> {
-    await this.config.update('displayMode', mode, vscode.ConfigurationTarget.Global)
+    await this.cfg.update('displayMode', mode, vscode.ConfigurationTarget.Global)
+  }
+
+  async setDailyBudget(value: number | null): Promise<void> {
+    await this.cfg.update('budget.dailyUsd', value, vscode.ConfigurationTarget.Global)
   }
 }
 ```
@@ -193,7 +278,6 @@ React to settings changes without requiring extension restart:
 ```typescript
 vscode.workspace.onDidChangeConfiguration(e => {
   if (e.affectsConfiguration('claudeStatus')) {
-    config.reload()
     statusBar.update(lastData)  // re-render with new settings
   }
 })

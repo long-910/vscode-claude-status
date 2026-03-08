@@ -3,8 +3,8 @@
 ## Purpose
 
 **VSCode-exclusive feature** — visualize Claude Code usage patterns over time.
-Two views: a GitHub Contributions-style daily heatmap (90 days), and an
-hourly usage pattern bar chart (average activity by hour of day).
+Two views: a GitHub Contributions-style daily heatmap (configurable days), and an
+hourly usage pattern bar chart (last 30 days, average activity by hour of day).
 
 Both views use **Chart.js** loaded from CDN — no npm dependency needed in the
 extension itself, keeping the package size small.
@@ -13,82 +13,66 @@ extension itself, keeping the package size small.
 
 ## Data Aggregation (`src/webview/heatmap.ts`)
 
+### Data Types
+
 ```typescript
-async function getHeatmapData(days: number = 90): Promise<HeatmapData> {
-  const claudeProjectsDir = path.join(os.homedir(), '.claude', 'projects')
-  const allEntries: JournalEntry[] = []
-
-  // Read ALL project directories (global view, not per-project)
-  const projectDirs = await fs.readdir(claudeProjectsDir)
-  for (const dir of projectDirs) {
-    const projectPath = path.join(claudeProjectsDir, dir)
-    const stat = await fs.stat(projectPath)
-    if (!stat.isDirectory()) continue
-
-    const files = await fs.readdir(projectPath)
-    for (const file of files) {
-      if (!file.endsWith('.jsonl')) continue
-      const entries = await readJsonlFile(path.join(projectPath, file))
-      allEntries.push(...entries)
-    }
-  }
-
-  return {
-    daily: aggregateByDay(allEntries, days),
-    hourly: aggregateByHour(allEntries, 30),  // last 30 days for hourly
-  }
+interface EntryForHeatmap {
+  timestamp: number   // ms
+  cost: number        // USD (always calculated from tokens — no costUSD field)
+  tokens: number      // input + output tokens
+  hour: number        // 0–23 local time
 }
 
-function aggregateByDay(entries: JournalEntry[], days: number): DailyUsage[] {
-  const cutoff = Date.now() - days * 24 * 3600 * 1000
-  const byDate = new Map<string, DailyUsage>()
-
-  for (const entry of entries) {
-    const ts = new Date(entry.timestamp)
-    if (ts.getTime() < cutoff) continue
-
-    const dateKey = ts.toISOString().slice(0, 10)  // "2026-02-24"
-    const existing = byDate.get(dateKey) ?? {
-      date: dateKey, cost: 0, sessionCount: 0, tokensTotal: 0
-    }
-    existing.cost += entry.costUSD ?? 0
-    existing.tokensTotal += (entry.usage?.input_tokens ?? 0) + (entry.usage?.output_tokens ?? 0)
-    byDate.set(dateKey, existing)
-  }
-
-  // Count sessions: assume new session if gap > 30 min from previous entry on same day
-  // (simplified: count JSONL files per day instead)
-
-  // Fill in missing days with zeroes
-  const result: DailyUsage[] = []
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 24 * 3600 * 1000)
-    const key = d.toISOString().slice(0, 10)
-    result.push(byDate.get(key) ?? { date: key, cost: 0, sessionCount: 0, tokensTotal: 0 })
-  }
-  return result
+interface DailyUsage {
+  date: string        // "YYYY-MM-DD" local time
+  cost: number        // USD
+  sessionCount: number  // number of entries (assistant turns) on this day
+  tokensTotal: number
 }
 
-function aggregateByHour(entries: JournalEntry[], days: number): HourlyUsage[] {
-  const cutoff = Date.now() - days * 24 * 3600 * 1000
-  const byHour = new Array(24).fill(null).map((_, h) => ({
-    hour: h, totalCost: 0, count: 0
-  }))
-
-  for (const entry of entries) {
-    const ts = new Date(entry.timestamp)
-    if (ts.getTime() < cutoff) continue
-    const h = ts.getHours()
-    byHour[h].totalCost += entry.costUSD ?? 0
-    byHour[h].count++
-  }
-
-  return byHour.map(h => ({
-    hour: h.hour,
-    avgCost: h.count > 0 ? h.totalCost / h.count : 0,
-    count: h.count,
-  }))
+interface HourlyUsage {
+  hour: number        // 0–23 (local time)
+  avgCost: number     // USD average per entry at this hour
+  count: number       // total entries at this hour (across all days)
 }
+
+interface HeatmapData {
+  daily: DailyUsage[]    // N days (configurable, default 90)
+  hourly: HourlyUsage[]  // last 30 days by hour (fixed window)
+  generatedAt: Date
+}
+```
+
+### Main Entry Point
+
+```typescript
+export async function getHeatmapData(days = 90): Promise<HeatmapData> {
+  // Reads ALL project directories (global view, not per-project)
+  // Filters directories AND files by mtime >= cutoff (performance optimization)
+  // Reads qualifying JSONL files in parallel with Promise.all
+  // Aggregates entries where type === 'assistant' AND message.usage exists
+}
+```
+
+**Performance optimizations (implemented):**
+1. Skip project directories with `mtime < cutoff` (skips dirs with no recent activity)
+2. Skip individual JSONL files with `mtime < cutoff`
+3. Read all qualifying files in parallel with `Promise.all`
+4. In-memory TTL cache in DataManager: 5-minute TTL (`heatmapTtlMs = 5 * 60 * 1000`)
+5. Heatmap computed in background after initial data update, fires second `onDidUpdate`
+
+### Aggregation Functions
+
+```typescript
+export function aggregateByDay(entries: EntryForHeatmap[], days: number): DailyUsage[]
+// - Uses local time date keys ("YYYY-MM-DD")
+// - Fills ALL days in the window (including zero-activity days)
+// - sessionCount = number of assistant entries (turns), not JSONL files
+
+export function aggregateByHour(entries: EntryForHeatmap[], days: number): HourlyUsage[]
+// - Uses local time hours (0–23)
+// - Always called with days=30 regardless of heatmap.days config
+// - avgCost = totalCost / count (per entry, not per day)
 ```
 
 ---
@@ -102,46 +86,55 @@ just a CSS grid. Chart.js is used only for the bar chart.
 
 ```html
 <div class="heatmap-container">
-  <div class="heatmap-header">
+  <div class="hm-header">
     <!-- Month labels, generated by JS -->
   </div>
-  <div class="heatmap-grid">
-    <!-- 90 cells, one per day -->
-    <!-- data-date, data-cost set by JS -->
+  <div class="hm-grid">
+    <!-- N cells, one per day, arranged in weekly columns -->
   </div>
-  <div class="heatmap-legend">
-    Less <span class="cell l0"></span>
-         <span class="cell l1"></span>
-         <span class="cell l2"></span>
-         <span class="cell l3"></span>
-         <span class="cell l4"></span> More
+  <div class="hm-legend">
+    Less
+    <span class="hm-cell hm-l0"></span>
+    <span class="hm-cell hm-l1"></span>
+    <span class="hm-cell hm-l2"></span>
+    <span class="hm-cell hm-l3"></span>
+    <span class="hm-cell hm-l4"></span>
+    More
   </div>
 </div>
 ```
 
 ### CSS Grid
 
+The heatmap is a column-by-column weekly layout:
+
 ```css
-.heatmap-grid {
-  display: grid;
-  grid-template-columns: repeat(13, 1fr);  /* ~13 weeks */
-  grid-auto-flow: column;
-  gap: 3px;
+.hm-grid {
+  display: flex;
+  gap: 2px;
 }
 
-.heatmap-cell {
+/* Each week column */
+.hm-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hm-cell {
   width: 12px;
   height: 12px;
   border-radius: 2px;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
-/* Intensity levels — use green palette similar to GitHub */
-.cell.l0 { background-color: var(--vscode-editor-background); border: 1px solid var(--vscode-panel-border); }
-.cell.l1 { background-color: #0e4429; }
-.cell.l2 { background-color: #006d32; }
-.cell.l3 { background-color: #26a641; }
-.cell.l4 { background-color: #39d353; }
+/* Intensity levels — green palette similar to GitHub */
+.hm-l0 { background-color: var(--vscode-editor-background); border: 1px solid var(--vscode-panel-border); }
+.hm-l1 { background-color: #0e4429; }
+.hm-l2 { background-color: #006d32; }
+.hm-l3 { background-color: #26a641; }
+.hm-l4 { background-color: #39d353; }
 ```
 
 ### Level Thresholds
@@ -150,7 +143,7 @@ Assign level based on cost relative to max daily cost in the dataset:
 
 ```javascript
 function getCostLevel(cost, maxCost) {
-  if (cost === 0) return 0
+  if (cost === 0 || maxCost === 0) return 0
   const ratio = cost / maxCost
   if (ratio < 0.25) return 1
   if (ratio < 0.50) return 2
@@ -162,10 +155,13 @@ function getCostLevel(cost, maxCost) {
 ### Tooltip on Hover
 
 ```javascript
-cell.addEventListener('mouseenter', (e) => {
+cell.addEventListener('mouseenter', () => {
   tooltip.textContent = `${cell.dataset.date}: $${parseFloat(cell.dataset.cost).toFixed(3)}`
   tooltip.style.display = 'block'
-  // position near cursor
+  // position tooltip near cursor
+})
+cell.addEventListener('mouseleave', () => {
+  tooltip.style.display = 'none'
 })
 ```
 
@@ -184,7 +180,7 @@ cell.addEventListener('mouseenter', (e) => {
     data: {
       labels: Array.from({length: 24}, (_, i) => `${i}h`),
       datasets: [{
-        label: 'Avg cost per session ($)',
+        label: 'Avg cost per entry ($)',
         data: hourlyData.map(h => h.avgCost),
         backgroundColor: getComputedStyle(document.body)
           .getPropertyValue('--vscode-progressBar-background').trim(),
@@ -196,27 +192,20 @@ cell.addEventListener('mouseenter', (e) => {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: ctx => `$${ctx.parsed.y.toFixed(4)} avg (${hourlyData[ctx.dataIndex].count} sessions)`
+            label: ctx => `$${ctx.parsed.y.toFixed(4)} avg (${hourlyData[ctx.dataIndex].count} entries)`
           }
         }
       },
       scales: {
-        x: {
-          ticks: { color: getComputedStyle(document.body).getPropertyValue('--vscode-foreground') }
-        },
-        y: {
-          ticks: { color: getComputedStyle(document.body).getPropertyValue('--vscode-foreground') },
-          beginAtZero: true,
-        }
+        x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--vscode-foreground') } },
+        y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--vscode-foreground') }, beginAtZero: true }
       }
     }
   })
 </script>
 ```
 
-### Chart.js Version
-
-Pin to `chart.js@4.4.0` in the CDN URL. Do not use `@latest`.
+> **Chart.js version:** Pinned to `chart.js@4.4.0`. Do not use `@latest`.
 
 ---
 
@@ -224,23 +213,10 @@ Pin to `chart.js@4.4.0` in the CDN URL. Do not use `@latest`.
 
 Heatmap and hourly data are read from JSONL only (no API call).
 Recalculate on:
-- Extension activation (once, then cached in memory)
-- JSONL FileWatcher trigger
-- User clicks "↻ Refresh" in the dashboard
+- Extension activation (lazy — computed on first WebView open)
+- JSONL FileWatcher trigger (via `DataManager.refresh()` → background task)
+- User clicks "↻ Refresh" in the dashboard (invalidates in-memory cache)
 
-Because this reads all 90 days of JSONL, it can be slow on large datasets.
-Run it on a background Node.js worker or use `setTimeout(..., 0)` to avoid
-blocking the extension host.
-
----
-
-## Performance Considerations
-
-If `~/.claude/projects/` contains many large JSONL files, reading all 90 days
-can take >1 second. Mitigations:
-
-1. Read JSONL files in parallel with `Promise.all`
-2. Skip files with `mtime < 90 days ago` using `fs.stat` before reading
-3. Cache the aggregated result to disk (`~/.claude/vscode-claude-status-heatmap-cache.json`)
-   with a 5-minute TTL
-4. Show stale heatmap while fresh data loads in the background
+The heatmap is computed in a background `Promise` to avoid blocking the main update.
+`DataManager` fires a second `onDidUpdate` event when the background computation completes.
+The WebView re-renders the heatmap section when it receives this second update.

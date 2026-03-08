@@ -24,7 +24,85 @@ function generateNonce(): string {
   return crypto.randomBytes(16).toString('hex');
 }
 
-function getWebviewContent(nonce: string): string {
+function buildI18n(): Record<string, string> {
+  const t = vscode.l10n.t.bind(vscode.l10n);
+  return {
+    title:              t('Claude Code Usage'),
+    refresh:            t('↻ Refresh'),
+    toggleMode:         t('$ / %'),
+    currentUsage:       t('Current Usage'),
+    window5h:           t('5h window'),
+    window7d:           t('7d window'),
+    tokenCost:          t('Token Cost'),
+    today:              t('Today'),
+    days7:              t('7 days'),
+    days7short:         t('7d'),
+    days30:             t('30 days'),
+    monthEst:           t('Month (est.)'),
+    project:            t('Project'),
+    prediction:         t('Prediction'),
+    pricingSettings:    t('Pricing & Settings'),
+    usageHistory:       t('Usage History'),
+    loadingProject:     t('Loading project data…'),
+    noProjectData:      t('No project data'),
+    loadingPrediction:  t('Loading prediction…'),
+    noPredictionData:   t('No prediction data'),
+    loadingHistory:     t('Loading usage history…'),
+    noUsageHistory:     t('No usage history'),
+    tokenBreakdown:     t('Token breakdown (5h)'),
+    hide:               t('▲ Hide'),
+    show:               t('▼ Show'),
+    burnRate:           t('Burn rate'),
+    perHour:            t('/hr'),
+    dailyBudget:        t('Daily budget'),
+    weeklyBudget:       t('Weekly budget'),
+    budgetExhausted:    t('💸 Daily budget exhausted'),
+    weeklyExhausted:    t('⚠️ Weekly budget exhausted'),
+    weeklyNearlyExhausted: t('⚠️ Weekly budget nearly exhausted'),
+    configureBudget:    t('⚙ Configure budget'),
+    setDailyBudget:     t('⚙ Set daily budget'),
+    dailyBudgetLabel:   t('Daily budget ($):'),
+    budgetPlaceholder:  t('e.g. 20'),
+    save:               t('Save'),
+    disable:            t('Disable'),
+    input:              t('Input'),
+    output:             t('Output'),
+    cacheRead:          t('Cache read'),
+    cacheCreate:        t('Cache create'),
+    cacheGood:          t('Good! Cache is saving cost.'),
+    cacheLow:           t('Low cache reuse.'),
+    noCacheReads:       t('No cache reads in this window.'),
+    apiEnabled:         t('API enabled'),
+    apiDisabled:        t('API disabled'),
+    editSettings:       t('⚙ Edit pricing & settings'),
+    stale:              t('(stale)'),
+    live:               t('(live)'),
+    justNow:            t('just now'),
+    lastUpdated:        t('Last updated:'),
+    utilization:        t('Utilization'),
+    warningLine:        t('Warning (75%)'),
+    limitLine:          t('Limit (100%)'),
+    less:               t('Less'),
+    more:               t('More'),
+    avgByHour:          t('Avg cost by hour of day (last 30 days)'),
+    resetsIn:           t('resets in'),
+    calculating:        t('Calculating…'),
+    cacheTtl:           t('Cache TTL'),
+    limitIn5hCritical:  t('⛔ 5h limit in ~'),
+    limitIn5hWarning:   t('⚠️ 5h limit in ~'),
+    limitIn5h:          t('5h limit in ~'),
+    atTime:             t('at'),
+    budgetExhaustedAt:  t('💸 Budget exhausted ~'),
+    atThisRate:         t('at this rate'),
+    cacheHitRatio:      t('Cache hit ratio:'),
+    msgs:               t('msgs'),
+    avg:                t('avg'),
+    mAgoFormat:         t('{0}m ago', '__N__'),
+  };
+}
+
+function getWebviewContent(nonce: string, i18n: Record<string, string>): string {
+  const i18nJson = JSON.stringify(i18n);
   return /* html */`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -37,7 +115,7 @@ function getWebviewContent(nonce: string): string {
     img-src data:;
     connect-src 'none';
   ">
-  <title>Claude Code Usage</title>
+  <title>${i18n.title}</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
 
@@ -314,20 +392,20 @@ function getWebviewContent(nonce: string): string {
 <body>
 
   <div class="header">
-    <h1>Claude Code Usage</h1>
+    <h1>${i18n.title}</h1>
     <div class="header-actions">
-      <button id="btn-refresh">↻ Refresh</button>
-      <button id="btn-toggle">$ / %</button>
+      <button id="btn-refresh">${i18n.refresh}</button>
+      <button id="btn-toggle">${i18n.toggleMode}</button>
       <button id="btn-settings">⚙</button>
     </div>
   </div>
 
   <!-- Current Usage -->
   <div class="card">
-    <div class="card-title">Current Usage</div>
+    <div class="card-title">${i18n.currentUsage}</div>
     <div class="progress-row">
       <div class="progress-labels">
-        <span>5h window</span>
+        <span>${i18n.window5h}</span>
         <span id="usage-5h-label">—</span>
       </div>
       <div class="progress-track">
@@ -336,7 +414,7 @@ function getWebviewContent(nonce: string): string {
     </div>
     <div class="progress-row" id="usage-7d-row">
       <div class="progress-labels">
-        <span>7d window</span>
+        <span>${i18n.window7d}</span>
         <span id="usage-7d-label">—</span>
       </div>
       <div class="progress-track">
@@ -348,52 +426,52 @@ function getWebviewContent(nonce: string): string {
   <div class="two-col">
     <!-- Token Cost -->
     <div class="card">
-      <div class="card-title">Token Cost</div>
+      <div class="card-title">${i18n.tokenCost}</div>
       <div class="cost-row">
         <span class="cost-label">5h</span>
         <span id="cost-5h">—</span>
       </div>
       <div class="cost-row">
-        <span class="cost-label">Today</span>
+        <span class="cost-label">${i18n.today}</span>
         <span id="cost-day">—</span>
       </div>
       <div class="cost-row">
-        <span class="cost-label">7 days</span>
+        <span class="cost-label">${i18n.days7}</span>
         <span id="cost-7d">—</span>
       </div>
       <div class="cost-row" id="cost-month-row" style="display:none">
-        <span class="cost-label">Month (est.)</span>
+        <span class="cost-label">${i18n.monthEst}</span>
         <span id="cost-month">—</span>
       </div>
       <div style="margin-top:6px">
-        <button class="detail-toggle" id="breakdown-toggle">▶ Token breakdown (5h)</button>
+        <button class="detail-toggle" id="breakdown-toggle">▶ ${i18n.tokenBreakdown}</button>
         <div id="token-breakdown" class="token-breakdown" style="display:none"></div>
       </div>
     </div>
 
     <!-- Project Cost (Feature 03) -->
     <div class="card">
-      <div class="card-title">Project</div>
+      <div class="card-title">${i18n.project}</div>
       <div id="project-cost-content">
-        <div class="placeholder">Loading project data…</div>
+        <div class="placeholder">${i18n.loadingProject}</div>
       </div>
     </div>
   </div>
 
   <!-- Prediction (Feature 04) -->
   <div class="card">
-    <div class="card-title">Prediction</div>
+    <div class="card-title">${i18n.prediction}</div>
     <canvas id="predChart" height="90" style="display:none; margin-bottom:10px"></canvas>
     <div id="prediction-content">
-      <div class="placeholder">Loading prediction…</div>
+      <div class="placeholder">${i18n.loadingPrediction}</div>
     </div>
   </div>
 
   <!-- Pricing & Settings (collapsible) -->
   <div class="card">
     <div class="card-title-row">
-      <div class="card-title">Pricing &amp; Settings</div>
-      <button class="detail-toggle" id="pricing-toggle">▲ Hide</button>
+      <div class="card-title">${i18n.pricingSettings}</div>
+      <button class="detail-toggle" id="pricing-toggle">${i18n.hide}</button>
     </div>
     <div id="pricing-content"></div>
   </div>
@@ -401,17 +479,18 @@ function getWebviewContent(nonce: string): string {
   <!-- Usage History (Feature 05) -->
   <div class="card">
     <div class="card-title">
-      Usage History (last <span id="heatmap-days">90</span> days)
+      ${i18n.usageHistory} (<span id="heatmap-days">90</span> ${i18n.days7})
     </div>
     <div id="heatmap-content">
-      <div class="placeholder">Loading usage history…</div>
+      <div class="placeholder">${i18n.loadingHistory}</div>
     </div>
   </div>
 
-  <div class="footer" id="footer">Last updated: —</div>
+  <div class="footer" id="footer">${i18n.lastUpdated} —</div>
 
   <script nonce="${nonce}" src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script nonce="${nonce}">
+    const i18n = ${i18nJson};
     const vscode = acquireVsCodeApi();
 
     let currentMode = 'percent';
@@ -455,7 +534,7 @@ function getWebviewContent(nonce: string): string {
         btn.innerHTML = '<span class="spinning">⟳</span>';
         btn.disabled = true;
       } else {
-        btn.textContent = '↻ Refresh';
+        btn.textContent = i18n.refresh;
         btn.disabled = false;
       }
     }
@@ -483,23 +562,23 @@ function getWebviewContent(nonce: string): string {
 
       if (useCostMode) {
         const resetSuffix5h = isClaudeAi && usage.resetIn5h > 0
-          ? ' — resets in ' + fmt(usage.resetIn5h) : '';
+          ? ' — ' + i18n.resetsIn + ' ' + fmt(usage.resetIn5h) : '';
         document.getElementById('usage-5h-label').textContent =
           '$' + usage.cost5h.toFixed(2) + resetSuffix5h;
         if (show7d) {
           document.getElementById('usage-7d-label').textContent =
-            '$' + usage.cost7d.toFixed(2) + ' — resets in ' + fmt(usage.resetIn7d);
+            '$' + usage.cost7d.toFixed(2) + ' — ' + i18n.resetsIn + ' ' + fmt(usage.resetIn7d);
         }
       } else {
         // percent mode — claude-ai only
         const warn5h = usage.utilization5h >= 0.75 ? ' ⚠' : '';
         const deniedFlag = denied ? '✗' : '';
         document.getElementById('usage-5h-label').textContent =
-          pct(usage.utilization5h) + warn5h + deniedFlag + ' — resets in ' + fmt(usage.resetIn5h);
+          pct(usage.utilization5h) + warn5h + deniedFlag + ' — ' + i18n.resetsIn + ' ' + fmt(usage.resetIn5h);
         if (show7d) {
           const warn7d = usage.utilization7d >= 0.75 ? ' ⚠' : '';
           document.getElementById('usage-7d-label').textContent =
-            pct(usage.utilization7d) + warn7d + ' — resets in ' + fmt(usage.resetIn7d);
+            pct(usage.utilization7d) + warn7d + ' — ' + i18n.resetsIn + ' ' + fmt(usage.resetIn7d);
         }
       }
 
@@ -537,18 +616,18 @@ function getWebviewContent(nonce: string): string {
       }
 
       const ageStr = usage.cacheAge < 60
-        ? 'just now'
-        : Math.round(usage.cacheAge / 60) + 'm ago';
-      const srcLabel = usage.dataSource === 'stale' ? ' (stale)'
-                     : usage.dataSource === 'api'   ? ' (live)' : '';
+        ? i18n.justNow
+        : i18n.mAgoFormat.replace('__N__', String(Math.round(usage.cacheAge / 60)));
+      const srcLabel = usage.dataSource === 'stale' ? ' ' + i18n.stale
+                     : usage.dataSource === 'api'   ? ' ' + i18n.live : '';
       document.getElementById('footer').textContent =
-        'Last updated: ' + ageStr + srcLabel;
+        i18n.lastUpdated + ' ' + ageStr + srcLabel;
     }
 
     function updateProjectCosts(projectCosts) {
       const el = document.getElementById('project-cost-content');
       if (!projectCosts || projectCosts.length === 0) {
-        el.innerHTML = '<div class="placeholder">No project data</div>';
+        el.innerHTML = '<div class="placeholder">' + i18n.noProjectData + '</div>';
         return;
       }
       // Single project: show detailed breakdown
@@ -556,9 +635,9 @@ function getWebviewContent(nonce: string): string {
         const pj = projectCosts[0];
         el.innerHTML =
           '<div class="cost-row"><span class="cost-label" style="font-weight:600">' + esc(pj.projectName) + '</span></div>' +
-          '<div class="cost-row"><span class="cost-label">Today</span><span>$' + pj.costToday.toFixed(2) + '</span></div>' +
-          '<div class="cost-row"><span class="cost-label">7 days</span><span>$' + pj.cost7d.toFixed(2) + '</span></div>' +
-          '<div class="cost-row"><span class="cost-label">30 days</span><span>$' + pj.cost30d.toFixed(2) + '</span></div>';
+          '<div class="cost-row"><span class="cost-label">' + i18n.today + '</span><span>$' + pj.costToday.toFixed(2) + '</span></div>' +
+          '<div class="cost-row"><span class="cost-label">' + i18n.days7 + '</span><span>$' + pj.cost7d.toFixed(2) + '</span></div>' +
+          '<div class="cost-row"><span class="cost-label">' + i18n.days30 + '</span><span>$' + pj.cost30d.toFixed(2) + '</span></div>';
         return;
       }
       // Multi-root: show each project
@@ -567,8 +646,8 @@ function getWebviewContent(nonce: string): string {
         html +=
           '<div style="margin-bottom:8px">' +
           '<div class="cost-row"><span class="cost-label" style="font-weight:600">' + esc(pj.projectName) + '</span></div>' +
-          '<div class="cost-row"><span class="cost-label">Today</span><span>$' + pj.costToday.toFixed(2) + '</span></div>' +
-          '<div class="cost-row"><span class="cost-label">7d</span><span>$' + pj.cost7d.toFixed(2) + '</span></div>' +
+          '<div class="cost-row"><span class="cost-label">' + i18n.today + '</span><span>$' + pj.costToday.toFixed(2) + '</span></div>' +
+          '<div class="cost-row"><span class="cost-label">' + i18n.days7short + '</span><span>$' + pj.cost7d.toFixed(2) + '</span></div>' +
           '</div>';
       }
       el.innerHTML = html;
@@ -585,7 +664,7 @@ function getWebviewContent(nonce: string): string {
     function updatePrediction(prediction, usage, settings) {
       const el = document.getElementById('prediction-content');
       if (!prediction) {
-        el.innerHTML = '<div class="placeholder">No prediction data</div>';
+        el.innerHTML = '<div class="placeholder">' + i18n.noPredictionData + '</div>';
         return;
       }
 
@@ -593,25 +672,25 @@ function getWebviewContent(nonce: string): string {
 
       // Burn rate
       if (prediction.currentBurnRate > 0) {
-        html += '<div class="cost-row"><span class="cost-label">Burn rate</span>' +
-          '<span>$' + prediction.currentBurnRate.toFixed(2) + '/hr</span></div>';
+        html += '<div class="cost-row"><span class="cost-label">' + i18n.burnRate + '</span>' +
+          '<span>$' + prediction.currentBurnRate.toFixed(2) + i18n.perHour + '</span></div>';
       } else {
-        html += '<div class="cost-row"><span class="cost-label">Burn rate</span>' +
-          '<span class="placeholder">Calculating…</span></div>';
+        html += '<div class="cost-row"><span class="cost-label">' + i18n.burnRate + '</span>' +
+          '<span class="placeholder">' + i18n.calculating + '</span></div>';
       }
 
       // Rate limit exhaustion alert
       if (prediction.estimatedExhaustionIn !== null) {
         const atTime = fmtTime(prediction.estimatedExhaustionTime);
         if (prediction.estimatedExhaustionIn < 600) {
-          html += '<div class="alert error">⛔ 5h limit in ~' +
-            fmt(prediction.estimatedExhaustionIn) + ' (at ' + atTime + ')</div>';
+          html += '<div class="alert error">' + i18n.limitIn5hCritical +
+            fmt(prediction.estimatedExhaustionIn) + ' (' + i18n.atTime + ' ' + atTime + ')</div>';
         } else if (prediction.estimatedExhaustionIn < 1800) {
-          html += '<div class="alert warning">⚠️ 5h limit in ~' +
-            fmt(prediction.estimatedExhaustionIn) + ' (at ' + atTime + ')</div>';
+          html += '<div class="alert warning">' + i18n.limitIn5hWarning +
+            fmt(prediction.estimatedExhaustionIn) + ' (' + i18n.atTime + ' ' + atTime + ')</div>';
         } else {
-          html += '<div class="prediction-row">5h limit in ~' +
-            fmt(prediction.estimatedExhaustionIn) + ' (at ' + atTime + ')</div>';
+          html += '<div class="prediction-row">' + i18n.limitIn5h +
+            fmt(prediction.estimatedExhaustionIn) + ' (' + i18n.atTime + ' ' + atTime + ')</div>';
         }
       }
 
@@ -624,7 +703,7 @@ function getWebviewContent(nonce: string): string {
 
         html += '<div class="progress-row" style="margin-top:8px">' +
           '<div class="progress-labels">' +
-          '<span>Daily budget</span>' +
+          '<span>' + i18n.dailyBudget + '</span>' +
           '<span>$' + spent.toFixed(2) + ' / $' + total.toFixed(2) +
           ' (' + Math.round(usedPct) + '%)</span>' +
           '</div>' +
@@ -635,16 +714,16 @@ function getWebviewContent(nonce: string): string {
         if (prediction.budgetExhaustionTime) {
           const atBudget = fmtTime(prediction.budgetExhaustionTime);
           if (prediction.budgetRemaining === 0) {
-            html += '<div class="alert error">💸 Daily budget exhausted</div>';
+            html += '<div class="alert error">' + i18n.budgetExhausted + '</div>';
           } else if (usedPct >= 80) {
-            html += '<div class="alert warning">💸 Budget exhausted ~' +
-              atBudget + ' at this rate</div>';
+            html += '<div class="alert warning">' + i18n.budgetExhaustedAt +
+              atBudget + ' ' + i18n.atThisRate + '</div>';
           }
         }
 
-        html += '<button class="configure-link" id="budget-configure-btn">⚙ Configure budget</button>';
+        html += '<button class="configure-link" id="budget-configure-btn">' + i18n.configureBudget + '</button>';
       } else {
-        html += '<button class="configure-link" id="budget-configure-btn">⚙ Set daily budget</button>';
+        html += '<button class="configure-link" id="budget-configure-btn">' + i18n.setDailyBudget + '</button>';
       }
 
       // Weekly budget
@@ -655,7 +734,7 @@ function getWebviewContent(nonce: string): string {
         const weeklyFillClass = weeklyPct >= 80 ? ' error' : weeklyPct >= 60 ? ' warning' : '';
         html += '<div class="progress-row" style="margin-top:8px">' +
           '<div class="progress-labels">' +
-          '<span>Weekly budget</span>' +
+          '<span>' + i18n.weeklyBudget + '</span>' +
           '<span>$' + weeklySpent.toFixed(2) + ' / $' + weeklyTotal.toFixed(2) +
           ' (' + Math.round(weeklyPct) + '%)</span>' +
           '</div>' +
@@ -663,8 +742,8 @@ function getWebviewContent(nonce: string): string {
           weeklyPct.toFixed(1) + '%"></div></div>' +
           '</div>';
         if (weeklyPct >= 80) {
-          html += '<div class="alert warning">⚠️ Weekly budget ' +
-            (weeklyPct >= 100 ? 'exhausted' : 'nearly exhausted') + '</div>';
+          html += '<div class="alert warning">' +
+            (weeklyPct >= 100 ? i18n.weeklyExhausted : i18n.weeklyNearlyExhausted) + '</div>';
         }
       }
 
@@ -675,10 +754,10 @@ function getWebviewContent(nonce: string): string {
       // Budget input form (toggled)
       html += '<div class="budget-configure" id="budget-form" style="display:' +
         (budgetConfigOpen ? 'flex' : 'none') + '">' +
-        '<label>Daily budget ($):</label>' +
-        '<input type="number" id="budget-input" min="0" step="5" placeholder="e.g. 20">' +
-        '<button id="budget-save-btn">Save</button>' +
-        '<button id="budget-clear-btn">Disable</button>' +
+        '<label>' + i18n.dailyBudgetLabel + '</label>' +
+        '<input type="number" id="budget-input" min="0" step="5" placeholder="' + i18n.budgetPlaceholder + '">' +
+        '<button id="budget-save-btn">' + i18n.save + '</button>' +
+        '<button id="budget-clear-btn">' + i18n.disable + '</button>' +
         '</div>';
 
       el.innerHTML = html;
@@ -711,7 +790,7 @@ function getWebviewContent(nonce: string): string {
       const el = document.getElementById('token-breakdown');
       const btn = document.getElementById('breakdown-toggle');
       if (el) { el.style.display = breakdownOpen ? 'block' : 'none'; }
-      if (btn) { btn.textContent = (breakdownOpen ? '▼' : '▶') + ' Token breakdown (5h)'; }
+      if (btn) { btn.textContent = (breakdownOpen ? '▼' : '▶') + ' ' + i18n.tokenBreakdown; }
       if (breakdownOpen && lastData) {
         renderTokenBreakdown(lastData.usage, lastData.pricing);
       }
@@ -734,29 +813,29 @@ function getWebviewContent(nonce: string): string {
         ? Math.round((usage.tokensCacheRead5h / totalIn) * 100) : 0;
 
       let html =
-        '<div class="cost-row"><span class="cost-label">Input</span>' +
+        '<div class="cost-row"><span class="cost-label">' + i18n.input + '</span>' +
         '<span>' + fmtK(usage.tokensIn5h) + ' tok = $' + inCost.toFixed(4) + '</span></div>' +
-        '<div class="cost-row"><span class="cost-label">Output</span>' +
+        '<div class="cost-row"><span class="cost-label">' + i18n.output + '</span>' +
         '<span>' + fmtK(usage.tokensOut5h) + ' tok = $' + outCost.toFixed(4) + '</span></div>';
 
       if (usage.tokensCacheRead5h > 0 || usage.tokensCacheCreate5h > 0) {
         html +=
-          '<div class="cost-row"><span class="cost-label">Cache read</span>' +
+          '<div class="cost-row"><span class="cost-label">' + i18n.cacheRead + '</span>' +
           '<span>' + fmtK(usage.tokensCacheRead5h) + ' tok = $' + rdCost.toFixed(4) + '</span></div>' +
-          '<div class="cost-row"><span class="cost-label">Cache create</span>' +
+          '<div class="cost-row"><span class="cost-label">' + i18n.cacheCreate + '</span>' +
           '<span>' + fmtK(usage.tokensCacheCreate5h) + ' tok = $' + crCost.toFixed(4) + '</span></div>';
       }
 
       html += '<div class="cache-efficiency">';
       if (usage.tokensCacheRead5h > 0) {
-        html += 'Cache hit ratio: ' + cacheHitRatio + '% — ';
+        html += i18n.cacheHitRatio + ' ' + cacheHitRatio + '% — ';
         if (cacheHitRatio >= 50) {
-          html += 'Good! Cache is saving cost.';
+          html += i18n.cacheGood;
         } else {
-          html += 'Low cache reuse.';
+          html += i18n.cacheLow;
         }
       } else {
-        html += 'No cache reads in this window.';
+        html += i18n.noCacheReads;
       }
       html += '</div>';
 
@@ -775,7 +854,7 @@ function getWebviewContent(nonce: string): string {
           renderPricingContent(lastData.pricing, lastData.settings);
         }
       }
-      if (btn) { btn.textContent = pricingOpen ? '▲ Hide' : '▼ Show'; }
+      if (btn) { btn.textContent = pricingOpen ? i18n.hide : i18n.show; }
     }
 
     function renderPricingContent(pricing, settings) {
@@ -789,33 +868,33 @@ function getWebviewContent(nonce: string): string {
       }[settings.provider] || settings.provider;
 
       const apiStatus = settings.apiEnabled
-        ? '<span class="settings-badge ok">API enabled</span>'
-        : '<span class="settings-badge warn">API disabled</span>';
+        ? '<span class="settings-badge ok">' + i18n.apiEnabled + '</span>'
+        : '<span class="settings-badge warn">' + i18n.apiDisabled + '</span>';
 
       const cacheMins = Math.round(settings.cacheTtlSeconds / 60);
 
       let html =
         '<div class="pricing-grid">' +
-        '<span class="pg-label">Input</span>' +
+        '<span class="pg-label">' + i18n.input + '</span>' +
         '<span class="pg-rate">$' + pricing.inputPerMillion.toFixed(2) + '</span>' +
         '<span class="pg-unit">/ 1M tokens</span>' +
-        '<span class="pg-label">Output</span>' +
+        '<span class="pg-label">' + i18n.output + '</span>' +
         '<span class="pg-rate">$' + pricing.outputPerMillion.toFixed(2) + '</span>' +
         '<span class="pg-unit">/ 1M tokens</span>' +
-        '<span class="pg-label">Cache read</span>' +
+        '<span class="pg-label">' + i18n.cacheRead + '</span>' +
         '<span class="pg-rate">$' + pricing.cacheReadPerMillion.toFixed(2) + '</span>' +
         '<span class="pg-unit">/ 1M tokens</span>' +
-        '<span class="pg-label">Cache create</span>' +
+        '<span class="pg-label">' + i18n.cacheCreate + '</span>' +
         '<span class="pg-rate">$' + pricing.cacheCreatePerMillion.toFixed(2) + '</span>' +
         '<span class="pg-unit">/ 1M tokens</span>' +
         '</div>' +
         '<div class="settings-row">' +
         '<span class="settings-badge">' + esc(providerLabel) + '</span>' +
         apiStatus +
-        '<span class="settings-badge">Cache TTL: ' + cacheMins + 'm</span>' +
+        '<span class="settings-badge">' + i18n.cacheTtl + ': ' + cacheMins + 'm</span>' +
         '</div>' +
         '<div style="margin-top:8px">' +
-        '<button class="configure-link" id="pricing-settings-btn">⚙ Edit pricing &amp; settings</button>' +
+        '<button class="configure-link" id="pricing-settings-btn">' + i18n.editSettings + '</button>' +
         '</div>';
 
       el.innerHTML = html;
@@ -888,7 +967,7 @@ function getWebviewContent(nonce: string): string {
           labels,
           datasets: [
             {
-              label: 'Utilization',
+              label: i18n.utilization,
               data: projValues,
               borderColor: lineColor,
               backgroundColor: lineColor + '22',
@@ -898,7 +977,7 @@ function getWebviewContent(nonce: string): string {
               tension: 0,
             },
             {
-              label: 'Warning (75%)',
+              label: i18n.warningLine,
               data: Array(refLen).fill(75),
               borderColor: '#e8a83888',
               borderWidth: 1,
@@ -907,7 +986,7 @@ function getWebviewContent(nonce: string): string {
               fill: false,
             },
             {
-              label: 'Limit (100%)',
+              label: i18n.limitLine,
               data: Array(refLen).fill(100),
               borderColor: '#cc333388',
               borderWidth: 1,
@@ -925,7 +1004,7 @@ function getWebviewContent(nonce: string): string {
             tooltip: {
               filter: item => item.datasetIndex === 0,
               callbacks: {
-                label: ctx => 'Utilization: ' + ctx.parsed.y.toFixed(1) + '%',
+                label: ctx => i18n.utilization + ': ' + ctx.parsed.y.toFixed(1) + '%',
               },
             },
           },
@@ -967,7 +1046,7 @@ function getWebviewContent(nonce: string): string {
       const daysEl = document.getElementById('heatmap-days');
 
       if (!heatmap || !heatmap.daily || heatmap.daily.length === 0) {
-        el.innerHTML = '<div class="placeholder">No usage history</div>';
+        el.innerHTML = '<div class="placeholder">' + i18n.noUsageHistory + '</div>';
         return;
       }
 
@@ -1018,13 +1097,13 @@ function getWebviewContent(nonce: string): string {
 
       // Legend
       const legendHtml =
-        '<div class="heatmap-legend">Less ' +
+        '<div class="heatmap-legend">' + i18n.less + ' ' +
         '<div class="hm-cell l0"></div>' +
         '<div class="hm-cell l1"></div>' +
         '<div class="hm-cell l2"></div>' +
         '<div class="hm-cell l3"></div>' +
         '<div class="hm-cell l4"></div>' +
-        ' More</div>';
+        ' ' + i18n.more + '</div>';
 
       el.innerHTML =
         '<div class="heatmap-container">' +
@@ -1032,7 +1111,7 @@ function getWebviewContent(nonce: string): string {
         '<div class="heatmap-grid">' + gridHtml + '</div>' +
         '</div>' +
         legendHtml +
-        '<div class="hourly-title">Avg cost by hour of day (last 30 days)</div>' +
+        '<div class="hourly-title">' + i18n.avgByHour + '</div>' +
         '<canvas id="hourlyChart" height="80"></canvas>';
 
       // Hourly bar chart (Chart.js)
@@ -1064,7 +1143,7 @@ function getWebviewContent(nonce: string): string {
                   callbacks: {
                     label: ctx => {
                       const h = hourly[ctx.dataIndex];
-                      return '$' + ctx.parsed.y.toFixed(4) + ' avg (' + h.count + ' msgs)';
+                      return '$' + ctx.parsed.y.toFixed(4) + ' ' + i18n.avg + ' (' + h.count + ' ' + i18n.msgs + ')';
                     },
                   },
                 },
@@ -1130,7 +1209,7 @@ export class DashboardPanel {
 
     this.panel = vscode.window.createWebviewPanel(
       'claudeStatusDashboard',
-      'Claude Code Usage',
+      vscode.l10n.t('Claude Code Usage'),
       vscode.ViewColumn.Beside,
       {
         enableScripts: true,
@@ -1139,7 +1218,7 @@ export class DashboardPanel {
       }
     );
 
-    this.panel.webview.html = getWebviewContent(nonce);
+    this.panel.webview.html = getWebviewContent(nonce, buildI18n());
 
     // Handle messages from WebView
     this.panel.webview.onDidReceiveMessage(

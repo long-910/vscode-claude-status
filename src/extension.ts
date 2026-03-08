@@ -29,10 +29,10 @@ async function checkAndNotify(data: ClaudeUsageData, prediction: PredictionData 
     if (estimatedExhaustionIn < 600 && !notifiedKeys.has('ratelimit-critical')) {
       notifiedKeys.add('ratelimit-critical'); // mark before await to prevent duplicates
       const action = await vscode.window.showErrorMessage(
-        `Claude Code: Rate limit in ~${minRemaining} min`,
-        'Open Dashboard', 'Dismiss'
+        vscode.l10n.t('Claude Code: Rate limit in ~{0} min', minRemaining),
+        vscode.l10n.t('Open Dashboard'), vscode.l10n.t('Dismiss')
       );
-      if (action === 'Open Dashboard') {
+      if (action === vscode.l10n.t('Open Dashboard')) {
         vscode.commands.executeCommand('vscode-claude-status.openDashboard');
       }
     } else if (
@@ -41,7 +41,7 @@ async function checkAndNotify(data: ClaudeUsageData, prediction: PredictionData 
     ) {
       notifiedKeys.add('ratelimit-warning');
       vscode.window.showWarningMessage(
-        `Claude Code: Rate limit in ~${minRemaining} min`
+        vscode.l10n.t('Claude Code: Rate limit in ~{0} min', minRemaining)
       );
     }
   }
@@ -53,7 +53,7 @@ async function checkAndNotify(data: ClaudeUsageData, prediction: PredictionData 
       notifiedKeys.add('budget');
       const used = (config.dailyBudget - prediction.budgetRemaining).toFixed(2);
       vscode.window.showWarningMessage(
-        `Claude Code: Daily budget ${config.budgetAlertThreshold}% used ($${used} / $${config.dailyBudget})`
+        vscode.l10n.t('Claude Code: Daily budget {0}% used (${1} / ${2})', config.budgetAlertThreshold, used, config.dailyBudget)
       );
     }
   }
@@ -87,13 +87,13 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('vscode-claude-status.setBudget', async () => {
       const current = config.dailyBudget;
       const input = await vscode.window.showInputBox({
-        prompt: 'Set daily budget in USD (leave empty to disable)',
+        prompt: vscode.l10n.t('Set daily budget in USD (leave empty to disable)'),
         value: current !== null ? String(current) : '',
-        placeHolder: 'e.g. 20',
+        placeHolder: vscode.l10n.t('e.g. 20'),
         validateInput: (v) => {
           if (v === '') { return null; }
           const n = parseFloat(v);
-          if (isNaN(n) || n < 0) { return 'Enter a non-negative number, or leave empty to disable'; }
+          if (isNaN(n) || n < 0) { return vscode.l10n.t('Enter a non-negative number, or leave empty to disable'); }
           return null;
         },
       });
@@ -101,7 +101,9 @@ export function activate(context: vscode.ExtensionContext) {
       const value = input === '' ? null : parseFloat(input);
       await config.setDailyBudget(value);
       vscode.window.showInformationMessage(
-        value === null ? 'Daily budget disabled.' : `Daily budget set to $${value.toFixed(2)}.`
+        value === null
+          ? vscode.l10n.t('Daily budget disabled.')
+          : vscode.l10n.t('Daily budget set to ${0}.', value.toFixed(2))
       );
     }),
   );

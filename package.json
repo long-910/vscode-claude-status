@@ -1,14 +1,29 @@
 {
   "name": "vscode-claude-status",
-  "displayName": "Claude Status",
-  "description": "Claude Code token usage & cost in VSCode status bar",
-  "version": "0.4.0",
+  "displayName": "%ext.displayName%",
+  "description": "%ext.description%",
+  "l10n": "./l10n",
+  "version": "0.4.1",
   "publisher": "long-kudo",
   "engines": {
     "vscode": "^1.109.0"
   },
   "categories": [
-    "Other"
+    "Visualization"
+  ],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "real-time",
+    "usage",
+    "cost",
+    "customization",
+    "monitoring",
+    "visualization",
+    "anthropic",
+    "token",
+    "dashboard",
+    "status-bar"
   ],
   "icon": "images/icon.png",
   "repository": {
@@ -30,19 +45,19 @@
     "commands": [
       {
         "command": "vscode-claude-status.openDashboard",
-        "title": "Claude Status: Open Dashboard"
+        "title": "%cmd.openDashboard%"
       },
       {
         "command": "vscode-claude-status.refresh",
-        "title": "Claude Status: Refresh Now"
+        "title": "%cmd.refresh%"
       },
       {
         "command": "vscode-claude-status.toggleDisplayMode",
-        "title": "Claude Status: Toggle % / $ Display"
+        "title": "%cmd.toggleDisplayMode%"
       },
       {
         "command": "vscode-claude-status.setBudget",
-        "title": "Claude Status: Set Budget..."
+        "title": "%cmd.setBudget%"
       }
     ],
     "keybindings": [
@@ -53,7 +68,7 @@
       }
     ],
     "configuration": {
-      "title": "Claude Status",
+      "title": "%config.title%",
       "properties": {
         "claudeStatus.displayMode": {
           "type": "string",
@@ -62,7 +77,7 @@
             "cost"
           ],
           "default": "percent",
-          "description": "Status bar display mode: utilization percentage or USD cost."
+          "description": "%config.displayMode.desc%"
         },
         "claudeStatus.statusBar.alignment": {
           "type": "string",
@@ -71,29 +86,29 @@
             "right"
           ],
           "default": "left",
-          "description": "Position of the status bar item."
+          "description": "%config.statusBar.alignment.desc%"
         },
         "claudeStatus.statusBar.showProjectCost": {
           "type": "boolean",
           "default": true,
-          "description": "Show current project cost in the status bar."
+          "description": "%config.statusBar.showProjectCost.desc%"
         },
         "claudeStatus.cache.ttlSeconds": {
           "type": "number",
           "default": 300,
           "minimum": 60,
           "maximum": 3600,
-          "description": "Cache TTL in seconds. API is not called more often than this when Claude Code is idle."
+          "description": "%config.cache.ttlSeconds.desc%"
         },
         "claudeStatus.rateLimitApi.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Enable fetching rate-limit utilization (5h/7d %) from the Anthropic API. When disabled, only local token cost is shown (no rate-limit percentages). Default: true — API consumption is negligible because calls are made only when Claude Code is actively running."
+          "description": "%config.rateLimitApi.enabled.desc%"
         },
         "claudeStatus.realtime.enabled": {
           "type": "boolean",
           "default": false,
-          "description": "Poll the rate-limit API every cache.ttlSeconds regardless of Claude Code activity. Requires rateLimitApi.enabled to be true. Increases API usage."
+          "description": "%config.realtime.enabled.desc%"
         },
         "claudeStatus.budget.dailyUsd": {
           "type": [
@@ -102,7 +117,7 @@
           ],
           "default": null,
           "minimum": 0,
-          "description": "Daily budget in USD. Set to null to disable."
+          "description": "%config.budget.dailyUsd.desc%"
         },
         "claudeStatus.budget.weeklyUsd": {
           "type": [
@@ -111,31 +126,31 @@
           ],
           "default": null,
           "minimum": 0,
-          "description": "Weekly budget in USD. Set to null to disable."
+          "description": "%config.budget.weeklyUsd.desc%"
         },
         "claudeStatus.budget.alertThresholdPercent": {
           "type": "number",
           "default": 80,
           "minimum": 1,
           "maximum": 100,
-          "description": "Show budget warning when usage exceeds this percentage of the budget."
+          "description": "%config.budget.alertThresholdPercent.desc%"
         },
         "claudeStatus.notifications.rateLimitWarning": {
           "type": "boolean",
           "default": true,
-          "description": "Show notification when rate limit is approaching."
+          "description": "%config.notifications.rateLimitWarning.desc%"
         },
         "claudeStatus.notifications.rateLimitWarningThresholdMinutes": {
           "type": "number",
           "default": 30,
           "minimum": 5,
           "maximum": 120,
-          "description": "Show rate limit warning this many minutes before exhaustion."
+          "description": "%config.notifications.rateLimitWarningThresholdMinutes.desc%"
         },
         "claudeStatus.notifications.budgetWarning": {
           "type": "boolean",
           "default": true,
-          "description": "Show notification when budget threshold is exceeded."
+          "description": "%config.notifications.budgetWarning.desc%"
         },
         "claudeStatus.heatmap.days": {
           "type": "number",
@@ -145,7 +160,7 @@
             60,
             90
           ],
-          "description": "Number of days shown in the usage heatmap."
+          "description": "%config.heatmap.days.desc%"
         },
         "claudeStatus.credentials.path": {
           "type": [
@@ -153,7 +168,7 @@
             "null"
           ],
           "default": null,
-          "description": "Custom path to Claude credentials file. Leave null to use default (~/.claude/.credentials.json)."
+          "description": "%config.credentials.path.desc%"
         },
         "claudeStatus.claudeProvider": {
           "type": "string",
@@ -164,37 +179,37 @@
             "api-key"
           ],
           "enumDescriptions": [
-            "Auto-detect: checks credentials file, then AWS/API key environment variables.",
-            "Claude.ai subscription — shows rate limit utilization (5h window, 7d window if available).",
-            "AWS Bedrock — no rate limits, shows token cost only.",
-            "Anthropic API key — no rate limits, shows token cost only."
+            "%config.claudeProvider.auto%",
+            "%config.claudeProvider.claudeAi%",
+            "%config.claudeProvider.awsBedrock%",
+            "%config.claudeProvider.apiKey%"
           ],
           "default": "auto",
-          "description": "Claude provider type. Controls whether rate limit percentages or cost is shown in the status bar."
+          "description": "%config.claudeProvider.desc%"
         },
         "claudeStatus.pricing.inputPerMillion": {
           "type": "number",
           "default": 3.0,
           "minimum": 0,
-          "description": "Cost per 1M input tokens in USD. Default: $3.00 (Claude Sonnet 4.x). Update this if Anthropic changes pricing."
+          "description": "%config.pricing.inputPerMillion.desc%"
         },
         "claudeStatus.pricing.outputPerMillion": {
           "type": "number",
           "default": 15.0,
           "minimum": 0,
-          "description": "Cost per 1M output tokens in USD. Default: $15.00 (Claude Sonnet 4.x). Update this if Anthropic changes pricing."
+          "description": "%config.pricing.outputPerMillion.desc%"
         },
         "claudeStatus.pricing.cacheReadPerMillion": {
           "type": "number",
           "default": 0.3,
           "minimum": 0,
-          "description": "Cost per 1M cache-read tokens in USD. Default: $0.30 (Claude Sonnet 4.x). Update this if Anthropic changes pricing."
+          "description": "%config.pricing.cacheReadPerMillion.desc%"
         },
         "claudeStatus.pricing.cacheCreatePerMillion": {
           "type": "number",
           "default": 3.75,
           "minimum": 0,
-          "description": "Cost per 1M cache-creation tokens in USD. Default: $3.75 (Claude Sonnet 4.x). Update this if Anthropic changes pricing."
+          "description": "%config.pricing.cacheCreatePerMillion.desc%"
         }
       }
     }

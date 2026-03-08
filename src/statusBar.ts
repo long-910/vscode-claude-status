@@ -36,10 +36,10 @@ export function buildLabel(data: ClaudeUsageData, projectCosts: ProjectCostData[
   const displayMode = config.displayMode;
 
   if (dataSource === 'no-credentials') {
-    return '🤖 Not logged in';
+    return vscode.l10n.t('🤖 Not logged in');
   }
   if (dataSource === 'no-data') {
-    return '🤖 Claude: run refresh';
+    return vscode.l10n.t('🤖 Claude: run refresh');
   }
 
   const isStale = dataSource === 'stale';
@@ -97,20 +97,22 @@ export function buildTooltip(data: ClaudeUsageData, projectCosts: ProjectCostDat
   } = data;
 
   if (dataSource === 'no-credentials') {
-    return 'Claude Code is not logged in.\nRun: claude login';
+    return vscode.l10n.t('Claude Code is not logged in.\nRun: claude login');
   }
   if (dataSource === 'no-data') {
-    return 'No usage data found.\nClick to open dashboard →';
+    return vscode.l10n.t('No usage data found.\nClick to open dashboard →');
   }
 
-  const lastUpdated = cacheAge < 60 ? 'just now' : `${Math.round(cacheAge / 60)}m ago`;
+  const lastUpdated = cacheAge < 60
+    ? vscode.l10n.t('just now')
+    : vscode.l10n.t('{0}m ago', Math.round(cacheAge / 60));
   const lines: string[] = [];
 
   if (providerType === 'claude-ai') {
     // Rate limit section — only for Claude.ai subscriptions
     const bar5h = buildBar(utilization5h, 8);
     lines.push(
-      'Claude Code Usage',
+      vscode.l10n.t('Claude Code Usage'),
       '─────────────────────────────',
       `5h window:   ${formatPercent(utilization5h)} [${bar5h}] resets in ${formatDuration(resetIn5h)}`,
     );
@@ -120,14 +122,14 @@ export function buildTooltip(data: ClaudeUsageData, projectCosts: ProjectCostDat
     }
     lines.push('');
   } else {
-    const providerLabel = providerType === 'aws-bedrock' ? 'AWS Bedrock'
-      : providerType === 'api-key' ? 'API Key'
-      : 'Claude Code';
+    const providerLabel = providerType === 'aws-bedrock' ? vscode.l10n.t('AWS Bedrock')
+      : providerType === 'api-key' ? vscode.l10n.t('API Key')
+      : vscode.l10n.t('Claude Code');
     lines.push(`Claude Code (${providerLabel})`, '─────────────────────────────', '');
   }
 
   lines.push(
-    'Token Cost (local)',
+    vscode.l10n.t('Token Cost (local)'),
     '─────────────────────────────',
     `5h:   in:${formatTokens(tokensIn5h)} out:${formatTokens(tokensOut5h)}  $${cost5h.toFixed(2)}`,
     `day:  $${costDay.toFixed(2)}`,
@@ -137,12 +139,12 @@ export function buildTooltip(data: ClaudeUsageData, projectCosts: ProjectCostDat
   if (projectCosts.length > 0) {
     lines.push('');
     for (const pj of projectCosts) {
-      lines.push(`Project: ${pj.projectName}`);
-      lines.push(`  Today: $${pj.costToday.toFixed(2)}  |  7d: $${pj.cost7d.toFixed(2)}`);
+      lines.push(vscode.l10n.t('Project: {0}', pj.projectName));
+      lines.push(`  ${vscode.l10n.t('Today')}: $${pj.costToday.toFixed(2)}  |  ${vscode.l10n.t('7 days')}: $${pj.cost7d.toFixed(2)}`);
     }
   }
 
-  lines.push('', `Last updated: ${lastUpdated}`, 'Click to open dashboard →');
+  lines.push('', vscode.l10n.t('Last updated: {0}', lastUpdated), vscode.l10n.t('Click to open dashboard →'));
   return lines.join('\n');
 }
 
@@ -191,9 +193,9 @@ export class StatusBarManager {
       ? vscode.StatusBarAlignment.Right
       : vscode.StatusBarAlignment.Left;
     this.item = vscode.window.createStatusBarItem(alignment, 100);
-    this.item.name = 'Claude Code Usage';
+    this.item.name = vscode.l10n.t('Claude Code Usage');
     this.item.command = 'vscode-claude-status.openDashboard';
-    this.item.text = '🤖 Claude: loading...';
+    this.item.text = vscode.l10n.t('🤖 Claude: loading...');
     this.item.show();
   }
 

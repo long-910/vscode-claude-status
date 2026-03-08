@@ -14,7 +14,7 @@
 [![Release](https://github.com/long-910/vscode-claude-status/actions/workflows/release.yml/badge.svg)](https://github.com/long-910/vscode-claude-status/actions/workflows/release.yml)
 [![Sponsor](https://img.shields.io/badge/Sponsor-GitHub-pink?logo=github)](https://github.com/sponsors/long-910)
 
-🌐 [English](README.md) | [日本語](README.ja.md)
+🌐 [English](README.md) | [日本語](README.ja.md) | [中文](README.zh.md)
 
 </div>
 
@@ -84,7 +84,7 @@ Click the status bar item to open a rich dashboard panel with:
 The panel supports light, dark, and high-contrast VS Code themes natively.
 
 <div align="center">
-<img width="574" alt="Dashboard screenshot" src="https://github.com/user-attachments/assets/e8848826-9650-4e92-ad7d-a03f4a249f82" />
+<img width="574" alt="Dashboard screenshot" src="https://raw.githubusercontent.com/long-910/vscode-claude-status/main/docs/screenshots/dashboard.png" />
 </div>
 
 ### 🗂 Project-Level Cost Tracking *(VS Code-exclusive)*
@@ -282,6 +282,7 @@ All settings are under the `claudeStatus` namespace in VS Code Settings.
 | Monthly cost projection | ✅ v0.4.0 |
 | Weekly budget progress bar | ✅ v0.4.0 |
 | Pricing & Settings card in dashboard | ✅ v0.4.0 |
+| i18n — English / Japanese / Chinese | ✅ v0.4.1 |
 
 ---
 

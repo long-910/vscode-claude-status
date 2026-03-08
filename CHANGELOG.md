@@ -11,6 +11,35 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.1] — 2026-03-09
+
+### Added
+
+- **Internationalization (i18n)** — the extension UI now supports English, Japanese (日本語),
+  and Simplified Chinese (简体中文):
+  - `package.nls.json` / `package.nls.ja.json` / `package.nls.zh-cn.json` — command titles
+    and all VS Code Settings descriptions are translated via the standard `%key%` NLS mechanism.
+  - `l10n/bundle.l10n.ja.json` / `l10n/bundle.l10n.zh-cn.json` — runtime strings
+    (status bar labels, notifications, tooltips, input prompts) translated using
+    `vscode.l10n.t()`.
+  - Dashboard WebView — translated via an `i18n` object built on the extension host
+    (using `vscode.l10n.t()`) and injected as `window.i18n` into the WebView at creation
+    time; all card titles, labels, alerts, and chart tooltips are localized.
+  - `package.json` gains `"l10n": "./l10n"` field to register the bundle directory.
+
+- **Chinese README** (`README.zh.md`) — full Simplified Chinese translation of the README,
+  added to the language switcher in `README.md` and `README.ja.md`.
+
+### Fixed
+
+- **Dashboard screenshot not shown on VS Code Marketplace** — the screenshot was hosted
+  on `github.com/user-attachments/`, which is not in the Marketplace's image allowlist.
+  Moved the image reference to `docs/screenshots/dashboard.png` (served via
+  `raw.githubusercontent.com`) and excluded `docs/**` from the `.vsix` via `.vscodeignore`
+  so the package size is unaffected.
+
+---
+
 ## [0.4.0] — 2026-03-08
 
 ### Added
@@ -350,6 +379,7 @@ and project-level cost tracking.
 
 ---
 
+[0.4.1]: https://github.com/long-910/vscode-claude-status/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/long-910/vscode-claude-status/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/long-910/vscode-claude-status/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/long-910/vscode-claude-status/compare/v0.3.1...v0.3.2

@@ -14,7 +14,7 @@
 [![Release](https://github.com/long-910/vscode-claude-status/actions/workflows/release.yml/badge.svg)](https://github.com/long-910/vscode-claude-status/actions/workflows/release.yml)
 [![Sponsor](https://img.shields.io/badge/Sponsor-GitHub-pink?logo=github)](https://github.com/sponsors/long-910)
 
-🌐 [English](README.md) | [日本語](README.ja.md)
+🌐 [English](README.md) | [日本語](README.ja.md) | [中文](README.zh.md)
 
 </div>
 
@@ -79,7 +79,7 @@ VS Code ステータスバーにピン留めされたリアルタイム使用状
 パネルはVS Codeのライト・ダーク・ハイコントラストテーマをネイティブにサポートします。
 
 <div align="center">
-<img width="574" alt="ダッシュボード スクリーンショット" src="https://github.com/user-attachments/assets/e8848826-9650-4e92-ad7d-a03f4a249f82" />
+<img width="574" alt="ダッシュボード スクリーンショット" src="https://raw.githubusercontent.com/long-910/vscode-claude-status/main/docs/screenshots/dashboard.png" />
 </div>
 
 ### 🗂 プロジェクトレベルのコスト追跡 *(VS Code専用)*
@@ -262,6 +262,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | 月次コスト推計 | ✅ v0.4.0 |
 | 週次予算プログレスバー | ✅ v0.4.0 |
 | 料金 & 設定カード（ダッシュボード内） | ✅ v0.4.0 |
+| i18n — 英語 / 日本語 / 中国語 | ✅ v0.4.1 |
 
 ---
 

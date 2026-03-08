@@ -1,6 +1,8 @@
 import * as fs from 'fs/promises';
 import { findAllJsonlFiles, calculateCost, TokenUsage } from './jsonlReader';
 
+export type RecommendationKey = 'safe' | 'caution' | 'warning' | 'critical' | 'rate-limit-reached';
+
 export interface PredictionData {
   estimatedExhaustionTime: Date | null  // null if pace is slow or unknown
   estimatedExhaustionIn: number | null  // seconds, null if safe/unknown
@@ -8,7 +10,8 @@ export interface PredictionData {
   budgetRemaining: number | null        // null if no budget set
   budgetExhaustionTime: Date | null
   safeToStartHeavyTask: boolean
-  recommendation: string
+  recommendation: string        // English fallback (used by tests)
+  recommendationKey: RecommendationKey  // i18n key for UI display
 }
 
 interface TimestampedCost {
@@ -65,6 +68,13 @@ export function buildRecommendation(exhaustionIn: number): string {
   return 'Plenty of capacity. Safe to start heavy tasks.';
 }
 
+export function buildRecommendationKey(exhaustionIn: number): RecommendationKey {
+  if (exhaustionIn < 600)  { return 'critical'; }
+  if (exhaustionIn < 1800) { return 'warning'; }
+  if (exhaustionIn < 3600) { return 'caution'; }
+  return 'safe';
+}
+
 export async function computePrediction(
   utilization5h: number,
   resetIn5h: number,
@@ -80,12 +90,14 @@ export async function computePrediction(
   let estimatedExhaustionIn: number | null = null;
   let safeToStartHeavyTask = true;
   let recommendation = 'Plenty of capacity. Safe to start heavy tasks.';
+  let recommendationKey: RecommendationKey = 'safe';
 
   if (utilization5h >= 1.0) {
     estimatedExhaustionTime = new Date();
     estimatedExhaustionIn = 0;
     safeToStartHeavyTask = false;
     recommendation = 'Rate limit reached. Wait for reset.';
+    recommendationKey = 'rate-limit-reached';
   } else if (burnRateUsdPerHour > 0 && utilization5h > 0) {
     // Estimate total capacity: cost5h corresponds to utilization5h fraction used
     const estimatedCapacityUsd = cost5h / utilization5h;
@@ -99,6 +111,7 @@ export async function computePrediction(
     estimatedExhaustionIn = effectiveSeconds;
     safeToStartHeavyTask = effectiveSeconds > 1800;
     recommendation = buildRecommendation(effectiveSeconds);
+    recommendationKey = buildRecommendationKey(effectiveSeconds);
   }
 
   // --- Budget exhaustion ---
@@ -124,5 +137,6 @@ export async function computePrediction(
     budgetExhaustionTime,
     safeToStartHeavyTask,
     recommendation,
+    recommendationKey,
   };
 }

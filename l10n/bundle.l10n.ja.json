@@ -25,5 +25,11 @@
   "Claude Code": "Claude Code",
   "just now": "たった今",
   "{0}m ago": "{0}分前",
-  "__N__m ago": "__N__分前"
+  "__N__m ago": "__N__分前",
+  "Plenty of capacity. Safe to start heavy tasks.": "余裕十分。重いタスクを開始しても安全です。",
+  "About 1 hour remaining. Plan your next task accordingly.": "残り約1時間。次のタスクを計画してください。",
+  "Less than 30 min remaining. Wrap up current task.": "残り30分未満。現在のタスクを終わらせてください。",
+  "Less than 10 min remaining. Save your work and pause.": "残り10分未満。作業を保存して一時停止してください。",
+  "Rate limit reached. Wait for reset.": "レート制限に達しました。リセットまでお待ちください。",
+  "msgs": "件"
 }

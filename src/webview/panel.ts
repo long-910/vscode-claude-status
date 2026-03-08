@@ -98,6 +98,11 @@ function buildI18n(): Record<string, string> {
     msgs:               t('msgs'),
     avg:                t('avg'),
     mAgoFormat:         t('{0}m ago', '__N__'),
+    recSafe:            t('Plenty of capacity. Safe to start heavy tasks.'),
+    recCaution:         t('About 1 hour remaining. Plan your next task accordingly.'),
+    recWarning:         t('Less than 30 min remaining. Wrap up current task.'),
+    recCritical:        t('Less than 10 min remaining. Save your work and pause.'),
+    recRateLimitReached: t('Rate limit reached. Wait for reset.'),
   };
 }
 
@@ -747,9 +752,16 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
         }
       }
 
-      // Recommendation
-      html += '<div class="prediction-row" style="margin-top:8px">💡 ' +
-        esc(prediction.recommendation) + '</div>';
+      // Recommendation (i18n via recommendationKey)
+      const recI18n = {
+        'safe':               i18n.recSafe,
+        'caution':            i18n.recCaution,
+        'warning':            i18n.recWarning,
+        'critical':           i18n.recCritical,
+        'rate-limit-reached': i18n.recRateLimitReached,
+      };
+      const recText = recI18n[prediction.recommendationKey] || esc(prediction.recommendation);
+      html += '<div class="prediction-row" style="margin-top:8px">💡 ' + recText + '</div>';
 
       // Budget input form (toggled)
       html += '<div class="budget-configure" id="budget-form" style="display:' +
@@ -1090,7 +1102,7 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
       for (const day of daily) {
         const level = getCostLevel(day.cost, maxCost);
         const costStr = day.cost.toFixed(3);
-        const sessions = day.sessionCount > 0 ? ' (' + day.sessionCount + ' msgs)' : '';
+        const sessions = day.sessionCount > 0 ? ' (' + day.sessionCount + ' ' + i18n.msgs + ')' : '';
         gridHtml += '<div class="hm-cell l' + level +
           '" title="' + esc(day.date + ': $' + costStr + sessions) + '"></div>';
       }

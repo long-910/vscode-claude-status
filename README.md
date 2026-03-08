@@ -83,6 +83,10 @@ Click the status bar item to open a rich dashboard panel with:
 
 The panel supports light, dark, and high-contrast VS Code themes natively.
 
+<div align="center">
+<img width="574" alt="Dashboard screenshot" src="https://github.com/user-attachments/assets/e8848826-9650-4e92-ad7d-a03f4a249f82" />
+</div>
+
 ### 🗂 Project-Level Cost Tracking *(VS Code-exclusive)*
 
 Automatically maps the open workspace folder to its Claude Code session

@@ -2,7 +2,7 @@
   "name": "vscode-claude-status",
   "displayName": "Claude Status",
   "description": "Claude Code token usage & cost in VSCode status bar",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "publisher": "long-kudo",
   "engines": {
     "vscode": "^1.109.0"
@@ -174,19 +174,19 @@
         },
         "claudeStatus.pricing.inputPerMillion": {
           "type": "number",
-          "default": 3.00,
+          "default": 3.0,
           "minimum": 0,
           "description": "Cost per 1M input tokens in USD. Default: $3.00 (Claude Sonnet 4.x). Update this if Anthropic changes pricing."
         },
         "claudeStatus.pricing.outputPerMillion": {
           "type": "number",
-          "default": 15.00,
+          "default": 15.0,
           "minimum": 0,
           "description": "Cost per 1M output tokens in USD. Default: $15.00 (Claude Sonnet 4.x). Update this if Anthropic changes pricing."
         },
         "claudeStatus.pricing.cacheReadPerMillion": {
           "type": "number",
-          "default": 0.30,
+          "default": 0.3,
           "minimum": 0,
           "description": "Cost per 1M cache-read tokens in USD. Default: $0.30 (Claude Sonnet 4.x). Update this if Anthropic changes pricing."
         },

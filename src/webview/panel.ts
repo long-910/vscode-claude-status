@@ -2,13 +2,22 @@ import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import { DataManager, ClaudeUsageData, ProjectCostData, PredictionData, HeatmapData } from '../data/dataManager';
 import { config } from '../config';
+import type { TokenPricing } from '../data/jsonlReader';
 
+interface DashboardSettings {
+  provider: string;
+  apiEnabled: boolean;
+  cacheTtlSeconds: number;
+  weeklyBudget: number | null;
+}
 
 interface DashboardMessage {
   usage: ClaudeUsageData;
   projectCosts: ProjectCostData[];
   prediction: PredictionData | null;
   heatmap: HeatmapData | null;
+  pricing: TokenPricing;
+  settings: DashboardSettings;
 }
 
 function generateNonce(): string {
@@ -167,6 +176,76 @@ function getWebviewContent(nonce: string): string {
     }
     .configure-link:hover { opacity: 0.8; }
 
+    .detail-toggle {
+      background: none;
+      border: none;
+      color: var(--vscode-textLink-foreground);
+      cursor: pointer;
+      padding: 0;
+      font-size: 0.8em;
+      text-decoration: none;
+    }
+    .detail-toggle:hover { opacity: 0.8; }
+
+    .token-breakdown {
+      margin-top: 8px;
+      border-top: 1px solid var(--vscode-panel-border);
+      padding-top: 6px;
+    }
+    .token-breakdown .cost-row { font-size: 0.85em; }
+    .token-breakdown .cost-label {
+      font-family: var(--vscode-editor-font-family, monospace);
+    }
+    .cache-efficiency {
+      margin-top: 4px;
+      padding-top: 4px;
+      border-top: 1px solid var(--vscode-panel-border);
+      font-size: 0.82em;
+      color: var(--vscode-descriptionForeground);
+    }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 3px 10px;
+      font-size: 0.88em;
+      margin: 6px 0;
+      align-items: center;
+    }
+    .pricing-grid .pg-label { color: var(--vscode-descriptionForeground); }
+    .pricing-grid .pg-rate {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      font-family: var(--vscode-editor-font-family, monospace);
+    }
+    .pricing-grid .pg-unit { color: var(--vscode-descriptionForeground); font-size: 0.85em; }
+
+    .settings-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+      font-size: 0.85em;
+      align-items: center;
+    }
+    .settings-badge {
+      background: var(--vscode-badge-background);
+      color: var(--vscode-badge-foreground);
+      padding: 1px 7px;
+      border-radius: 10px;
+      font-size: 0.85em;
+    }
+    .settings-badge.ok   { background: #0e4429; color: #39d353; }
+    .settings-badge.warn { background: var(--vscode-inputValidation-warningBackground); color: var(--vscode-editorWarning-foreground); }
+
+    .card-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 0 0 10px 0;
+    }
+    .card-title-row .card-title { margin: 0; }
+
     .placeholder {
       color: var(--vscode-descriptionForeground);
       font-style: italic;
@@ -282,6 +361,14 @@ function getWebviewContent(nonce: string): string {
         <span class="cost-label">7 days</span>
         <span id="cost-7d">—</span>
       </div>
+      <div class="cost-row" id="cost-month-row" style="display:none">
+        <span class="cost-label">Month (est.)</span>
+        <span id="cost-month">—</span>
+      </div>
+      <div style="margin-top:6px">
+        <button class="detail-toggle" id="breakdown-toggle">▶ Token breakdown (5h)</button>
+        <div id="token-breakdown" class="token-breakdown" style="display:none"></div>
+      </div>
     </div>
 
     <!-- Project Cost (Feature 03) -->
@@ -296,9 +383,19 @@ function getWebviewContent(nonce: string): string {
   <!-- Prediction (Feature 04) -->
   <div class="card">
     <div class="card-title">Prediction</div>
+    <canvas id="predChart" height="90" style="display:none; margin-bottom:10px"></canvas>
     <div id="prediction-content">
       <div class="placeholder">Loading prediction…</div>
     </div>
+  </div>
+
+  <!-- Pricing & Settings (collapsible) -->
+  <div class="card">
+    <div class="card-title-row">
+      <div class="card-title">Pricing &amp; Settings</div>
+      <button class="detail-toggle" id="pricing-toggle">▲ Hide</button>
+    </div>
+    <div id="pricing-content"></div>
   </div>
 
   <!-- Usage History (Feature 05) -->
@@ -320,6 +417,8 @@ function getWebviewContent(nonce: string): string {
     let currentMode = 'percent';
     let lastData = null;
     let refreshing = false;
+    let breakdownOpen = false;
+    let pricingOpen = true;
 
     // Notify extension that the WebView is ready
     vscode.postMessage({ type: 'ready' });
@@ -335,6 +434,18 @@ function getWebviewContent(nonce: string): string {
 
     document.getElementById('btn-settings').addEventListener('click', () => {
       vscode.postMessage({ type: 'openSettings' });
+    });
+
+    document.getElementById('breakdown-toggle').addEventListener('click', toggleBreakdown);
+    document.getElementById('pricing-toggle').addEventListener('click', togglePricing);
+
+    // Event delegation for dynamically generated buttons
+    document.addEventListener('click', e => {
+      const id = e.target && e.target.id;
+      if (id === 'budget-configure-btn') { toggleBudgetConfig(); }
+      else if (id === 'budget-save-btn')  { saveBudget(); }
+      else if (id === 'budget-clear-btn') { clearBudget(); }
+      else if (id === 'pricing-settings-btn') { vscode.postMessage({ type: 'openSettings' }); }
     });
 
     function setRefreshing(value) {
@@ -412,6 +523,19 @@ function getWebviewContent(nonce: string): string {
       document.getElementById('cost-day').textContent = '$' + usage.costDay.toFixed(2);
       document.getElementById('cost-7d').textContent  = '$' + usage.cost7d.toFixed(2);
 
+      // Monthly projection
+      const monthRow = document.getElementById('cost-month-row');
+      if (monthRow) {
+        const dailyAvg = usage.costDay > 0 ? usage.costDay
+          : usage.cost7d > 0 ? usage.cost7d / 7 : 0;
+        if (dailyAvg > 0) {
+          document.getElementById('cost-month').textContent = '$' + (dailyAvg * 30).toFixed(2);
+          monthRow.style.display = '';
+        } else {
+          monthRow.style.display = 'none';
+        }
+      }
+
       const ageStr = usage.cacheAge < 60
         ? 'just now'
         : Math.round(usage.cacheAge / 60) + 'm ago';
@@ -458,7 +582,7 @@ function getWebviewContent(nonce: string): string {
       return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
 
-    function updatePrediction(prediction, usage) {
+    function updatePrediction(prediction, usage, settings) {
       const el = document.getElementById('prediction-content');
       if (!prediction) {
         el.innerHTML = '<div class="placeholder">No prediction data</div>';
@@ -518,9 +642,30 @@ function getWebviewContent(nonce: string): string {
           }
         }
 
-        html += '<button class="configure-link" onclick="toggleBudgetConfig()">⚙ Configure budget</button>';
+        html += '<button class="configure-link" id="budget-configure-btn">⚙ Configure budget</button>';
       } else {
-        html += '<button class="configure-link" onclick="toggleBudgetConfig()">⚙ Set daily budget</button>';
+        html += '<button class="configure-link" id="budget-configure-btn">⚙ Set daily budget</button>';
+      }
+
+      // Weekly budget
+      if (settings && settings.weeklyBudget && usage) {
+        const weeklySpent = usage.cost7d;
+        const weeklyTotal = settings.weeklyBudget;
+        const weeklyPct = Math.min(100, (weeklySpent / weeklyTotal) * 100);
+        const weeklyFillClass = weeklyPct >= 80 ? ' error' : weeklyPct >= 60 ? ' warning' : '';
+        html += '<div class="progress-row" style="margin-top:8px">' +
+          '<div class="progress-labels">' +
+          '<span>Weekly budget</span>' +
+          '<span>$' + weeklySpent.toFixed(2) + ' / $' + weeklyTotal.toFixed(2) +
+          ' (' + Math.round(weeklyPct) + '%)</span>' +
+          '</div>' +
+          '<div class="progress-track"><div class="progress-fill' + weeklyFillClass + '" style="width:' +
+          weeklyPct.toFixed(1) + '%"></div></div>' +
+          '</div>';
+        if (weeklyPct >= 80) {
+          html += '<div class="alert warning">⚠️ Weekly budget ' +
+            (weeklyPct >= 100 ? 'exhausted' : 'nearly exhausted') + '</div>';
+        }
       }
 
       // Recommendation
@@ -532,8 +677,8 @@ function getWebviewContent(nonce: string): string {
         (budgetConfigOpen ? 'flex' : 'none') + '">' +
         '<label>Daily budget ($):</label>' +
         '<input type="number" id="budget-input" min="0" step="5" placeholder="e.g. 20">' +
-        '<button onclick="saveBudget()">Save</button>' +
-        '<button onclick="clearBudget()">Disable</button>' +
+        '<button id="budget-save-btn">Save</button>' +
+        '<button id="budget-clear-btn">Disable</button>' +
         '</div>';
 
       el.innerHTML = html;
@@ -557,6 +702,252 @@ function getWebviewContent(nonce: string): string {
     function clearBudget() {
       vscode.postMessage({ type: 'setBudget', amount: null });
       budgetConfigOpen = false;
+    }
+
+    // ---- Token Breakdown ---------------------------------------------------
+
+    function toggleBreakdown() {
+      breakdownOpen = !breakdownOpen;
+      const el = document.getElementById('token-breakdown');
+      const btn = document.getElementById('breakdown-toggle');
+      if (el) { el.style.display = breakdownOpen ? 'block' : 'none'; }
+      if (btn) { btn.textContent = (breakdownOpen ? '▼' : '▶') + ' Token breakdown (5h)'; }
+      if (breakdownOpen && lastData) {
+        renderTokenBreakdown(lastData.usage, lastData.pricing);
+      }
+    }
+
+    function renderTokenBreakdown(usage, pricing) {
+      const el = document.getElementById('token-breakdown');
+      if (!el || !pricing) { return; }
+
+      function fmtK(n) { return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n); }
+      function tokenCost(tokens, ratePerM) { return (tokens / 1_000_000) * ratePerM; }
+
+      const inCost   = tokenCost(usage.tokensIn5h,         pricing.inputPerMillion);
+      const outCost  = tokenCost(usage.tokensOut5h,        pricing.outputPerMillion);
+      const rdCost   = tokenCost(usage.tokensCacheRead5h,  pricing.cacheReadPerMillion);
+      const crCost   = tokenCost(usage.tokensCacheCreate5h, pricing.cacheCreatePerMillion);
+
+      const totalIn = usage.tokensIn5h + usage.tokensCacheRead5h;
+      const cacheHitRatio = totalIn > 0
+        ? Math.round((usage.tokensCacheRead5h / totalIn) * 100) : 0;
+
+      let html =
+        '<div class="cost-row"><span class="cost-label">Input</span>' +
+        '<span>' + fmtK(usage.tokensIn5h) + ' tok = $' + inCost.toFixed(4) + '</span></div>' +
+        '<div class="cost-row"><span class="cost-label">Output</span>' +
+        '<span>' + fmtK(usage.tokensOut5h) + ' tok = $' + outCost.toFixed(4) + '</span></div>';
+
+      if (usage.tokensCacheRead5h > 0 || usage.tokensCacheCreate5h > 0) {
+        html +=
+          '<div class="cost-row"><span class="cost-label">Cache read</span>' +
+          '<span>' + fmtK(usage.tokensCacheRead5h) + ' tok = $' + rdCost.toFixed(4) + '</span></div>' +
+          '<div class="cost-row"><span class="cost-label">Cache create</span>' +
+          '<span>' + fmtK(usage.tokensCacheCreate5h) + ' tok = $' + crCost.toFixed(4) + '</span></div>';
+      }
+
+      html += '<div class="cache-efficiency">';
+      if (usage.tokensCacheRead5h > 0) {
+        html += 'Cache hit ratio: ' + cacheHitRatio + '% — ';
+        if (cacheHitRatio >= 50) {
+          html += 'Good! Cache is saving cost.';
+        } else {
+          html += 'Low cache reuse.';
+        }
+      } else {
+        html += 'No cache reads in this window.';
+      }
+      html += '</div>';
+
+      el.innerHTML = html;
+    }
+
+    // ---- Pricing & Settings -----------------------------------------------
+
+    function togglePricing() {
+      pricingOpen = !pricingOpen;
+      const el = document.getElementById('pricing-content');
+      const btn = document.getElementById('pricing-toggle');
+      if (el) {
+        el.style.display = pricingOpen ? '' : 'none';
+        if (pricingOpen && lastData) {
+          renderPricingContent(lastData.pricing, lastData.settings);
+        }
+      }
+      if (btn) { btn.textContent = pricingOpen ? '▲ Hide' : '▼ Show'; }
+    }
+
+    function renderPricingContent(pricing, settings) {
+      const el = document.getElementById('pricing-content');
+      if (!el || !pricing) { return; }
+
+      const providerLabel = {
+        'claude-ai': 'Claude.ai',
+        'aws-bedrock': 'AWS Bedrock',
+        'api-key': 'API Key',
+      }[settings.provider] || settings.provider;
+
+      const apiStatus = settings.apiEnabled
+        ? '<span class="settings-badge ok">API enabled</span>'
+        : '<span class="settings-badge warn">API disabled</span>';
+
+      const cacheMins = Math.round(settings.cacheTtlSeconds / 60);
+
+      let html =
+        '<div class="pricing-grid">' +
+        '<span class="pg-label">Input</span>' +
+        '<span class="pg-rate">$' + pricing.inputPerMillion.toFixed(2) + '</span>' +
+        '<span class="pg-unit">/ 1M tokens</span>' +
+        '<span class="pg-label">Output</span>' +
+        '<span class="pg-rate">$' + pricing.outputPerMillion.toFixed(2) + '</span>' +
+        '<span class="pg-unit">/ 1M tokens</span>' +
+        '<span class="pg-label">Cache read</span>' +
+        '<span class="pg-rate">$' + pricing.cacheReadPerMillion.toFixed(2) + '</span>' +
+        '<span class="pg-unit">/ 1M tokens</span>' +
+        '<span class="pg-label">Cache create</span>' +
+        '<span class="pg-rate">$' + pricing.cacheCreatePerMillion.toFixed(2) + '</span>' +
+        '<span class="pg-unit">/ 1M tokens</span>' +
+        '</div>' +
+        '<div class="settings-row">' +
+        '<span class="settings-badge">' + esc(providerLabel) + '</span>' +
+        apiStatus +
+        '<span class="settings-badge">Cache TTL: ' + cacheMins + 'm</span>' +
+        '</div>' +
+        '<div style="margin-top:8px">' +
+        '<button class="configure-link" id="pricing-settings-btn">⚙ Edit pricing &amp; settings</button>' +
+        '</div>';
+
+      el.innerHTML = html;
+    }
+
+    // ---- Prediction Chart --------------------------------------------------
+    let predChart = null;
+
+    function updatePredictionChart(usage, prediction) {
+      const canvas = document.getElementById('predChart');
+      if (!canvas) { return; }
+
+      const isClaudeAi = usage && usage.providerType === 'claude-ai';
+      const hasUtil    = usage && usage.utilization5h > 0 && usage.resetIn5h > 0;
+
+      if (!isClaudeAi || !hasUtil || typeof Chart === 'undefined') {
+        canvas.style.display = 'none';
+        if (predChart) { try { predChart.destroy(); } catch { /* ignore */ } predChart = null; }
+        return;
+      }
+
+      canvas.style.display = 'block';
+
+      const nowMs      = Date.now();
+      const resetMin   = usage.resetIn5h / 60;
+      const currentPct = Math.min(100, usage.utilization5h * 100);
+      const exhaustMin = (prediction && prediction.estimatedExhaustionIn != null)
+        ? prediction.estimatedExhaustionIn / 60 : null;
+
+      // Generate 8-10 evenly-spaced time points, plus exact exhaustion point
+      const keyMins = new Set();
+      const steps = 8;
+      for (let i = 0; i <= steps; i++) { keyMins.add(i * resetMin / steps); }
+      if (exhaustMin && exhaustMin > 0 && exhaustMin < resetMin) { keyMins.add(exhaustMin); }
+      const sortedMins = Array.from(keyMins).sort((a, b) => a - b);
+
+      const labels = [];
+      const projValues = [];
+
+      for (const t of sortedMins) {
+        const absMs = nowMs + t * 60000;
+        labels.push(new Date(absMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+
+        let y;
+        if (exhaustMin && t >= exhaustMin) {
+          y = 100;
+        } else if (exhaustMin && exhaustMin > 0) {
+          // Linear interpolation: currentPct at t=0 → 100% at t=exhaustMin
+          y = currentPct + (100 - currentPct) * (t / exhaustMin);
+        } else {
+          // Won't exhaust in this window — show flat line
+          y = currentPct;
+        }
+        projValues.push(Math.round(y * 10) / 10);
+      }
+
+      // Colour the projection line by severity
+      const lineColor = currentPct >= 90 ? '#cc3333'
+        : currentPct >= 75 ? '#e8a838'
+        : (getComputedStyle(document.body).getPropertyValue('--vscode-progressBar-background').trim() || '#007acc');
+
+      const fg = getComputedStyle(document.body).getPropertyValue('--vscode-editor-foreground').trim() || '#ccc';
+      const refLen = labels.length;
+
+      if (predChart) { try { predChart.destroy(); } catch { /* ignore */ } predChart = null; }
+
+      predChart = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Utilization',
+              data: projValues,
+              borderColor: lineColor,
+              backgroundColor: lineColor + '22',
+              borderWidth: 2,
+              pointRadius: projValues.map((_, i) => (i === 0 || (exhaustMin && Math.abs(sortedMins[i] - exhaustMin) < 0.01)) ? 4 : 0),
+              fill: true,
+              tension: 0,
+            },
+            {
+              label: 'Warning (75%)',
+              data: Array(refLen).fill(75),
+              borderColor: '#e8a83888',
+              borderWidth: 1,
+              borderDash: [4, 3],
+              pointRadius: 0,
+              fill: false,
+            },
+            {
+              label: 'Limit (100%)',
+              data: Array(refLen).fill(100),
+              borderColor: '#cc333388',
+              borderWidth: 1,
+              borderDash: [4, 3],
+              pointRadius: 0,
+              fill: false,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          animation: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              filter: item => item.datasetIndex === 0,
+              callbacks: {
+                label: ctx => 'Utilization: ' + ctx.parsed.y.toFixed(1) + '%',
+              },
+            },
+          },
+          scales: {
+            x: {
+              ticks: { color: fg, font: { size: 10 }, maxRotation: 0 },
+              grid: { display: false },
+            },
+            y: {
+              min: 0,
+              max: 105,
+              ticks: {
+                color: fg,
+                font: { size: 10 },
+                callback: v => v + '%',
+                stepSize: 25,
+              },
+              grid: { color: fg + '22' },
+            },
+          },
+        },
+      });
     }
 
     // ---- Heatmap -----------------------------------------------------------
@@ -710,8 +1101,12 @@ function getWebviewContent(nonce: string): string {
         lastData = msg.data;
         updateUsage(msg.data.usage, currentMode);
         updateProjectCosts(msg.data.projectCosts);
-        updatePrediction(msg.data.prediction, msg.data.usage);
+        updatePrediction(msg.data.prediction, msg.data.usage, msg.data.settings);
+        updatePredictionChart(msg.data.usage, msg.data.prediction);
         if (msg.data.heatmap) { updateHeatmap(msg.data.heatmap); }
+        // Refresh open panels on data update
+        if (breakdownOpen) { renderTokenBreakdown(msg.data.usage, msg.data.pricing); }
+        renderPricingContent(msg.data.pricing, msg.data.settings);
       } else if (msg.type === 'setDisplayMode') {
         currentMode = msg.mode;
         if (lastData) { updateUsage(lastData.usage, currentMode); }
@@ -823,6 +1218,13 @@ export class DashboardPanel {
         projectCosts: this.dataManager.getLastProjectCosts(),
         prediction,
         heatmap,
+        pricing: config.tokenPricing,
+        settings: {
+          provider: usage.providerType,
+          apiEnabled: config.rateLimitApiEnabled,
+          cacheTtlSeconds: config.cacheTtlSeconds,
+          weeklyBudget: config.weeklyBudget,
+        },
       },
     };
     this.panel.webview.postMessage(message);

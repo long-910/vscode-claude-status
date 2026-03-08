@@ -71,9 +71,14 @@ Hover for a detailed tooltip with full token breakdown and reset times.
 Click the status bar item to open a rich dashboard panel with:
 
 - **Current Usage** — colour-coded progress bars for 5 h and 7 d windows
-- **Token Cost** — 5 h / today / 7 d cost calculated from local JSONL data
+- **Token Cost** — 5 h / today / 7 d / month (est.) costs; expandable **token breakdown**
+  shows per-type counts (input / output / cache read / cache create) with individual costs
+  and cache hit ratio
 - **Project Cost** — per-workspace breakdown (today / 7 days / 30 days)
-- **Prediction** — burn rate ($/hr), time-to-exhaustion, daily budget tracking
+- **Prediction** — burn rate ($/hr), time-to-exhaustion, daily & weekly budget tracking;
+  **Rate Limit Timeline chart** visualises the projected 5 h utilization from now to reset
+- **Pricing & Settings** — always-visible card showing current token pricing rates,
+  provider, API state, and cache TTL; opens VS Code settings with one click
 - **Usage History** — GitHub-style daily heatmap + hourly pattern bar chart
 
 The panel supports light, dark, and high-contrast VS Code themes natively.
@@ -103,6 +108,7 @@ the 5 h rate limit is exhausted and warns you before it happens.
 - **Safety indicator** — "Safe to start heavy task" if > 30 min remains
 - **Daily budget** — set an optional USD cap; progress bar and alerts fire when
   the configured threshold (default 80 %) is reached
+- **Weekly budget** — optional USD weekly cap with progress bar (`claudeStatus.budget.weeklyUsd`)
 - **VS Code notifications** — non-blocking warning at ≤ 30 min, error dialog
   at ≤ 10 min (with "Open Dashboard" action); budget alert fires once per window
 
@@ -267,6 +273,11 @@ All settings are under the `claudeStatus` namespace in VS Code Settings.
 | Usage prediction & budget alerts | ✅ v0.2.0 |
 | Session history heatmap | ✅ v0.3.0 |
 | VS Code Marketplace publication | ✅ v0.3.0 |
+| Rate Limit Timeline chart | ✅ v0.4.0 |
+| Token breakdown with cache efficiency | ✅ v0.4.0 |
+| Monthly cost projection | ✅ v0.4.0 |
+| Weekly budget progress bar | ✅ v0.4.0 |
+| Pricing & Settings card in dashboard | ✅ v0.4.0 |
 
 ---
 

@@ -61,13 +61,38 @@ All inline `<script>` tags must include `nonce="${nonce}"`.
 │  │ 5h:  $14.21    │  │ Today:  $3.21                ││
 │  │ day: $14.21    │  │ 7 days: $18.45               ││
 │  │ 7d:  $53.17    │  │ 30 days: $62.10              ││
-│  └────────────────┘  └──────────────────────────────┘│
+│  │ Month: $426    │  └──────────────────────────────┘│
+│  │ ▶ Token breakdown (5h)                           ││
+│  └────────────────┘                                  │
+│    ↳ expanded:                                       │
+│      Input:       120k tok = $0.0036                 │
+│      Output:       18k tok = $0.0270                 │
+│      Cache read:  340k tok = $0.0001                 │
+│      Cache create: 12k tok = $0.0000                 │
+│      Cache hit ratio: 74% — Good! Cache is saving…  │
 │                                                      │
 │  ┌─────────────────────────────────────────────────┐ │
 │  │  PREDICTION                                     │ │
+│  │  [Rate Limit Timeline chart]                    │ │
+│  │  100% ┤- - - - - - - - - ✕ (limit)             │ │
+│  │   75% ┤- - - - - ⚠ (warn)                      │ │
+│  │   78% ┤━━━━━━━━━━                               │ │
+│  │      23:00   23:22  00:17                       │ │
 │  │  Burn rate: $4.2/hr                             │ │
-│  │  ⚠ At this rate, 5h limit in ~45 minutes        │ │
+│  │  ⚠ 5h limit in ~45m (at 23:22)                 │ │
+│  │  Daily budget: $12.50 / $20.00 (62%)            │ │
+│  │  Weekly budget: $48.10 / $100 (48%)             │ │
 │  │  💡 Recommendation: finish current task soon    │ │
+│  └─────────────────────────────────────────────────┘ │
+│                                                      │
+│  ┌─────────────────────────────────────────────────┐ │
+│  │  PRICING & SETTINGS                    [▲ Hide] │ │
+│  │  Input        $3.00  / 1M tokens               │ │
+│  │  Output      $15.00  / 1M tokens               │ │
+│  │  Cache read   $0.30  / 1M tokens               │ │
+│  │  Cache create $3.75  / 1M tokens               │ │
+│  │  [Claude.ai] [API enabled] [Cache TTL: 5m]     │ │
+│  │  ⚙ Edit pricing & settings                     │ │
 │  └─────────────────────────────────────────────────┘ │
 │                                                      │
 │  ┌─────────────────────────────────────────────────┐ │
@@ -148,6 +173,13 @@ panel.webview.postMessage({
     projectCosts: ProjectCostData[],   // array (multi-root aware)
     prediction: PredictionData | null,
     heatmap: HeatmapData | null,
+    pricing: TokenPricing,             // current claudeStatus.pricing.* values
+    settings: {
+      provider: string,                // detected/configured provider type
+      apiEnabled: boolean,             // claudeStatus.rateLimitApi.enabled
+      cacheTtlSeconds: number,         // claudeStatus.cache.ttlSeconds
+      weeklyBudget: number | null,     // claudeStatus.budget.weeklyUsd
+    },
   }
 })
 
@@ -248,3 +280,80 @@ The WebView re-renders heatmap when it receives this second update.
 `DataManager.getHeatmapData()` caches the computed result in memory for 5 minutes
 (`heatmapTtlMs = 5 * 60 * 1000`) to avoid re-reading all JSONL on every refresh.
 `forceRefresh()` invalidates the heatmap cache (`heatmapComputedAt = 0`).
+
+---
+
+## CSP and Event Handlers
+
+**Critical:** The CSP `script-src 'nonce-...'` blocks all inline `onclick="fn()"` HTML
+attribute handlers. Only the `<script nonce="...">` tag itself is trusted.
+
+**Rule:** Never use `onclick`, `onchange`, or any other inline event attribute in the
+WebView HTML. Always use one of these patterns instead:
+
+```javascript
+// Static elements — attach in script init block
+document.getElementById('my-btn').addEventListener('click', myHandler);
+
+// Dynamically generated elements — use document-level event delegation
+document.addEventListener('click', e => {
+  if (e.target && e.target.id === 'dynamic-btn-id') { myHandler(); }
+});
+```
+
+Assign unique `id` attributes to dynamically created buttons so the delegation handler
+can identify them. Do not rely on class names alone (multiple elements may share a class).
+
+---
+
+## Rate Limit Timeline Chart
+
+The Prediction card includes a Chart.js line chart (`<canvas id="predChart">`) that
+visualises the projected 5 h utilization over the remaining window time.
+
+**Visibility:** shown only when `providerType === 'claude-ai'` and `utilization5h > 0`.
+
+**Data construction:**
+
+1. Generate ~8 evenly-spaced time points from now to reset (`resetIn5h` seconds).
+2. If `estimatedExhaustionIn` is set, insert that exact minute as an additional point.
+3. For each point at time `t` (minutes from now):
+   - If `t >= exhaustMin`: y = 100 %
+   - Else: y = `currentPct + (100 − currentPct) × (t / exhaustMin)` (linear)
+   - If no exhaustion predicted: y = `currentPct` (flat)
+4. Reference datasets: flat lines at y = 75 (orange dashed) and y = 100 (red dashed).
+
+**Chart options:** `animation: false`, y-axis 0–105 %, x-axis shows absolute time labels,
+legend hidden, tooltip only on the projection dataset.
+
+---
+
+## Token Breakdown (collapsible)
+
+Inside the Token Cost card, a `▶ Token breakdown (5h)` toggle button reveals
+per-type token counts and costs using the `usage` and `pricing` fields from the
+`update` message:
+
+| Row | Formula |
+|-----|---------|
+| Input | `tokensIn5h / 1M × pricing.inputPerMillion` |
+| Output | `tokensOut5h / 1M × pricing.outputPerMillion` |
+| Cache read | `tokensCacheRead5h / 1M × pricing.cacheReadPerMillion` |
+| Cache create | `tokensCacheCreate5h / 1M × pricing.cacheCreatePerMillion` |
+| Cache hit ratio | `tokensCacheRead5h / (tokensIn5h + tokensCacheRead5h) × 100` |
+
+The breakdown re-renders on every `update` message if the toggle is open.
+
+---
+
+## Pricing & Settings Card
+
+Always-visible card (default expanded, toggle with `▲ Hide` / `▼ Show`) showing:
+
+- **Pricing grid** — current `claudeStatus.pricing.*` values for all four token types
+- **Status badges** — provider type, `rateLimitApi.enabled` state, cache TTL in minutes
+- **Settings link** — button that posts `{ type: 'openSettings' }` to open VS Code
+  settings filtered to `claudeStatus`
+
+The card content is re-rendered on every `update` message regardless of open/closed state,
+so it always reflects live settings without requiring a panel reload.

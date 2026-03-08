@@ -11,6 +11,62 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.0] — 2026-03-08
+
+### Added
+
+- **Rate Limit Timeline chart** — Chart.js line chart in the Prediction card showing
+  projected 5h utilization from now to the next window reset. Includes:
+  - Solid fill line from current utilization to predicted exhaustion point (100 %)
+  - Linear projection continues flat at 100 % through to reset if exhaustion is predicted
+  - Orange dashed reference line at 75 % (warning threshold)
+  - Red dashed reference line at 100 % (hard limit)
+  - Line colour adapts to severity: blue → orange (≥ 75 %) → red (≥ 90 %)
+  - Tooltip shows utilization % at each time point
+  - Chart hidden automatically for non-claude-ai providers and when no utilization
+    data is available
+
+- **Token breakdown** — collapsible section inside the Token Cost card (▶ toggle):
+  - Per-type token counts and individual costs for the 5 h window:
+    Input tokens (`$X.XX/M`), Output tokens, Cache read, Cache create
+  - **Cache hit ratio** — percentage of input tokens served from cache (`cache_read /
+    (input + cache_read)`); shows "Good! Cache is saving cost." when ≥ 50 %
+  - All costs use the currently configured `claudeStatus.pricing.*` rates
+
+- **Monthly cost projection** — "Month (est.)" row in the Token Cost card:
+  - Derived from today's JSONL cost × 30 (falls back to 7-day average if today = $0)
+  - Hidden when no cost data is available yet
+
+- **Weekly budget progress bar** — shown in the Prediction card when
+  `claudeStatus.budget.weeklyUsd` is set:
+  - Progress bar, spent / total / percentage display
+  - Warning alert at ≥ 80 % of weekly budget
+
+- **Pricing & Settings card** — always-visible card above the Usage History section:
+  - Token pricing grid: Input / Output / Cache read / Cache create (per 1M tokens)
+  - Status badges: provider type, API enabled/disabled state, cache TTL
+  - "⚙ Edit pricing & settings" button opens VSCode settings filtered to `claudeStatus`
+  - Collapsible via "▲ Hide" / "▼ Show" toggle (default: expanded)
+
+### Fixed
+
+- **CSP: inline `onclick` attributes blocked** — all `onclick="fn()"` HTML attributes
+  have been replaced with `addEventListener` calls (for static buttons) and a single
+  document-level event delegation handler (for dynamically generated buttons).
+  This fixes Token breakdown, Pricing & Settings toggle, budget configure / save /
+  disable buttons, and the "Edit pricing & settings" link — all of which were silently
+  blocked by the `script-src 'nonce-...'` Content Security Policy.
+
+### Changed
+
+- `DashboardMessage` now includes `pricing: TokenPricing` and
+  `settings: { provider, apiEnabled, cacheTtlSeconds, weeklyBudget }` so the WebView
+  can render the Pricing & Settings card and token breakdown without extra round-trips.
+- Pricing & Settings card re-renders on every data update to stay in sync when settings
+  change while the dashboard is open.
+
+---
+
 ## [0.3.3] — 2026-03-05
 
 ### Added
@@ -294,6 +350,7 @@ and project-level cost tracking.
 
 ---
 
+[0.4.0]: https://github.com/long-910/vscode-claude-status/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/long-910/vscode-claude-status/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/long-910/vscode-claude-status/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/long-910/vscode-claude-status/compare/v0.3.0...v0.3.1

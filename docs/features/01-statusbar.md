@@ -27,7 +27,9 @@ Lightweight, non-blocking, updates automatically.
 
 ### Stale data (cache expired, or `rateLimitApi.enabled: false` with cached data)
 ```
-🤖 5h:78% 7d:84% [32m ago] | my-app:$3.21
+🤖 5h:78% 7d:84% [32m ago] | my-app:$3.21   ← minutes (< 1 h)
+🤖 5h:78% 7d:84% [2h 15m ago] | my-app:$3.21 ← hours  (1 h – 23 h)
+🤖 5h:78% 7d:84% [1d 3h ago] | my-app:$3.21  ← days   (≥ 24 h)
 ```
 
 ### Cost mode (non-claude-ai provider, or `displayMode: "cost"`)
@@ -52,7 +54,7 @@ Lightweight, non-blocking, updates automatically.
 | Provider | Rate % shown | Mode |
 |----------|-------------|------|
 | `claude-ai`, API enabled | Yes | percent (default) or cost |
-| `claude-ai`, API disabled, cache exists | Yes (stale) | percent with `[Xm ago]` |
+| `claude-ai`, API disabled, cache exists | Yes (stale) | percent with `[X ago]` (m / h / d) |
 | `claude-ai`, API disabled, no cache | No | cost only |
 | `aws-bedrock` / `api-key` / `unknown` | No | cost only (always) |
 
@@ -135,7 +137,7 @@ function applyColor(item: vscode.StatusBarItem, data: ClaudeUsageData): void {
 Claude Code Usage
 ─────────────────────────────
 5h window:   78% [XXXXXX..] resets in 2h 47m
-7d window:   84% [XXXXXXX.] resets in 4.3d
+7d window:   84% [XXXXXXX.] resets in 4d 8h
 
 Token Cost (local)
 ─────────────────────────────

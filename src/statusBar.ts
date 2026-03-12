@@ -4,18 +4,18 @@ import { config } from './config';
 
 export function formatDuration(seconds: number): string {
   if (seconds < 3600) {
-    return `${Math.round(seconds / 60)}m`;
+    return vscode.l10n.t('{0}m', Math.round(seconds / 60));
   }
   if (seconds < 86400) {
     const hours = Math.floor(seconds / 3600);
     const mins = Math.round((seconds % 3600) / 60);
-    if (mins === 0) { return `${hours}h`; }
-    return `${hours}h ${mins}m`;
+    if (mins === 0) { return vscode.l10n.t('{0}h', hours); }
+    return vscode.l10n.t('{0}h {1}m', hours, mins);
   }
   const days = Math.floor(seconds / 86400);
   const hours = Math.round((seconds % 86400) / 3600);
-  if (hours === 0) { return `${days}d`; }
-  return `${days}d ${hours}h`;
+  if (hours === 0) { return vscode.l10n.t('{0}d', days); }
+  return vscode.l10n.t('{0}d {1}h', days, hours);
 }
 
 function formatTokens(n: number): string {

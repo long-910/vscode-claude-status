@@ -15,6 +15,17 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   days (`d`) and hours (`h`) in addition to minutes (`m`), so long durations like
   "1440m ago" are shown as "1d ago" and "120m ago" as "2h ago".
 
+### Fixed
+
+- **i18n completeness (JA / ZH-CN)** — all previously untranslated UI strings are now
+  registered in the runtime l10n bundle files and fully translated:
+  - `formatDuration` uses `vscode.l10n.t` for time units, so durations appear in the
+    active locale (e.g. "2時間30分前" in Japanese, "2小时30分钟前" in Chinese).
+  - Dashboard (`panel.ts`): 60 + strings covering card titles, buttons, alerts, and
+    status labels added to `bundle.l10n.{ja,zh-cn}.json`.
+  - WebView `fmt()` helper updated to use i18n unit strings and now also supports days.
+  - Removed dead keys `{0}m ago` / `__N__m ago` from both bundle files.
+
 ---
 
 ## [0.4.1] — 2026-03-09

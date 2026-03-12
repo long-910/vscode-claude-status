@@ -128,6 +128,34 @@ vscode-claude-status/
 
 ---
 
+## Git Branch Convention
+
+Use the following prefixes for branch names:
+
+| Prefix | Use case |
+|--------|----------|
+| `feat/` | New feature |
+| `fix/` | Bug fix |
+| `docs/` | Documentation only |
+| `chore/` | Maintenance, dependency updates |
+| `test/` | Tests only |
+| `refactor/` | Code refactoring without behaviour change |
+
+Examples:
+
+```
+feat/status-bar-time-format
+fix/missing-credentials-crash
+docs/update-architecture
+chore/update-dependencies
+```
+
+> **Note for automated Claude Code sessions:** the task runner requires branches that
+> start with `claude/` and end with the session ID (e.g. `claude/feat-description-XxXxX`).
+> This is a platform constraint — the prefix rule above applies to all human-authored branches.
+
+---
+
 ## Git Commit Convention
 
 ```

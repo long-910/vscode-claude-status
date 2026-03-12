@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { buildLabel, buildTooltip } from '../../statusBar';
+import { buildLabel, buildTooltip, formatDuration } from '../../statusBar';
 import { ClaudeUsageData } from '../../data/dataManager';
 
 function makeData(overrides: Partial<ClaudeUsageData> = {}): ClaudeUsageData {
@@ -35,6 +35,25 @@ const mockProject = {
   lastActive: new Date(),
 };
 
+suite('formatDuration', () => {
+  test('returns minutes for < 1 hour', () => {
+    assert.strictEqual(formatDuration(600), '10m');
+    assert.strictEqual(formatDuration(3540), '59m');
+  });
+
+  test('returns hours for 1h-23h', () => {
+    assert.strictEqual(formatDuration(3600), '1h');
+    assert.strictEqual(formatDuration(5400), '1h 30m');
+    assert.strictEqual(formatDuration(82800), '23h');
+  });
+
+  test('returns days for >= 24h', () => {
+    assert.strictEqual(formatDuration(86400), '1d');
+    assert.strictEqual(formatDuration(90000), '1d 1h');
+    assert.strictEqual(formatDuration(172800), '2d');
+  });
+});
+
 suite('StatusBar', () => {
   test('buildLabel shows not-logged-in for no-credentials', () => {
     const label = buildLabel(makeData({ dataSource: 'no-credentials' }));
@@ -60,9 +79,19 @@ suite('StatusBar', () => {
     assert.ok(label.includes('⚠'), `Expected ⚠ in: ${label}`);
   });
 
-  test('buildLabel shows stale age suffix for stale data', () => {
+  test('buildLabel shows stale age suffix for stale data (minutes)', () => {
     const label = buildLabel(makeData({ dataSource: 'stale', cacheAge: 600 }));
     assert.ok(label.includes('10m ago'), `Expected stale suffix in: ${label}`);
+  });
+
+  test('buildLabel shows stale age in hours for stale data > 1h', () => {
+    const label = buildLabel(makeData({ dataSource: 'stale', cacheAge: 7200 }));
+    assert.ok(label.includes('2h ago'), `Expected 2h ago in: ${label}`);
+  });
+
+  test('buildLabel shows stale age in days for stale data > 24h', () => {
+    const label = buildLabel(makeData({ dataSource: 'stale', cacheAge: 172800 }));
+    assert.ok(label.includes('2d ago'), `Expected 2d ago in: ${label}`);
   });
 
   test('buildLabel includes project cost when project data is present', () => {

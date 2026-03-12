@@ -9,6 +9,12 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Status bar time format** — duration values (stale-cache age, reset countdowns) now display
+  days (`d`) and hours (`h`) in addition to minutes (`m`), so long durations like
+  "1440m ago" are shown as "1d ago" and "120m ago" as "2h ago".
+
 ---
 
 ## [0.4.1] — 2026-03-09

@@ -2,14 +2,20 @@ import * as vscode from 'vscode';
 import { ClaudeUsageData, ProjectCostData } from './data/dataManager';
 import { config } from './config';
 
-function formatDuration(seconds: number): string {
+export function formatDuration(seconds: number): string {
   if (seconds < 3600) {
     return `${Math.round(seconds / 60)}m`;
   }
-  const hours = Math.floor(seconds / 3600);
-  const mins = Math.round((seconds % 3600) / 60);
-  if (mins === 0) { return `${hours}h`; }
-  return `${hours}h ${mins}m`;
+  if (seconds < 86400) {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.round((seconds % 3600) / 60);
+    if (mins === 0) { return `${hours}h`; }
+    return `${hours}h ${mins}m`;
+  }
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.round((seconds % 86400) / 3600);
+  if (hours === 0) { return `${days}d`; }
+  return `${days}d ${hours}h`;
 }
 
 function formatTokens(n: number): string {
@@ -43,7 +49,7 @@ export function buildLabel(data: ClaudeUsageData, projectCosts: ProjectCostData[
   }
 
   const isStale = dataSource === 'stale';
-  const staleSuffix = isStale ? ` [${Math.round(cacheAge / 60)}m ago]` : '';
+  const staleSuffix = isStale ? ` [${formatDuration(cacheAge)} ago]` : '';
 
   // Non-Claude.ai providers (Bedrock, API key, local-only) always use cost mode
   const useCostMode = providerType !== 'claude-ai' || dataSource === 'local-only' || displayMode === 'cost';
@@ -105,7 +111,7 @@ export function buildTooltip(data: ClaudeUsageData, projectCosts: ProjectCostDat
 
   const lastUpdated = cacheAge < 60
     ? vscode.l10n.t('just now')
-    : vscode.l10n.t('{0}m ago', Math.round(cacheAge / 60));
+    : vscode.l10n.t('{0} ago', formatDuration(cacheAge));
   const lines: string[] = [];
 
   if (providerType === 'claude-ai') {

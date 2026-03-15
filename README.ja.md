@@ -2,7 +2,7 @@
 
 > Claude Code のトークン使用量とコスト — VS Code のステータスバーに常時表示。
 
-![vscode-claude-status social preview](https://repository-images.githubusercontent.com/1165729413/42e4fb3f-18f2-4378-a809-84b92a471d8f)
+![vscode-claude-status social preview](https://repository-images.githubusercontent.com/1165729413/1dc1fbe5-b0d9-45f9-9b5b-c5ad06e36d10)
 
 <div align="center">
 

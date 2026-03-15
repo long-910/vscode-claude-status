@@ -3,7 +3,7 @@
   "displayName": "%ext.displayName%",
   "description": "%ext.description%",
   "l10n": "./l10n",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "publisher": "long-kudo",
   "engines": {
     "vscode": "^1.109.0"

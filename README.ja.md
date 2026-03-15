@@ -2,6 +2,8 @@
 
 > Claude Code のトークン使用量とコスト — VS Code のステータスバーに常時表示。
 
+![vscode-claude-status social preview](https://repository-images.githubusercontent.com/1165729413/42e4fb3f-18f2-4378-a809-84b92a471d8f)
+
 <div align="center">
 
 [![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/long-kudo.vscode-claude-status?style=flat-square&logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=long-kudo.vscode-claude-status)
@@ -13,6 +15,7 @@
 [![CI](https://github.com/long-910/vscode-claude-status/actions/workflows/ci.yml/badge.svg)](https://github.com/long-910/vscode-claude-status/actions/workflows/ci.yml)
 [![Release](https://github.com/long-910/vscode-claude-status/actions/workflows/release.yml/badge.svg)](https://github.com/long-910/vscode-claude-status/actions/workflows/release.yml)
 [![Sponsor](https://img.shields.io/badge/Sponsor-GitHub-pink?logo=github)](https://github.com/sponsors/long-910)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/long910)
 
 🌐 [English](README.md) | [日本語](README.ja.md) | [中文](README.zh.md)
 

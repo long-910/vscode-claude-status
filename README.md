@@ -303,6 +303,14 @@ architecture overview, and release procedures.
 
 ---
 
+## Contributors
+
+Thanks to everyone who has contributed to this project!
+
+[![Contributors](https://contrib.rocks/image?repo=long-910/vscode-claude-status&exclude=dependabot%5Bbot%5D)](https://github.com/long-910/vscode-claude-status/graphs/contributors)
+
+---
+
 ## License
 
 [MIT](LICENSE) — © 2026 long-910

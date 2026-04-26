@@ -277,6 +277,14 @@ npm run package       # → vscode-claude-status-*.vsix
 
 ---
 
+## 贡献者
+
+感谢所有为本项目做出贡献的人！
+
+[![Contributors](https://contrib.rocks/image?repo=long-910/vscode-claude-status&exclude=dependabot%5Bbot%5D)](https://github.com/long-910/vscode-claude-status/graphs/contributors)
+
+---
+
 ## 许可证
 
 [MIT](LICENSE) — © 2026 long-910

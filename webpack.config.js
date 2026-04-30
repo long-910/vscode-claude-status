@@ -17,6 +17,7 @@ const extensionConfig = {
     // the bundle is stored in the 'dist' folder (check package.json), 📖 -> https://webpack.js.org/configuration/output/
     path: path.resolve(__dirname, 'dist'),
     filename: 'extension.js',
+    chunkFilename: '[name].js',
     libraryTarget: 'commonjs2'
   },
   externals: {
@@ -25,7 +26,9 @@ const extensionConfig = {
   },
   resolve: {
     // support reading TypeScript and JavaScript files, 📖 -> https://github.com/TypeStrong/ts-loader
-    extensions: ['.ts', '.js']
+    extensions: ['.ts', '.js'],
+    // allow `import './foo.js'` to resolve to `./foo.ts` (required for Node16 moduleResolution)
+    extensionAlias: { '.js': ['.ts', '.js'] },
   },
   module: {
     rules: [

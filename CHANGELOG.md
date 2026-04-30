@@ -9,6 +9,14 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Performance
+
+- **Lazy-load dashboard panel** — `src/webview/panel.ts` (50 KiB) is now split into
+  a separate webpack chunk (`dist/panel.js`) and loaded on demand when the user first
+  opens the dashboard. The startup bundle (`dist/extension.js`) shrinks from **118 KiB
+  to 73 KiB** (−38%), reducing V8 parse time and improving the extension activation time.
+  The status bar always appears immediately; only the dashboard itself loads on first use.
+
 ---
 
 ## [0.4.3] — 2026-04-26

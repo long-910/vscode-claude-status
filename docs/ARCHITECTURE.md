@@ -36,6 +36,20 @@
 
 ---
 
+## Bundle Layout
+
+The extension is split into two webpack chunks to minimise startup parse time:
+
+| File | Size | When loaded |
+|------|------|-------------|
+| `dist/extension.js` | ~73 KiB | Always — at extension activation |
+| `dist/panel.js` | ~50 KiB | On demand — first time dashboard is opened |
+
+`src/webview/panel.ts` is loaded via dynamic `import()` inside the `openDashboard`
+command handler and is never parsed during the critical activation path.
+
+---
+
 ## Core Components
 
 ### DataManager (`src/data/dataManager.ts`)

@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import { DataManager, ClaudeUsageData, PredictionData } from './data/dataManager';
 import { StatusBarManager } from './statusBar';
-import { DashboardPanel } from './webview/panel';
 import { config } from './config';
 
 // --- Notification system ---
@@ -74,7 +73,9 @@ export function activate(context: vscode.ExtensionContext) {
   // Register commands
   context.subscriptions.push(
     vscode.commands.registerCommand('vscode-claude-status.openDashboard', () => {
-      DashboardPanel.createOrShow(dataManager);
+      import(/* webpackChunkName: "panel" */ './webview/panel.js')
+        .then(({ DashboardPanel }) => DashboardPanel.createOrShow(dataManager))
+        .catch(() => {});
     }),
     vscode.commands.registerCommand('vscode-claude-status.refresh', async () => {
       await dataManager.forceRefresh();
@@ -162,5 +163,6 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
-  DashboardPanel.dispose();
+  // Fire-and-forget: webpack returns the cached module synchronously if already loaded
+  import('./webview/panel.js').then(({ DashboardPanel }) => DashboardPanel.dispose()).catch(() => {});
 }

@@ -6,7 +6,7 @@
   "version": "0.5.0",
   "publisher": "long-kudo",
   "engines": {
-    "vscode": "^1.100.0"
+    "vscode": "^1.73.0"
   },
   "categories": [
     "Visualization"
@@ -226,7 +226,7 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.100.0",
+    "@types/vscode": "^1.73.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
     "@typescript-eslint/eslint-plugin": "^8.31.1",

@@ -16,9 +16,9 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - **Minimum VS Code version** — lowered the engine requirement from `^1.109.0` to
-  `^1.100.0`. The extension uses no API introduced after VS Code 1.73, so the previous
-  floor was unnecessarily high and blocked installation on VS Code 1.100–1.108.
-  Resolves [#28](https://github.com/long-910/vscode-claude-status/issues/28).
+  `^1.73.0`. The extension uses no API newer than `vscode.l10n` (added in 1.73), so
+  the previous floor was unnecessarily high and blocked installation on VS Code
+  1.73–1.108. Resolves [#28](https://github.com/long-910/vscode-claude-status/issues/28).
 
 ---
 

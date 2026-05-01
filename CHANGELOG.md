@@ -9,6 +9,10 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [0.5.1] — 2026-05-01
+
 ### Fixed
 
 - **Cost deduplication** — Claude Code writes one JSONL entry per content block in a
@@ -18,6 +22,10 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (falling back to `message.id`) so each API call is counted exactly once.
   Resolves [#31](https://github.com/long-910/vscode-claude-status/issues/31).
 
+---
+
+## [0.5.0] — 2026-04-30
+
 ### Performance
 
 - **Lazy-load dashboard panel** — `src/webview/panel.ts` (50 KiB) is now split into
@@ -25,10 +33,6 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   opens the dashboard. The startup bundle (`dist/extension.js`) shrinks from **118 KiB
   to 73 KiB** (−38%), reducing V8 parse time and improving the extension activation time.
   The status bar always appears immediately; only the dashboard itself loads on first use.
-
----
-
-## [0.5.0] — 2026-04-30
 
 ### Fixed
 
@@ -124,7 +128,7 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - Per-type token counts and individual costs for the 5 h window:
     Input tokens (`$X.XX/M`), Output tokens, Cache read, Cache create
   - **Cache hit ratio** — percentage of input tokens served from cache (`cache_read /
-    (input + cache_read)`); shows "Good! Cache is saving cost." when ≥ 50 %
+(input + cache_read)`); shows "Good! Cache is saving cost." when ≥ 50 %
   - All costs use the currently configured `claudeStatus.pricing.*` rates
 
 - **Monthly cost projection** — "Month (est.)" row in the Token Cost card:
@@ -274,7 +278,7 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   prevents concurrent recomputes.
 - **`src/webview/panel.ts`** — Full heatmap section in the dashboard:
   - **Daily heatmap** — CSS grid (`grid-template-rows: repeat(7, 12px);
-    grid-auto-flow: column`) with day-of-week padding for correct alignment,
+grid-auto-flow: column`) with day-of-week padding for correct alignment,
     month labels, five green intensity levels (l0–l4) based on cost relative
     to the window maximum, hover tooltip showing date + cost + message count.
   - **Hourly bar chart** — `<canvas id="hourlyChart">` rendered by
@@ -316,16 +320,16 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `onDidUpdate`, so notification listeners always see an up-to-date prediction.
 - **`src/config.ts`** — Added `setDailyBudget(value: number | null)` method.
 - **`src/webview/panel.ts`** — Replaced placeholder `PredictionData` type with
-  the real import from `dataManager`.  `sendUpdate()` is now `async` and calls
-  `getPrediction()` on each update.  The Prediction card in the dashboard now
+  the real import from `dataManager`. `sendUpdate()` is now `async` and calls
+  `getPrediction()` on each update. The Prediction card in the dashboard now
   shows:
   - Burn rate row (`$X.XX/hr`)
   - Rate-limit exhaustion alert (info / warning / error styling by severity)
   - Daily budget progress bar + exhaustion time (when budget is set)
   - Collapsible budget input form ("⚙ Set daily budget" / "⚙ Configure budget")
   - Recommendation text
-  The `setBudget` message handler now calls `config.setDailyBudget()` and
-  triggers `forceRefresh()` instead of a no-op placeholder.
+    The `setBudget` message handler now calls `config.setDailyBudget()` and
+    triggers `forceRefresh()` instead of a no-op placeholder.
 - **`src/extension.ts`** — Notification system:
   - `notifiedKeys` `Set<string>` deduplicates alerts within a session window.
   - `checkWindowReset()` clears keys when `resetIn5h` jumps by > 1 h (window
@@ -351,6 +355,7 @@ and project-level cost tracking.
 ### Added
 
 #### Data Layer (`src/data/`)
+
 - **`jsonlReader.ts`** — Parses `~/.claude/projects/**/*.jsonl` locally (no network);
   aggregates `input_tokens`, `output_tokens`, `cache_read_input_tokens`,
   `cache_creation_input_tokens` for the last 5 h, today, and 7 d windows.
@@ -363,7 +368,7 @@ and project-level cost tracking.
 - **`cache.ts`** — Disk-backed JSON cache at `~/.claude/vscode-claude-status-cache.json`
   (version 1). Stores API response only; JSONL costs are always read fresh.
   Exposes `readCache()`, `writeCache()`, `isCacheValid()`, `getCacheAge()`.
-- **`dataManager.ts`** — Singleton data orchestrator.  Owns a
+- **`dataManager.ts`** — Singleton data orchestrator. Owns a
   `vscode.EventEmitter<ClaudeUsageData>` that fires on every refresh.
   Starts a `FileSystemWatcher` on `~/.claude/projects/**/*.jsonl` so the
   extension reacts within seconds of any Claude Code activity.
@@ -373,10 +378,11 @@ and project-level cost tracking.
   1. Hash: replace every non-alphanumeric character with `-`
      (`/home/user/my-app` → `-home-user-my-app`).
   2. Fallback: scan JSONL `cwd` fields for exact path match.
-  Aggregates `costToday`, `cost7d`, `cost30d`, `sessionCount`, `lastActive`
-  per project. Multi-root workspaces are each tracked independently.
+     Aggregates `costToday`, `cost7d`, `cost30d`, `sessionCount`, `lastActive`
+     per project. Multi-root workspaces are each tracked independently.
 
 #### Status Bar (`src/statusBar.ts`)
+
 - Persistent status bar item (left-aligned, priority 10).
 - **Percent mode** (default): `🤖 5h:45% 7d:62%`
 - **Cost mode**: `🤖 5h:$14.21 7d:$53.17`
@@ -389,6 +395,7 @@ and project-level cost tracking.
   cost table.
 
 #### WebView Dashboard (`src/webview/panel.ts`)
+
 - `DashboardPanel` singleton — opens a side panel with live usage data.
 - HTML/CSS/JS embedded as a TypeScript template literal (no separate HTML
   file required; compatible with webpack bundling and `.vscodeignore`).
@@ -401,6 +408,7 @@ and project-level cost tracking.
 - Supports VS Code light, dark, and high-contrast themes via CSS variables.
 
 #### Extension Entry Point (`src/extension.ts`)
+
 - Activation event: `onStartupFinished`.
 - Commands registered:
   - `vscode-claude-status.openDashboard` — open / reveal dashboard panel.
@@ -412,6 +420,7 @@ and project-level cost tracking.
 - Workspace folder change listener re-fetches project costs automatically.
 
 #### Configuration (`package.json` contributes)
+
 - `claudeStatus.displayMode` (`"percent"` | `"cost"`, default `"percent"`)
 - `claudeStatus.statusBar.alignment` (`"left"` | `"right"`, default `"left"`)
 - `claudeStatus.statusBar.showProjectCost` (boolean, default `true`)
@@ -427,6 +436,7 @@ and project-level cost tracking.
 - `claudeStatus.credentials.path` (string | null, default `null`)
 
 #### Tests (`src/test/suite/`)
+
 - `jsonlReader.test.ts` — unit tests for `calculateCost()` pricing formula.
 - `cache.test.ts` — unit tests for `isCacheValid()` and `getCacheAge()`.
 - `statusBar.test.ts` — label / tooltip builder tests covering all display
@@ -436,6 +446,7 @@ and project-level cost tracking.
   the real-world `sb_git` path verified against live Claude Code data.
 
 ### Technical Notes
+
 - JSONL entries are read from `entry.message.usage` (not `entry.usage` as
   some older docs suggest); the `costUSD` field is not present in current
   Claude Code output and is therefore always computed client-side.

@@ -18,7 +18,9 @@ interface JsonlEntry {
   type: string
   timestamp: string
   cwd?: string
+  requestId?: string
   message?: {
+    id?: string
     usage?: TokenUsage
   }
 }
@@ -88,8 +90,12 @@ export async function findAllJsonlFiles(): Promise<string[]> {
   return files;
 }
 
-async function readJsonlFile(filePath: string): Promise<JsonlEntry[]> {
+export async function readJsonlFile(filePath: string): Promise<JsonlEntry[]> {
   const entries: JsonlEntry[] = [];
+  // Claude Code writes one JSONL entry per content block in a streaming response,
+  // all sharing the same requestId and usage counts. Deduplicate to count each
+  // API call exactly once.
+  const seenRequestIds = new Set<string>();
   try {
     const content = await fs.readFile(filePath, 'utf-8');
     for (const line of content.split('\n')) {
@@ -103,6 +109,15 @@ async function readJsonlFile(filePath: string): Promise<JsonlEntry[]> {
           typeof obj.timestamp === 'string' &&
           obj.message !== undefined
         ) {
+          const dedupeKey =
+            (typeof obj.requestId === 'string' && obj.requestId) ||
+            (typeof (obj.message as Record<string, unknown>)?.id === 'string' &&
+              (obj.message as Record<string, unknown>).id as string) ||
+            null;
+          if (dedupeKey) {
+            if (seenRequestIds.has(dedupeKey)) { continue; }
+            seenRequestIds.add(dedupeKey);
+          }
           entries.push(obj as unknown as JsonlEntry);
         }
       } catch {

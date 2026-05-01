@@ -9,6 +9,15 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Cost deduplication** — Claude Code writes one JSONL entry per content block in a
+  streaming response (thinking, text, each tool-use call), all sharing the same
+  `requestId` and identical usage counts. The reader was summing every entry, inflating
+  costs by 2–4× in agentic sessions. Entries are now deduplicated by `requestId`
+  (falling back to `message.id`) so each API call is counted exactly once.
+  Resolves [#31](https://github.com/long-910/vscode-claude-status/issues/31).
+
 ### Performance
 
 - **Lazy-load dashboard panel** — `src/webview/panel.ts` (50 KiB) is now split into

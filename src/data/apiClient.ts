@@ -1,8 +1,13 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 // Actual structure of ~/.claude/.credentials.json (verified against Claude Code v2.1.x)
+// macOS stores these in Keychain under service "Claude Code-credentials" with the same JSON format.
 interface ClaudeCredentials {
   claudeAiOauth: {
     accessToken: string
@@ -47,15 +52,39 @@ export async function detectProvider(customCredPath?: string | null): Promise<Cl
   return 'unknown';
 }
 
-async function readCredentials(customPath?: string | null): Promise<string> {
-  const credPath = customPath ?? path.join(os.homedir(), '.claude', '.credentials.json');
-  const content = await fs.readFile(credPath, 'utf-8');
-  const creds = JSON.parse(content) as ClaudeCredentials;
+// On macOS, Claude Code stores credentials in Keychain under this service name
+// instead of (or in addition to) ~/.claude/.credentials.json.
+const MACOS_KEYCHAIN_SERVICE = 'Claude Code-credentials';
+
+async function readCredentialsFromKeychain(): Promise<string> {
+  const { stdout } = await execAsync(
+    `/usr/bin/security find-generic-password -s "${MACOS_KEYCHAIN_SERVICE}" -w`
+  );
+  const creds = JSON.parse(stdout.trim()) as ClaudeCredentials;
   const token = creds.claudeAiOauth?.accessToken;
   if (!token) {
-    throw new Error('No OAuth access token found in credentials file');
+    throw new Error('No OAuth access token in macOS Keychain');
   }
   return token;
+}
+
+async function readCredentials(customPath?: string | null): Promise<string> {
+  const credPath = customPath ?? path.join(os.homedir(), '.claude', '.credentials.json');
+  try {
+    const content = await fs.readFile(credPath, 'utf-8');
+    const creds = JSON.parse(content) as ClaudeCredentials;
+    const token = creds.claudeAiOauth?.accessToken;
+    if (!token) {
+      throw new Error('No OAuth access token found in credentials file');
+    }
+    return token;
+  } catch {
+    // On macOS with no credentials file, fall back to Keychain (Claude Code v2.x+)
+    if (process.platform === 'darwin' && (customPath === null || customPath === undefined)) {
+      return readCredentialsFromKeychain();
+    }
+    throw new Error('No Claude.ai credentials found');
+  }
 }
 
 export async function fetchRateLimitData(customCredPath?: string | null): Promise<RateLimitData> {

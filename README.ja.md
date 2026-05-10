@@ -134,7 +134,7 @@ Claude Status: Set Budget...
 
 | プロバイダー | 認証方法 | 表示内容 |
 |-------------|---------|---------|
-| Claude.ai サブスクリプション | `claude login`（`~/.claude/.credentials.json` が作成される） | レート制限 % + コスト |
+| Claude.ai サブスクリプション | `claude login` — v2.x+ (Mac) はmacOSキーチェーンに保存、旧バージョンは `~/.claude/.credentials.json`。いずれも自動検出 | レート制限 % + コスト |
 | AWS Bedrock | AWS認証情報（環境変数または `~/.aws/`） | コストのみ |
 | Anthropic APIキー | `ANTHROPIC_API_KEY` 環境変数 | コストのみ |
 
@@ -266,6 +266,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | 週次予算プログレスバー | ✅ v0.4.0 |
 | 料金 & 設定カード（ダッシュボード内） | ✅ v0.4.0 |
 | i18n — 英語 / 日本語 / 中国語 | ✅ v0.4.1 |
+| macOS キーチェーン認証情報フォールバック（Claude Code v2.x+） | ✅ v0.6.0 |
 
 ---
 

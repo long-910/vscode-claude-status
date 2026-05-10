@@ -11,6 +11,17 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.6.0] — 2026-05-10
+
+### Fixed
+
+- **macOS Keychain credential lookup** — Claude Code v2.x on macOS stores OAuth credentials
+  in the system Keychain under `"Claude Code-credentials"` instead of
+  `~/.claude/.credentials.json`. The extension now falls back to the Keychain when the
+  credentials file is absent, restoring 5h/7d utilization display on Mac.
+
+---
+
 ## [0.5.1] — 2026-05-01
 
 ### Fixed

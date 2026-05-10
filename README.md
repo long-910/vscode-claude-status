@@ -148,7 +148,7 @@ Number of days is configurable via `claudeStatus.heatmap.days` (30 / 60 / 90).
 
 | Provider | Authentication | Display |
 |----------|---------------|---------|
-| Claude.ai subscription | `claude login` (creates `~/.claude/.credentials.json`) | Rate-limit % + cost |
+| Claude.ai subscription | `claude login` — credentials stored in macOS Keychain (v2.x+) or `~/.claude/.credentials.json`; detected automatically | Rate-limit % + cost |
 | AWS Bedrock | AWS credentials (env vars or `~/.aws/`) | Cost only |
 | Anthropic API key | `ANTHROPIC_API_KEY` env var | Cost only |
 
@@ -286,6 +286,7 @@ All settings are under the `claudeStatus` namespace in VS Code Settings.
 | Weekly budget progress bar | ✅ v0.4.0 |
 | Pricing & Settings card in dashboard | ✅ v0.4.0 |
 | i18n — English / Japanese / Chinese | ✅ v0.4.1 |
+| macOS Keychain credential fallback (Claude Code v2.x+) | ✅ v0.6.0 |
 
 ---
 

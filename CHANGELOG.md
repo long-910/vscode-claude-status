@@ -11,6 +11,22 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.6.1] — 2026-05-28
+
+### Added
+
+- **Open VSX Registry** — the extension is now published to [Open VSX](https://open-vsx.org/extension/long-kudo/vscode-claude-status)
+  in addition to the VS Code Marketplace, making it available for VSCodium, Gitpod, and
+  other Eclipse Theia-based editors.
+- **Open VSX badge** — README (EN / JA / ZH) now shows an Open VSX version badge.
+
+### Changed
+
+- **CI release workflow** — `release.yml` now publishes to both VS Marketplace and
+  Open VSX Registry in a single `git tag` push via `HaaLeo/publish-vscode-extension@v2`.
+
+---
+
 ## [0.6.0] — 2026-05-10
 
 ### Fixed
@@ -466,6 +482,10 @@ and project-level cost tracking.
 
 ---
 
+[0.6.1]: https://github.com/long-910/vscode-claude-status/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/long-910/vscode-claude-status/compare/v0.5.1...v0.6.0
+[0.5.1]: https://github.com/long-910/vscode-claude-status/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/long-910/vscode-claude-status/compare/v0.4.3...v0.5.0
 [0.4.3]: https://github.com/long-910/vscode-claude-status/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/long-910/vscode-claude-status/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/long-910/vscode-claude-status/compare/v0.4.0...v0.4.1

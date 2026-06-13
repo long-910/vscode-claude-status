@@ -37,6 +37,16 @@ function truncateName(name: string): string {
   return name.length > 12 ? name.slice(0, 11) + '…' : name;
 }
 
+function applyFormat(format: string, data: ClaudeUsageData): string {
+  const { utilization5h, utilization7d, cost5h, cost7d, costDay } = data;
+  return format
+    .replace(/\$\{usage5h\}/g, `${Math.round(utilization5h * 100)}`)
+    .replace(/\$\{usage7d\}/g, `${Math.round(utilization7d * 100)}`)
+    .replace(/\$\{cost5h\}/g, cost5h.toFixed(2))
+    .replace(/\$\{cost7d\}/g, cost7d.toFixed(2))
+    .replace(/\$\{costDay\}/g, costDay.toFixed(2));
+}
+
 export function buildLabel(data: ClaudeUsageData, projectCosts: ProjectCostData[] = []): string {
   const { dataSource, utilization5h, utilization7d, limitStatus, cost5h, cost7d, cacheAge, has7dLimit, providerType } = data;
   const displayMode = config.displayMode;
@@ -46,6 +56,11 @@ export function buildLabel(data: ClaudeUsageData, projectCosts: ProjectCostData[
   }
   if (dataSource === 'no-data') {
     return vscode.l10n.t('🤖 Claude: run refresh');
+  }
+
+  const customFormat = config.statusBarFormat;
+  if (customFormat) {
+    return applyFormat(customFormat, data);
   }
 
   const isStale = dataSource === 'stale';

@@ -19,6 +19,10 @@ export class ExtensionConfig {
     return this.cfg.get('statusBar.showProjectCost', true);
   }
 
+  get statusBarFormat(): string | null {
+    return this.cfg.get('statusBar.format', null);
+  }
+
   get cacheTtlSeconds(): number {
     return this.cfg.get('cache.ttlSeconds', 300);
   }
@@ -60,7 +64,8 @@ export class ExtensionConfig {
   }
 
   get credentialsPath(): string | null {
-    return this.cfg.get('credentials.path', null);
+    const v = this.cfg.get<string | null>('credentials.path', null);
+    return v || null;
   }
 
   get claudeProvider(): 'auto' | ClaudeProvider {
@@ -82,6 +87,10 @@ export class ExtensionConfig {
 
   async setDailyBudget(value: number | null): Promise<void> {
     await this.cfg.update('budget.dailyUsd', value, vscode.ConfigurationTarget.Global);
+  }
+
+  async setStatusBarFormat(value: string | null): Promise<void> {
+    await this.cfg.update('statusBar.format', value || null, vscode.ConfigurationTarget.Global);
   }
 }
 

@@ -11,6 +11,26 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.6.2] — 2026-06-13
+
+### Added
+
+- **Configurable status bar format** (`claudeStatus.statusBar.format`) — define a custom
+  template string using placeholders: `${usage5h}`, `${usage7d}`, `${cost5h}`, `${cost7d}`,
+  `${costDay}`. When `null` (default), the existing auto-generated label is used.
+  ([#35](https://github.com/long-910/vscode-claude-status/issues/35))
+- **Format editor in dashboard** — the Pricing & Settings card now includes an inline
+  text field to set or reset `claudeStatus.statusBar.format` without opening VS Code settings.
+
+### Fixed
+
+- **Empty `credentials.path` setting restores % display** — when `claudeStatus.credentials.path`
+  is set to `""` (empty string) via the VS Code Settings UI instead of `null`, the extension
+  now correctly falls back to the default credentials path and macOS Keychain lookup, restoring
+  rate-limit utilization (5h/7d %) in the status bar.
+
+---
+
 ## [0.6.1] — 2026-05-28
 
 ### Added

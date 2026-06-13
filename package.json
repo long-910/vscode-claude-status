@@ -3,7 +3,7 @@
   "displayName": "%ext.displayName%",
   "description": "%ext.description%",
   "l10n": "./l10n",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "publisher": "long-kudo",
   "engines": {
     "vscode": "^1.73.0"
@@ -92,6 +92,14 @@
           "type": "boolean",
           "default": true,
           "description": "%config.statusBar.showProjectCost.desc%"
+        },
+        "claudeStatus.statusBar.format": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "description": "%config.statusBar.format.desc%"
         },
         "claudeStatus.cache.ttlSeconds": {
           "type": "number",

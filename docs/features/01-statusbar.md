@@ -190,6 +190,37 @@ context.subscriptions.push({ dispose: () => clearInterval(timer) })
 
 ---
 
+## Custom Format (`claudeStatus.statusBar.format`)
+
+Users can override the auto-generated label with a template string containing placeholders.
+
+```
+// settings.json
+"claudeStatus.statusBar.format": "Claude Usage 5h:${usage5h}% 7d:${usage7d}%"
+// → Claude Usage 5h:35% 7d:72%
+```
+
+### Available placeholders
+
+| Placeholder | Resolves to |
+|-------------|-------------|
+| `${usage5h}` | 5h utilization as integer 0–100 (always `0` for non-claude-ai) |
+| `${usage7d}` | 7d utilization as integer 0–100 (`0` if no 7d window) |
+| `${cost5h}` | 5h local token cost, USD 2 d.p. (e.g. `1.23`) |
+| `${cost7d}` | 7d local token cost, USD 2 d.p. |
+| `${costDay}` | Today's local token cost, USD 2 d.p. |
+
+### Priority and fallback rules
+
+1. `no-credentials` / `no-data` states → always use default messages, format is ignored.
+2. `format` is set and non-empty → `applyFormat()` returns the interpolated string.
+3. `format` is `null` (default) → existing `buildLabel()` logic (mode, provider, stale suffix, project cost).
+
+The stale-age suffix and project cost suffix are **not** appended in custom format mode.
+Color coding is unaffected — it still follows `limitStatus`.
+
+---
+
 ## Display Toggle (Cost Mode)
 
 Command: `vscode-claude-status.toggleDisplayMode`

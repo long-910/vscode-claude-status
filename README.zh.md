@@ -206,6 +206,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | `claudeStatus.displayMode` | `"percent"` \| `"cost"` | `"percent"` | 状态栏显示模式 |
 | `claudeStatus.statusBar.alignment` | `"left"` \| `"right"` | `"left"` | 状态栏位置 |
 | `claudeStatus.statusBar.showProjectCost` | `boolean` | `true` | 在状态栏显示项目费用 |
+| `claudeStatus.statusBar.format` | `string \| null` | `null` | 自定义标签模板。占位符：`${usage5h}`, `${usage7d}`, `${cost5h}`, `${cost7d}`, `${costDay}`。`null` = 默认自动生成 |
 | `claudeStatus.cache.ttlSeconds` | `number` (60–3600) | `300` | API 缓存 TTL（秒） |
 | `claudeStatus.rateLimitApi.enabled` | `boolean` | `true` | 从 Anthropic API 获取速率限制 %。禁用时停止新的 API 调用；若有缓存，仍以 `[Xm ago]` 显示 % |
 | `claudeStatus.realtime.enabled` | `boolean` | `false` | 每隔 TTL 秒轮询速率限制 API（需启用 `rateLimitApi.enabled`） |

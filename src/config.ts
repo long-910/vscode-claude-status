@@ -64,7 +64,8 @@ export class ExtensionConfig {
   }
 
   get credentialsPath(): string | null {
-    return this.cfg.get('credentials.path', null);
+    const v = this.cfg.get<string | null>('credentials.path', null);
+    return v || null;
   }
 
   get claudeProvider(): 'auto' | ClaudeProvider {

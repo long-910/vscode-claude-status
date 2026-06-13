@@ -87,6 +87,10 @@ export class ExtensionConfig {
   async setDailyBudget(value: number | null): Promise<void> {
     await this.cfg.update('budget.dailyUsd', value, vscode.ConfigurationTarget.Global);
   }
+
+  async setStatusBarFormat(value: string | null): Promise<void> {
+    await this.cfg.update('statusBar.format', value || null, vscode.ConfigurationTarget.Global);
+  }
 }
 
 export const config = new ExtensionConfig();

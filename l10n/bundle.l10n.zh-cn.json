@@ -99,5 +99,9 @@
   "Less than 30 min remaining. Wrap up current task.": "不足30分钟，请结束当前任务。",
   "Less than 10 min remaining. Save your work and pause.": "不足10分钟，请保存工作并暂停。",
   "Rate limit reached. Wait for reset.": "已达速率限制，请等待重置。",
-  "msgs": "条"
+  "msgs": "条",
+  "⚙ Set format": "⚙ 设置格式",
+  "Format string:": "格式字符串：",
+  "Reset to default": "恢复默认",
+  "(default)": "（默认）"
 }

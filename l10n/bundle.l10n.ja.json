@@ -99,5 +99,9 @@
   "Less than 30 min remaining. Wrap up current task.": "残り30分未満。現在のタスクを終わらせてください。",
   "Less than 10 min remaining. Save your work and pause.": "残り10分未満。作業を保存して一時停止してください。",
   "Rate limit reached. Wait for reset.": "レート制限に達しました。リセットまでお待ちください。",
-  "msgs": "件"
+  "msgs": "件",
+  "⚙ Set format": "⚙ 書式を設定",
+  "Format string:": "書式文字列:",
+  "Reset to default": "デフォルトに戻す",
+  "(default)": "（デフォルト）"
 }

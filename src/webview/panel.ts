@@ -9,6 +9,7 @@ interface DashboardSettings {
   apiEnabled: boolean;
   cacheTtlSeconds: number;
   weeklyBudget: number | null;
+  statusBarFormat: string | null;
 }
 
 interface DashboardMessage {
@@ -75,6 +76,11 @@ function buildI18n(): Record<string, string> {
     apiEnabled:            t('API enabled'),
     apiDisabled:           t('API disabled'),
     editSettings:          t('⚙ Edit pricing & settings'),
+    configureFormat:       t('⚙ Set format'),
+    statusBarFormatLabel:  t('Format string:'),
+    statusBarFormatPlaceholder: t("e.g. \${usage5h}% | \$\${costDay}"),
+    statusBarFormatReset:  t('Reset to default'),
+    statusBarFormatDefault: t('(default)'),
     stale:                 t('(stale)'),
     live:                  t('(live)'),
     justNow:               t('just now'),
@@ -253,6 +259,7 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
       font-size: 0.9em;
     }
     .budget-configure label { color: var(--vscode-descriptionForeground); }
+    .budget-configure input.format-input { width: 260px; font-family: var(--vscode-editor-font-family, monospace); font-size: 0.85em; }
     .configure-link {
       background: none;
       border: none;
@@ -508,6 +515,25 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
     let refreshing = false;
     let breakdownOpen = false;
     let pricingOpen = true;
+    let formatConfigOpen = false;
+
+    function toggleFormatConfig() {
+      formatConfigOpen = !formatConfigOpen;
+      const form = document.getElementById('format-form');
+      if (form) { form.style.display = formatConfigOpen ? 'flex' : 'none'; }
+    }
+
+    function saveFormat() {
+      const input = document.getElementById('format-input');
+      const val = input ? input.value.trim() : '';
+      vscode.postMessage({ type: 'setFormat', format: val || null });
+      formatConfigOpen = false;
+    }
+
+    function clearFormat() {
+      vscode.postMessage({ type: 'setFormat', format: null });
+      formatConfigOpen = false;
+    }
 
     // Notify extension that the WebView is ready
     vscode.postMessage({ type: 'ready' });
@@ -534,6 +560,9 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
       if (id === 'budget-configure-btn') { toggleBudgetConfig(); }
       else if (id === 'budget-save-btn')  { saveBudget(); }
       else if (id === 'budget-clear-btn') { clearBudget(); }
+      else if (id === 'format-configure-btn') { toggleFormatConfig(); }
+      else if (id === 'format-save-btn')  { saveFormat(); }
+      else if (id === 'format-clear-btn') { clearFormat(); }
       else if (id === 'pricing-settings-btn') { vscode.postMessage({ type: 'openSettings' }); }
     });
 
@@ -928,6 +957,24 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
         '<button class="configure-link" id="pricing-settings-btn">' + i18n.editSettings + '</button>' +
         '</div>';
 
+      // Format row
+      const currentFormat = settings.statusBarFormat;
+      const formatDisplay = currentFormat
+        ? '<code style="font-size:0.85em">' + esc(currentFormat) + '</code>'
+        : '<span style="color:var(--vscode-descriptionForeground)">' + i18n.statusBarFormatDefault + '</span>';
+      html +=
+        '<div class="settings-row" style="margin-top:10px">' +
+        '<span>' + formatDisplay + '</span>' +
+        '<button class="configure-link" id="format-configure-btn">' + i18n.configureFormat + '</button>' +
+        '</div>' +
+        '<div class="budget-configure" id="format-form" style="display:' +
+        (formatConfigOpen ? 'flex' : 'none') + '">' +
+        '<label>' + i18n.statusBarFormatLabel + '</label>' +
+        '<input class="format-input" type="text" id="format-input" placeholder="' + esc(i18n.statusBarFormatPlaceholder) + '" value="' + esc(currentFormat || '') + '">' +
+        '<button id="format-save-btn">' + i18n.save + '</button>' +
+        '<button id="format-clear-btn">' + i18n.statusBarFormatReset + '</button>' +
+        '</div>';
+
       el.innerHTML = html;
     }
 
@@ -1279,7 +1326,7 @@ export class DashboardPanel {
     DashboardPanel.instance?.dispose();
   }
 
-  private handleMessage(msg: { type: string; amount?: number | null }): void {
+  private handleMessage(msg: { type: string; amount?: number | null; format?: string | null }): void {
     switch (msg.type) {
       case 'ready':
         // Fast first update (usage + prediction, cached heatmap or null)
@@ -1315,6 +1362,13 @@ export class DashboardPanel {
         }
         break;
       }
+      case 'setFormat': {
+        const fmt = msg.format;
+        config.setStatusBarFormat(typeof fmt === 'string' && fmt ? fmt : null)
+          .then(() => this.dataManager.refresh())
+          .catch(() => {});
+        break;
+      }
     }
   }
 
@@ -1334,6 +1388,7 @@ export class DashboardPanel {
           apiEnabled: config.rateLimitApiEnabled,
           cacheTtlSeconds: config.cacheTtlSeconds,
           weeklyBudget: config.weeklyBudget,
+          statusBarFormat: config.statusBarFormat,
         },
       },
     };

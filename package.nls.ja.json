@@ -9,6 +9,7 @@
   "config.displayMode.desc": "ステータスバーの表示モード: 利用率(%) または USD コスト。",
   "config.statusBar.alignment.desc": "ステータスバーアイテムの位置。",
   "config.statusBar.showProjectCost.desc": "ステータスバーに現在のプロジェクトコストを表示する。",
+  "config.statusBar.format.desc": "ステータスバーのカスタム書式文字列。使用可能なプレースホルダー: ${usage5h}（5h 利用率 0-100）、${usage7d}（7d 利用率 0-100）、${cost5h}（5h コスト、例: 1.23）、${cost7d}（7d コスト）、${costDay}（本日のコスト）。null でデフォルト書式を使用します。",
   "config.cache.ttlSeconds.desc": "キャッシュの有効期間（秒）。Claude Code がアイドル中はこの間隔より頻繁に API を呼び出しません。",
   "config.rateLimitApi.enabled.desc": "Anthropic API からレート制限の利用率（5h/7d %）を取得する。無効にすると、ローカルのトークンコストのみ表示されます（レート制限の割合は非表示）。デフォルト: true — Claude Code が実行中のときのみ API を呼び出すため消費は無視できる程度です。",
   "config.realtime.enabled.desc": "Claude Code のアクティビティに関係なく、cache.ttlSeconds ごとにレート制限 API をポーリングします。rateLimitApi.enabled が true である必要があります。API 使用量が増加します。",

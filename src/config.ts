@@ -19,6 +19,10 @@ export class ExtensionConfig {
     return this.cfg.get('statusBar.showProjectCost', true);
   }
 
+  get statusBarFormat(): string | null {
+    return this.cfg.get('statusBar.format', null);
+  }
+
   get cacheTtlSeconds(): number {
     return this.cfg.get('cache.ttlSeconds', 300);
   }

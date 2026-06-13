@@ -93,6 +93,14 @@
           "default": true,
           "description": "%config.statusBar.showProjectCost.desc%"
         },
+        "claudeStatus.statusBar.format": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "description": "%config.statusBar.format.desc%"
+        },
         "claudeStatus.cache.ttlSeconds": {
           "type": "number",
           "default": 300,

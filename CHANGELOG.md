@@ -9,6 +9,13 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Configurable status bar format** (`claudeStatus.statusBar.format`) — users can define
+  a custom template string for the status bar label using placeholders:
+  `${usage5h}`, `${usage7d}`, `${cost5h}`, `${cost7d}`, `${costDay}`.
+  When `null` (default), the existing auto-generated label is used. ([#35](https://github.com/long-910/vscode-claude-status/issues/35))
+
 ---
 
 ## [0.6.1] — 2026-05-28

@@ -69,6 +69,12 @@ What the status bar and dashboard show, depending on your Claude plan and key se
     "description": "Show current project cost in the status bar."
   },
 
+  "claudeStatus.statusBar.format": {
+    "type": ["string", "null"],
+    "default": null,
+    "description": "Custom status bar format string. Use placeholders: ${usage5h}, ${usage7d}, ${cost5h}, ${cost7d}, ${costDay}. null = default auto-generated label."
+  },
+
   "claudeStatus.cache.ttlSeconds": {
     "type": "number",
     "default": 300,
@@ -184,6 +190,45 @@ What the status bar and dashboard show, depending on your Claude plan and key se
   }
 }
 ```
+
+---
+
+## Custom Status Bar Format
+
+Set `claudeStatus.statusBar.format` to a template string to replace the default auto-generated label.
+
+### Placeholders
+
+| Placeholder | Type | Example output | Notes |
+|-------------|------|----------------|-------|
+| `${usage5h}` | integer 0–100 | `35` | 5h rate-limit utilization. Always `0` for non-claude-ai providers. |
+| `${usage7d}` | integer 0–100 | `72` | 7d rate-limit utilization. `0` if no 7d window. |
+| `${cost5h}` | decimal string | `1.23` | Local token cost in the last 5h (USD, 2 decimal places). |
+| `${cost7d}` | decimal string | `5.67` | Local token cost in the last 7 days (USD, 2 decimal places). |
+| `${costDay}` | decimal string | `2.34` | Local token cost today (USD, 2 decimal places). |
+
+### Examples
+
+```json
+// Match the issue request — percent utilization only
+"claudeStatus.statusBar.format": "Claude Usage 5h:${usage5h}% 7d:${usage7d}%"
+// → Claude Usage 5h:35% 7d:72%
+
+// Cost-focused display
+"claudeStatus.statusBar.format": "🤖 5h:$${cost5h} today:$${costDay}"
+// → 🤖 5h:$1.23 today:$2.34
+
+// Mixed — util% and cost together
+"claudeStatus.statusBar.format": "${usage5h}% | $${costDay}"
+// → 35% | $2.34
+```
+
+### Behaviour notes
+
+- When `format` is `null` (default), the existing automatic label logic is used (respects `displayMode`, provider type, stale/denied states, project cost suffix).
+- `no-credentials` and `no-data` states always show their standard messages regardless of `format`.
+- Color coding (warning/error backgrounds) is not affected by a custom format — it still reflects `limitStatus`.
+- The stale-age suffix (`[Xm ago]`) is **not** appended automatically in custom format mode. Include it manually if needed, or leave `format` as `null` to keep it.
 
 ---
 

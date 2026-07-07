@@ -5,6 +5,7 @@
   "cmd.refresh": "Claude Status: 立即刷新",
   "cmd.toggleDisplayMode": "Claude Status: 切换 % / $ 显示",
   "cmd.setBudget": "Claude Status: 设置预算...",
+  "cmd.exportUsage": "Claude Status: 导出使用历史...",
   "config.title": "Claude Status",
   "config.displayMode.desc": "状态栏显示模式：利用率百分比或 USD 费用。",
   "config.statusBar.alignment.desc": "状态栏项目的位置。",

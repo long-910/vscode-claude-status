@@ -103,5 +103,11 @@
   "⚙ Set format": "⚙ 设置格式",
   "Format string:": "格式字符串：",
   "Reset to default": "恢复默认",
-  "(default)": "（默认）"
+  "(default)": "（默认）",
+  "Spreadsheet-friendly (date, cost, messages, tokens)": "适合电子表格（日期、费用、消息数、令牌数）",
+  "Machine-readable with export metadata": "带导出元数据的机器可读格式",
+  "Select export format": "选择导出格式",
+  "No usage history to export yet.": "暂无可导出的使用历史。",
+  "Usage history exported to {0}": "使用历史已导出到 {0}",
+  "Failed to export usage history: {0}": "导出使用历史失败: {0}"
 }

@@ -1,5 +1,8 @@
 import * as vscode from 'vscode';
+import * as os from 'os';
+import * as path from 'path';
 import { DataManager, ClaudeUsageData, PredictionData } from './data/dataManager';
+import { dailyUsageToCsv, dailyUsageToJson } from './data/exportUsage';
 import { StatusBarManager } from './statusBar';
 import { config } from './config';
 
@@ -106,6 +109,51 @@ export function activate(context: vscode.ExtensionContext) {
           ? vscode.l10n.t('Daily budget disabled.')
           : vscode.l10n.t('Daily budget set to ${0}.', value.toFixed(2))
       );
+    }),
+    vscode.commands.registerCommand('vscode-claude-status.exportUsage', async () => {
+      type FormatPick = vscode.QuickPickItem & { format: 'csv' | 'json' };
+      const picks: FormatPick[] = [
+        {
+          label: 'CSV',
+          description: vscode.l10n.t('Spreadsheet-friendly (date, cost, messages, tokens)'),
+          format: 'csv',
+        },
+        {
+          label: 'JSON',
+          description: vscode.l10n.t('Machine-readable with export metadata'),
+          format: 'json',
+        },
+      ];
+      const pick = await vscode.window.showQuickPick(picks, {
+        placeHolder: vscode.l10n.t('Select export format'),
+      });
+      if (!pick) { return; } // cancelled
+
+      const heatmap = await dataManager.getHeatmapData();
+      const daily = heatmap?.daily ?? [];
+      if (daily.every(d => d.sessionCount === 0)) {
+        vscode.window.showWarningMessage(vscode.l10n.t('No usage history to export yet.'));
+        return;
+      }
+
+      const today = new Date().toISOString().slice(0, 10);
+      const uri = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file(path.join(os.homedir(), `claude-usage-${today}.${pick.format}`)),
+        filters: pick.format === 'csv' ? { CSV: ['csv'] } : { JSON: ['json'] },
+      });
+      if (!uri) { return; } // cancelled
+
+      const content = pick.format === 'csv' ? dailyUsageToCsv(daily) : dailyUsageToJson(daily);
+      try {
+        await vscode.workspace.fs.writeFile(uri, Buffer.from(content, 'utf8'));
+        vscode.window.showInformationMessage(
+          vscode.l10n.t('Usage history exported to {0}', uri.fsPath)
+        );
+      } catch (err) {
+        vscode.window.showErrorMessage(
+          vscode.l10n.t('Failed to export usage history: {0}', String(err))
+        );
+      }
     }),
   );
 

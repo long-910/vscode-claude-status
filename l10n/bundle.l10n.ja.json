@@ -121,5 +121,6 @@
   "Refresh Now": "今すぐ更新",
   "Toggle % / $ Display": "% / $ 表示を切り替え",
   "Set Budget…": "予算を設定…",
-  "Export Usage Data…": "使用データをエクスポート…"
+  "Export Usage Data…": "使用データをエクスポート…",
+  "Cost by weekday × hour (last 30 days)": "曜日×時間帯別コスト（直近30日）"
 }

@@ -121,5 +121,6 @@
   "Refresh Now": "立即刷新",
   "Toggle % / $ Display": "切换 % / $ 显示",
   "Set Budget…": "设置预算…",
-  "Export Usage Data…": "导出使用数据…"
+  "Export Usage Data…": "导出使用数据…",
+  "Cost by weekday × hour (last 30 days)": "按星期×小时的费用（最近30天）"
 }

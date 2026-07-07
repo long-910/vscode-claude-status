@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
-import { aggregateByDay, aggregateByHour, getHeatmapData, EntryForHeatmap } from '../../webview/heatmap';
+import { aggregateByDay, aggregateByDowHour, aggregateByHour, getHeatmapData, EntryForHeatmap } from '../../webview/heatmap';
 import { DEFAULT_CLAUDE_HOME, setClaudeHome } from '../../data/claudeHome';
 
 // Helper: create a fake entry at `hoursAgo` hours before now
@@ -145,4 +145,51 @@ suite('Heatmap', () => {
       assert.ok(Math.abs(today.cost - 6.00) < 1e-9, `expected $6.00, got ${today.cost}`);
     });
   });
+
+  suite('aggregateByDowHour', () => {
+    // Build an entry at a fixed local weekday/hour within the last week
+    function entryAt(dow: number, hour: number, cost: number): EntryForHeatmap {
+      const d = new Date();
+      d.setHours(hour, 30, 0, 0);
+      // Walk back to the requested day of week (0-6 days ago -> within window)
+      const diff = (d.getDay() - dow + 7) % 7;
+      d.setDate(d.getDate() - diff);
+      if (d.getTime() > Date.now()) { d.setDate(d.getDate() - 7); }
+      return { timestamp: d.getTime(), cost, tokens: 100, hour: d.getHours() };
+    }
+
+    test('returns a 7x24 grid of zeroes for no entries', () => {
+      const grid = aggregateByDowHour([], 30);
+      assert.strictEqual(grid.length, 7);
+      for (const row of grid) {
+        assert.strictEqual(row.length, 24);
+        assert.ok(row.every(c => c === 0));
+      }
+    });
+
+    test('accumulates cost into the correct weekday/hour cell', () => {
+      const entries = [
+        entryAt(1, 9, 0.10),   // Monday 09:xx
+        entryAt(1, 9, 0.20),   // Monday 09:xx
+        entryAt(5, 22, 0.05),  // Friday 22:xx
+      ];
+      const grid = aggregateByDowHour(entries, 30);
+      assert.ok(Math.abs(grid[1][9] - 0.30) < 1e-9, `Mon 9h should be 0.30, got ${grid[1][9]}`);
+      assert.ok(Math.abs(grid[5][22] - 0.05) < 1e-9, `Fri 22h should be 0.05, got ${grid[5][22]}`);
+      const total = grid.flat().reduce((s, c) => s + c, 0);
+      assert.ok(Math.abs(total - 0.35) < 1e-9, 'no cost should leak into other cells');
+    });
+
+    test('ignores entries outside the days window', () => {
+      const old: EntryForHeatmap = {
+        timestamp: Date.now() - 31 * 24 * 3600 * 1000,
+        cost: 99,
+        tokens: 100,
+        hour: 0,
+      };
+      const grid = aggregateByDowHour([old], 30);
+      assert.ok(grid.flat().every(c => c === 0));
+    });
+  });
 });
+

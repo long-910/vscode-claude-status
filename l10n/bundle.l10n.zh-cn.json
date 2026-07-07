@@ -103,5 +103,14 @@
   "⚙ Set format": "⚙ 设置格式",
   "Format string:": "格式字符串：",
   "Reset to default": "恢复默认",
-  "(default)": "（默认）"
+  "(default)": "（默认）",
+  "Rate Limit": "速率限制",
+  "Projects": "项目",
+  "Actions": "操作",
+  "resets in {0}": "{0} 后重置",
+  "Loading…": "加载中…",
+  "Not logged in": "未登录",
+  "Refresh Now": "立即刷新",
+  "Toggle % / $ Display": "切换 % / $ 显示",
+  "Set Budget…": "设置预算…"
 }

@@ -9,6 +9,15 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Sidebar tree view** — a new Activity Bar icon opens a native "Usage Overview"
+  view with rate-limit windows (utilization % and reset countdowns, colored at
+  75 % / 90 %), token costs (5h / today / 7d), per-project costs, and quick
+  actions (Open Dashboard, Refresh, Toggle % / $, Set Budget) — no dashboard
+  panel required. Refreshes on data updates and every 60 seconds; performs no
+  I/O of its own.
+
 ---
 
 ## [0.6.2] — 2026-06-13

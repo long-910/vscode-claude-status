@@ -29,5 +29,7 @@
   "config.pricing.inputPerMillion.desc": "入力トークン 1M あたりのコスト（USD）。デフォルト: $3.00（Claude Sonnet 4.x）。Anthropic が料金を変更した場合は更新してください。",
   "config.pricing.outputPerMillion.desc": "出力トークン 1M あたりのコスト（USD）。デフォルト: $15.00（Claude Sonnet 4.x）。Anthropic が料金を変更した場合は更新してください。",
   "config.pricing.cacheReadPerMillion.desc": "キャッシュ読み取りトークン 1M あたりのコスト（USD）。デフォルト: $0.30（Claude Sonnet 4.x）。Anthropic が料金を変更した場合は更新してください。",
-  "config.pricing.cacheCreatePerMillion.desc": "キャッシュ作成トークン 1M あたりのコスト（USD）。デフォルト: $3.75（Claude Sonnet 4.x）。Anthropic が料金を変更した場合は更新してください。"
+  "config.pricing.cacheCreatePerMillion.desc": "キャッシュ作成トークン 1M あたりのコスト（USD）。デフォルト: $3.75（Claude Sonnet 4.x）。Anthropic が料金を変更した場合は更新してください。",
+  "view.container.title": "Claude Status",
+  "view.overview.title": "使用状況の概要"
 }

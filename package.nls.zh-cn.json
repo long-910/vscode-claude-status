@@ -29,5 +29,7 @@
   "config.pricing.inputPerMillion.desc": "每百万输入令牌的费用（USD）。默认：$3.00（Claude Sonnet 4.x）。Anthropic 调整定价后请更新此值。",
   "config.pricing.outputPerMillion.desc": "每百万输出令牌的费用（USD）。默认：$15.00（Claude Sonnet 4.x）。Anthropic 调整定价后请更新此值。",
   "config.pricing.cacheReadPerMillion.desc": "每百万缓存读取令牌的费用（USD）。默认：$0.30（Claude Sonnet 4.x）。Anthropic 调整定价后请更新此值。",
-  "config.pricing.cacheCreatePerMillion.desc": "每百万缓存创建令牌的费用（USD）。默认：$3.75（Claude Sonnet 4.x）。Anthropic 调整定价后请更新此值。"
+  "config.pricing.cacheCreatePerMillion.desc": "每百万缓存创建令牌的费用（USD）。默认：$3.75（Claude Sonnet 4.x）。Anthropic 调整定价后请更新此值。",
+  "view.container.title": "Claude Status",
+  "view.overview.title": "使用情况概览"
 }

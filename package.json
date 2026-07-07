@@ -58,6 +58,10 @@
       {
         "command": "vscode-claude-status.setBudget",
         "title": "%cmd.setBudget%"
+      },
+      {
+        "command": "vscode-claude-status.exportUsage",
+        "title": "%cmd.exportUsage%"
       }
     ],
     "keybindings": [

@@ -194,6 +194,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | **Claude Status: Open Dashboard** | 打开仪表板面板 |
 | **Claude Status: Toggle % / $ Display** | 切换显示模式 |
 | **Claude Status: Set Budget…** | 设置或禁用每日 USD 预算 |
+| **Claude Status: 导出使用历史…** | 将每日使用历史导出为 CSV 或 JSON |
 
 ---
 

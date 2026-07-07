@@ -5,6 +5,7 @@
   "cmd.refresh": "Claude Status: Refresh Now",
   "cmd.toggleDisplayMode": "Claude Status: Toggle % / $ Display",
   "cmd.setBudget": "Claude Status: Set Budget...",
+  "cmd.exportUsage": "Claude Status: Export Usage Data...",
   "config.title": "Claude Status",
   "config.displayMode.desc": "Status bar display mode: utilization percentage or USD cost.",
   "config.statusBar.alignment.desc": "Position of the status bar item.",

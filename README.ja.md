@@ -199,6 +199,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | **Claude Status: Open Dashboard** | ダッシュボードパネルを開く |
 | **Claude Status: Toggle % / $ Display** | 表示モードの切り替え |
 | **Claude Status: Set Budget…** | 日次USD予算を設定または無効化 |
+| **Claude Status: 使用履歴をエクスポート…** | 日次使用履歴を CSV / JSON にエクスポート |
 
 ---
 

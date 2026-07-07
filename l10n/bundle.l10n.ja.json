@@ -105,5 +105,11 @@
   "Reset to default": "デフォルトに戻す",
   "(default)": "（デフォルト）",
   "By model (5h)": "モデル別 (5時間)",
-  "Model-aware pricing is on — these rates apply only to unrecognized models.": "モデル別料金が有効です — この単価は未知のモデルにのみ適用されます。"
+  "Model-aware pricing is on — these rates apply only to unrecognized models.": "モデル別料金が有効です — この単価は未知のモデルにのみ適用されます。",
+  "Spreadsheet-friendly (date, cost, messages, tokens)": "表計算向け（日付、コスト、メッセージ数、トークン数）",
+  "Machine-readable with export metadata": "エクスポートメタデータ付きの機械可読形式",
+  "Select export format": "エクスポート形式を選択",
+  "No usage history to export yet.": "エクスポートできる使用履歴がまだありません。",
+  "Usage history exported to {0}": "使用履歴を {0} にエクスポートしました",
+  "Failed to export usage history: {0}": "使用履歴のエクスポートに失敗しました: {0}"
 }

@@ -10,6 +10,7 @@
   "config.statusBar.alignment.desc": "状态栏项目的位置。",
   "config.statusBar.showProjectCost.desc": "在状态栏中显示当前项目费用。",
   "config.statusBar.format.desc": "状态栏自定义格式字符串。可用占位符：${usage5h}（5h 利用率 0-100）、${usage7d}（7d 利用率 0-100）、${cost5h}（5h 费用，例如 1.23）、${cost7d}（7d 费用）、${costDay}（今日费用）。设为 null 使用默认格式。",
+  "config.statusBar.showSparkline.desc": "在状态栏 5h 百分比旁显示紧凑的利用率仪表（▰▰▰▱▱）（percent 模式，仅 Claude.ai）。自定义格式可改用 ${bar5h} / ${bar7d} 占位符。",
   "config.cache.ttlSeconds.desc": "缓存有效期（秒）。Claude Code 空闲时，API 调用频率不会超过此间隔。",
   "config.rateLimitApi.enabled.desc": "启用从 Anthropic API 获取速率限制利用率（5h/7d %）。禁用时，仅显示本地令牌费用（不显示速率限制百分比）。默认值：true — 仅在 Claude Code 活跃运行时才调用 API，消耗可忽略不计。",
   "config.realtime.enabled.desc": "无论 Claude Code 活动状态如何，每隔 cache.ttlSeconds 轮询速率限制 API。需要 rateLimitApi.enabled 为 true。会增加 API 使用量。",

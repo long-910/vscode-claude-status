@@ -23,6 +23,10 @@ export class ExtensionConfig {
     return this.cfg.get('statusBar.format', null);
   }
 
+  get showSparkline(): boolean {
+    return this.cfg.get('statusBar.showSparkline', false);
+  }
+
   get cacheTtlSeconds(): number {
     return this.cfg.get('cache.ttlSeconds', 300);
   }

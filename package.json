@@ -101,6 +101,11 @@
           "default": null,
           "description": "%config.statusBar.format.desc%"
         },
+        "claudeStatus.statusBar.showSparkline": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.statusBar.showSparkline.desc%"
+        },
         "claudeStatus.cache.ttlSeconds": {
           "type": "number",
           "default": 300,

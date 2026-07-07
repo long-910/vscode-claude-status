@@ -10,6 +10,7 @@
   "config.statusBar.alignment.desc": "Position of the status bar item.",
   "config.statusBar.showProjectCost.desc": "Show current project cost in the status bar.",
   "config.statusBar.format.desc": "Custom status bar format string. Use placeholders: ${usage5h} (5h utilization 0-100), ${usage7d} (7d utilization 0-100), ${cost5h} (5h cost, e.g. 1.23), ${cost7d} (7d cost), ${costDay} (today's cost). Set to null to use the default format.",
+  "config.statusBar.showSparkline.desc": "Show a compact utilization meter (▰▰▰▱▱) next to the 5h percentage in the status bar (percent mode, Claude.ai only). Custom formats can use the ${bar5h} / ${bar7d} placeholders instead.",
   "config.cache.ttlSeconds.desc": "Cache TTL in seconds. API is not called more often than this when Claude Code is idle.",
   "config.rateLimitApi.enabled.desc": "Enable fetching rate-limit utilization (5h/7d %) from the Anthropic API. When disabled, only local token cost is shown (no rate-limit percentages). Default: true — API consumption is negligible because calls are made only when Claude Code is actively running.",
   "config.realtime.enabled.desc": "Poll the rate-limit API every cache.ttlSeconds regardless of Claude Code activity. Requires rateLimitApi.enabled to be true. Increases API usage.",

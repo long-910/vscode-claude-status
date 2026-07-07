@@ -232,6 +232,7 @@ All settings are under the `claudeStatus` namespace in VS Code Settings.
 | `claudeStatus.statusBar.alignment` | `"left"` \| `"right"` | `"left"` | Status bar position |
 | `claudeStatus.statusBar.showProjectCost` | `boolean` | `true` | Show project cost in status bar |
 | `claudeStatus.statusBar.format` | `string \| null` | `null` | Custom label template. Placeholders: `${usage5h}`, `${usage7d}`, `${cost5h}`, `${cost7d}`, `${costDay}`. `null` = default auto-generated label |
+| `claudeStatus.statusBar.showSparkline` | `boolean` | `false` | Show a compact 5h utilization meter (▰▰▰▱▱) in the status bar |
 | `claudeStatus.cache.ttlSeconds` | `number` (60–3600) | `300` | API cache TTL in seconds |
 | `claudeStatus.rateLimitApi.enabled` | `boolean` | `true` | Fetch rate-limit % from Anthropic API. When disabled, no new API calls are made; cached % is still shown with a staleness indicator (`[Xm ago]`) if available |
 | `claudeStatus.realtime.enabled` | `boolean` | `false` | Poll rate-limit API every TTL seconds (requires `rateLimitApi.enabled`) |

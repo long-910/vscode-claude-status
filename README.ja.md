@@ -212,6 +212,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | `claudeStatus.statusBar.alignment` | `"left"` \| `"right"` | `"left"` | ステータスバーの位置 |
 | `claudeStatus.statusBar.showProjectCost` | `boolean` | `true` | ステータスバーにプロジェクトコストを表示 |
 | `claudeStatus.statusBar.format` | `string \| null` | `null` | カスタムラベルテンプレート。プレースホルダー: `${usage5h}`, `${usage7d}`, `${cost5h}`, `${cost7d}`, `${costDay}`。`null` = デフォルト自動生成 |
+| `claudeStatus.statusBar.showSparkline` | `boolean` | `false` | ステータスバーにコンパクトな 5h 利用率メーター（▰▰▰▱▱）を表示 |
 | `claudeStatus.cache.ttlSeconds` | `number` (60–3600) | `300` | APIキャッシュTTL（秒） |
 | `claudeStatus.rateLimitApi.enabled` | `boolean` | `true` | レート制限%をAnthropicAPIから取得。`false` で新規APIコール停止。キャッシュがあれば `[Xm ago]` 付きで % を継続表示 |
 | `claudeStatus.realtime.enabled` | `boolean` | `false` | TTL秒ごとにAPIをポーリング（`rateLimitApi.enabled` が必要） |

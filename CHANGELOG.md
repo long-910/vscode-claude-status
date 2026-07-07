@@ -9,6 +9,16 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Performance
+
+- **Skip stale JSONL files by mtime** — the 60-second status bar poll and the
+  burn-rate prediction previously read and parsed *every* session file under
+  `~/.claude/projects/`, including months-old history that cannot affect any
+  aggregation window. `findAllJsonlFiles()` now takes an mtime cutoff: cost
+  aggregation skips files untouched for over 7 days, and the prediction pass
+  skips files untouched for over 30 minutes. Session files are append-only, so
+  the filter cannot drop relevant entries.
+
 ### Fixed
 
 - **Streaming deduplication now applies to project cost, prediction, and heatmap** —

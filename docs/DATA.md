@@ -58,6 +58,22 @@ export async function readUsageEntries(filePath: string): Promise<UsageEntry[]>
 Consumers: `readAllUsage` (status bar cost), `projectCost.ts`, `prediction.ts`
 (burn rate), `webview/heatmap.ts`.
 
+### mtime-Based File Skipping
+
+`findAllJsonlFiles(newerThanMs?)` accepts an optional cutoff (epoch ms) and skips
+files whose `mtime` is older. This is safe for time-windowed aggregation because
+JSONL session files are **append-only**: a file not modified since time *T* cannot
+contain entries with timestamps after *T*.
+
+| Caller | Cutoff | Why |
+|--------|--------|-----|
+| `readAllUsage` | `now − 7d − 1h` | Widest window is 7d; 1h safety margin |
+| `readRecentCosts` (prediction) | `window start − 60s` | Burn rate only looks at the last 30 min |
+| `wasJsonlUpdatedRecently` | `now − seconds` | Rewritten on top of the same filter |
+| `getHeatmapData` | `now − heatmap.days` | Pre-existing dir + file mtime filter |
+
+Always keep a margin on the cutoff — never filter with the exact window start.
+
 ### Cost Calculation
 
 Default rates are based on Claude Sonnet 4.x pricing.

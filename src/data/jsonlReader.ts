@@ -62,7 +62,10 @@ export function getClaudeProjectsDir(): string {
   return path.join(os.homedir(), '.claude', 'projects');
 }
 
-export async function findAllJsonlFiles(): Promise<string[]> {
+// `newerThanMs` skips files whose mtime is older than the given epoch ms.
+// Safe for time-windowed aggregation: JSONL files are append-only, so a file
+// not modified since T cannot contain entries with timestamps after T.
+export async function findAllJsonlFiles(newerThanMs?: number): Promise<string[]> {
   const projectsDir = getClaudeProjectsDir();
   const files: string[] = [];
 
@@ -75,9 +78,17 @@ export async function findAllJsonlFiles(): Promise<string[]> {
         if (!stat.isDirectory()) { continue; }
         const entries = await fs.readdir(dirPath);
         for (const entry of entries) {
-          if (entry.endsWith('.jsonl')) {
-            files.push(path.join(dirPath, entry));
+          if (!entry.endsWith('.jsonl')) { continue; }
+          const filePath = path.join(dirPath, entry);
+          if (newerThanMs !== undefined) {
+            try {
+              const fstat = await fs.stat(filePath);
+              if (fstat.mtimeMs < newerThanMs) { continue; }
+            } catch {
+              continue; // unreadable file — reading it would fail anyway
+            }
           }
+          files.push(filePath);
         }
       } catch {
         // skip unreadable dirs
@@ -178,7 +189,10 @@ export async function readAllUsage(pricing: TokenPricing = DEFAULT_PRICING): Pro
     tokensCacheCreate5h: 0,
   };
 
-  const files = await findAllJsonlFiles();
+  // Skip files untouched for over 7 days (+1h margin) — they cannot contain
+  // entries inside any aggregation window. Keeps the 60s poll cheap on
+  // installations with months of session history.
+  const files = await findAllJsonlFiles(now - window7d - 3600_000);
   for (const file of files) {
     const entries = await readUsageEntries(file);
     for (const entry of entries) {
@@ -206,15 +220,6 @@ export async function readAllUsage(pricing: TokenPricing = DEFAULT_PRICING): Pro
 }
 
 export async function wasJsonlUpdatedRecently(seconds: number): Promise<boolean> {
-  const files = await findAllJsonlFiles();
-  const threshold = Date.now() - seconds * 1000;
-  for (const file of files) {
-    try {
-      const stat = await fs.stat(file);
-      if (stat.mtimeMs >= threshold) { return true; }
-    } catch {
-      // skip
-    }
-  }
-  return false;
+  const files = await findAllJsonlFiles(Date.now() - seconds * 1000);
+  return files.length > 0;
 }

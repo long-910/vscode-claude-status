@@ -23,7 +23,9 @@ async function readRecentCosts(windowMs: number): Promise<TimestampedCost[]> {
   const cutoff = now - windowMs;
   const result: TimestampedCost[] = [];
 
-  const files = await findAllJsonlFiles();
+  // Only files modified inside the window (+60s margin) can contain relevant
+  // entries — skips the bulk of session history on every prediction pass
+  const files = await findAllJsonlFiles(cutoff - 60_000);
   for (const file of files) {
     // Deduplicated read — streaming duplicates would inflate the burn rate
     const entries = await readUsageEntries(file);

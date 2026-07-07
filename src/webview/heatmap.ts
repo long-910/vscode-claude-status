@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import { calculateCost, TokenUsage } from '../data/jsonlReader';
+import { calculateCost, readUsageEntries } from '../data/jsonlReader';
 
 export interface DailyUsage {
   date: string        // "YYYY-MM-DD" local time
@@ -43,35 +43,18 @@ async function readJsonlForHeatmap(
   filePath: string,
   cutoff: number,
 ): Promise<EntryForHeatmap[]> {
+  // Deduplicated read — streaming duplicates would inflate daily/hourly costs
+  const entries = await readUsageEntries(filePath);
   const result: EntryForHeatmap[] = [];
-  try {
-    const content = await fs.readFile(filePath, 'utf-8');
-    for (const line of content.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed) { continue; }
-      try {
-        const obj = JSON.parse(trimmed) as Record<string, unknown>;
-        if (obj.type !== 'assistant' || typeof obj.timestamp !== 'string') { continue; }
-        const ts = new Date(obj.timestamp).getTime();
-        if (isNaN(ts) || ts < cutoff) { continue; }
-        const msg = obj.message as { usage?: Partial<TokenUsage> } | undefined;
-        if (!msg?.usage) { continue; }
-        const u = msg.usage;
-        const cost = calculateCost({
-          input_tokens: u.input_tokens ?? 0,
-          output_tokens: u.output_tokens ?? 0,
-          cache_read_input_tokens: u.cache_read_input_tokens ?? 0,
-          cache_creation_input_tokens: u.cache_creation_input_tokens ?? 0,
-        });
-        result.push({
-          timestamp: ts,
-          cost,
-          tokens: (u.input_tokens ?? 0) + (u.output_tokens ?? 0),
-          hour: new Date(ts).getHours(),
-        });
-      } catch { /* skip malformed lines */ }
-    }
-  } catch { /* skip unreadable files */ }
+  for (const e of entries) {
+    if (e.timestamp < cutoff) { continue; }
+    result.push({
+      timestamp: e.timestamp,
+      cost: calculateCost(e.usage),
+      tokens: e.usage.input_tokens + e.usage.output_tokens,
+      hour: new Date(e.timestamp).getHours(),
+    });
+  }
   return result;
 }
 

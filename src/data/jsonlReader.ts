@@ -130,6 +130,37 @@ export async function readJsonlFile(filePath: string): Promise<JsonlEntry[]> {
   return entries;
 }
 
+// A single deduplicated usage record, shared by every feature that reads JSONL
+// (global cost, project cost, prediction, heatmap). Guarantees each API call is
+// counted exactly once regardless of streaming duplication.
+export interface UsageEntry {
+  timestamp: number  // ms since epoch, guaranteed valid
+  usage: TokenUsage  // all four fields normalized to numbers
+  cwd?: string
+}
+
+export async function readUsageEntries(filePath: string): Promise<UsageEntry[]> {
+  const entries = await readJsonlFile(filePath);
+  const result: UsageEntry[] = [];
+  for (const entry of entries) {
+    const rawUsage = entry.message?.usage;
+    if (!rawUsage) { continue; }
+    const ts = new Date(entry.timestamp).getTime();
+    if (isNaN(ts)) { continue; }
+    result.push({
+      timestamp: ts,
+      usage: {
+        input_tokens: rawUsage.input_tokens || 0,
+        output_tokens: rawUsage.output_tokens || 0,
+        cache_read_input_tokens: rawUsage.cache_read_input_tokens || 0,
+        cache_creation_input_tokens: rawUsage.cache_creation_input_tokens || 0,
+      },
+      cwd: typeof entry.cwd === 'string' ? entry.cwd : undefined,
+    });
+  }
+  return result;
+}
+
 export async function readAllUsage(pricing: TokenPricing = DEFAULT_PRICING): Promise<AggregatedUsage> {
   const now = Date.now();
   const window5h = 5 * 3600 * 1000;
@@ -149,13 +180,9 @@ export async function readAllUsage(pricing: TokenPricing = DEFAULT_PRICING): Pro
 
   const files = await findAllJsonlFiles();
   for (const file of files) {
-    const entries = await readJsonlFile(file);
+    const entries = await readUsageEntries(file);
     for (const entry of entries) {
-      const ts = new Date(entry.timestamp).getTime();
-      if (isNaN(ts)) { continue; }
-
-      const usage = entry.message?.usage;
-      if (!usage) { continue; }
+      const { timestamp: ts, usage } = entry;
       const cost = calculateCost(usage, pricing);
 
       const age = now - ts;

@@ -25,10 +25,18 @@ suite('Heatmap', () => {
     });
 
     test('aggregates costs for active days', () => {
+      // Anchor to local start-of-today so the test is deterministic at any
+      // time of day (hours-ago offsets cross midnight when run before 03:00)
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const at = (offsetMs: number, cost: number): EntryForHeatmap => {
+        const ts = startOfToday.getTime() + offsetMs;
+        return { timestamp: ts, cost, tokens: 1000, hour: new Date(ts).getHours() };
+      };
       const entries = [
-        makeEntry(2, 0.10),   // 2 hours ago → today
-        makeEntry(3, 0.20),   // 3 hours ago → today
-        makeEntry(25, 0.05),  // 25 hours ago → yesterday
+        at(2 * 3600 * 1000, 0.10),    // today 02:00
+        at(3 * 3600 * 1000, 0.20),    // today 03:00
+        at(-12 * 3600 * 1000, 0.05),  // yesterday 12:00
       ];
       const result = aggregateByDay(entries, 7);
       const today = result[result.length - 1];

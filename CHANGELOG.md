@@ -9,6 +9,15 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Streaming deduplication now applies to project cost, prediction, and heatmap** —
+  the `requestId` deduplication introduced in 0.5.1 only covered the global status bar
+  cost. Project-level costs, the burn-rate prediction, and the usage heatmap still
+  summed every streamed content-block line, inflating those figures 2–4× in agentic
+  sessions. All JSONL consumers now read through a shared deduplicated reader
+  (`readUsageEntries`), counting each API call exactly once.
+
 ---
 
 ## [0.6.2] — 2026-06-13

@@ -220,3 +220,27 @@ Recalculate on:
 The heatmap is computed in a background `Promise` to avoid blocking the main update.
 `DataManager` fires a second `onDidUpdate` event when the background computation completes.
 The WebView re-renders the heatmap section when it receives this second update.
+
+---
+
+## Punch Card (Weekday × Hour)
+
+Below the legend, a 7 × 24 matrix ("punch card") shows **where in the week**
+cost is spent, computed over the last 30 days in local time:
+
+```
+        0  1  2  3 … 21 22 23
+Sun     ·  ·  ·  ·    ·  ·  ·
+Mon     ·  ·  ·  ·    ▪  ▪  ·
+…
+Sat     ·  ·  ·  ·    ·  ·  ·
+```
+
+- Aggregation: `aggregateByDowHour(entries, days)` returns a `number[7][24]`
+  grid of **total USD** per (day-of-week, hour) cell — row 0 = Sunday.
+- Rendering reuses the heatmap intensity levels (`getCostLevel`, `hm-cell l0–l4`)
+  so the two visualizations share one color scale semantics (relative to the
+  grid's own max cell).
+- Row labels are localized short weekday names (`toLocaleString`); column
+  labels every 3 hours; cell tooltip shows `Ddd HH:00 — $X.XXX`.
+- Hidden automatically when `HeatmapData.dowHour` is absent (no data).

@@ -104,5 +104,6 @@
   "⚙ Set format": "⚙ 设置格式",
   "Format string:": "格式字符串：",
   "Reset to default": "恢复默认",
-  "(default)": "（默认）"
+  "(default)": "（默认）",
+  "Cost by weekday × hour (last 30 days)": "按星期×小时的费用（最近30天）"
 }

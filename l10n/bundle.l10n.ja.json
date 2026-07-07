@@ -104,5 +104,6 @@
   "⚙ Set format": "⚙ 書式を設定",
   "Format string:": "書式文字列:",
   "Reset to default": "デフォルトに戻す",
-  "(default)": "（デフォルト）"
+  "(default)": "（デフォルト）",
+  "Cost by weekday × hour (last 30 days)": "曜日×時間帯別コスト（直近30日）"
 }

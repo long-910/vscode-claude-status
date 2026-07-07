@@ -19,6 +19,7 @@ export interface HourlyUsage {
 export interface HeatmapData {
   daily: DailyUsage[]
   hourly: HourlyUsage[]
+  dowHour: number[][]  // 7 rows (0=Sun … 6=Sat) × 24 cols, total USD (local time)
   generatedAt: Date
 }
 
@@ -99,6 +100,16 @@ export function aggregateByHour(entries: EntryForHeatmap[], days: number): Hourl
   }));
 }
 
+export function aggregateByDowHour(entries: EntryForHeatmap[], days: number): number[][] {
+  const cutoff = Date.now() - days * 24 * 3600 * 1000;
+  const grid: number[][] = Array.from({ length: 7 }, () => Array<number>(24).fill(0));
+  for (const e of entries) {
+    if (e.timestamp < cutoff) { continue; }
+    grid[new Date(e.timestamp).getDay()][e.hour] += e.cost;
+  }
+  return grid;
+}
+
 // ---- main entry point -------------------------------------------------------
 
 export async function getHeatmapData(days = 90, options: CostOptions = DEFAULT_COST_OPTIONS): Promise<HeatmapData> {
@@ -137,6 +148,7 @@ export async function getHeatmapData(days = 90, options: CostOptions = DEFAULT_C
   return {
     daily: aggregateByDay(allEntries, days),
     hourly: aggregateByHour(allEntries, 30),   // always use last 30 days for hourly
+    dowHour: aggregateByDowHour(allEntries, 30),
     generatedAt: new Date(),
   };
 }

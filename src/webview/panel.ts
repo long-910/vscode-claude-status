@@ -92,6 +92,7 @@ function buildI18n(): Record<string, string> {
     less:                  t('Less'),
     more:                  t('More'),
     avgByHour:             t('Avg cost by hour of day (last 30 days)'),
+    punchcardTitle:        t('Cost by weekday × hour (last 30 days)'),
     resetsIn:              t('resets in'),
     calculating:           t('Calculating…'),
     cacheTtl:              t('Cache TTL'),
@@ -405,6 +406,21 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
       color: var(--vscode-descriptionForeground);
       margin: 12px 0 4px;
     }
+
+    /* ---- Punch card (weekday × hour) ---- */
+    .punchcard-container { overflow-x: auto; padding-bottom: 4px; }
+    .punchcard-grid {
+      display: grid;
+      grid-template-columns: 30px repeat(24, 12px);
+      gap: 2px;
+      align-items: center;
+    }
+    .pc-label {
+      font-size: 0.65em;
+      color: var(--vscode-descriptionForeground);
+      white-space: nowrap;
+    }
+    .pc-hour { text-align: center; }
   </style>
 </head>
 <body>
@@ -1198,12 +1214,39 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
         '<div class="hm-cell l4"></div>' +
         ' ' + i18n.more + '</div>';
 
+      // Punch card: weekday × hour cost matrix (reuses heatmap cell levels)
+      let punchcardHtml = '';
+      const dowHour = heatmap.dowHour;
+      if (dowHour && dowHour.length === 7) {
+        const maxCell = Math.max(...dowHour.flat(), 0.0001);
+        // Localized short weekday names — 2026-01-04 is a Sunday
+        const dowNames = Array.from({ length: 7 }, (_, d) =>
+          new Date(2026, 0, 4 + d).toLocaleString(undefined, { weekday: 'short' }));
+        let grid = '<div class="pc-label"></div>';
+        for (let h = 0; h < 24; h++) {
+          grid += '<div class="pc-label pc-hour">' + (h % 3 === 0 ? h : '') + '</div>';
+        }
+        for (let d = 0; d < 7; d++) {
+          grid += '<div class="pc-label">' + esc(dowNames[d]) + '</div>';
+          for (let h = 0; h < 24; h++) {
+            const cost = dowHour[d][h];
+            const level = getCostLevel(cost, maxCell);
+            grid += '<div class="hm-cell l' + level + '" title="' +
+              esc(dowNames[d] + ' ' + String(h).padStart(2, '0') + ':00 — $' + cost.toFixed(3)) + '"></div>';
+          }
+        }
+        punchcardHtml =
+          '<div class="hourly-title">' + i18n.punchcardTitle + '</div>' +
+          '<div class="punchcard-container"><div class="punchcard-grid">' + grid + '</div></div>';
+      }
+
       el.innerHTML =
         '<div class="heatmap-container">' +
         '<div class="hm-header">' + headerHtml + '</div>' +
         '<div class="heatmap-grid">' + gridHtml + '</div>' +
         '</div>' +
         legendHtml +
+        punchcardHtml +
         '<div class="hourly-title">' + i18n.avgByHour + '</div>' +
         '<canvas id="hourlyChart" height="80"></canvas>';
 

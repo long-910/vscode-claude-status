@@ -219,6 +219,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | `claudeStatus.heatmap.days` | `30 \| 60 \| 90` | `90` | 使用热力图显示的天数 |
 | `claudeStatus.credentials.path` | `string \| null` | `null` | 自定义凭证文件路径 |
 | `claudeStatus.claudeProvider` | `"auto"` \| `"claude-ai"` \| `"aws-bedrock"` \| `"api-key"` | `"auto"` | 提供商类型（自动检测或显式指定） |
+| `claudeStatus.pricing.useModelPricing` | `boolean` | `true` | 使用内置按模型费率（Opus/Sonnet/Haiku）以获得准确成本；下方手动费率为回退值 |
 | `claudeStatus.pricing.inputPerMillion` | `number` | `3.00` | 每百万输入令牌的 USD 单价 |
 | `claudeStatus.pricing.outputPerMillion` | `number` | `15.00` | 每百万输出令牌的 USD 单价 |
 | `claudeStatus.pricing.cacheReadPerMillion` | `number` | `0.30` | 每百万缓存读取令牌的 USD 单价 |

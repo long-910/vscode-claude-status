@@ -70,6 +70,7 @@ function buildI18n(): Record<string, string> {
     output:                t('Output'),
     cacheRead:             t('Cache read'),
     cacheCreate:           t('Cache create'),
+    byModel:               t('By model (5h)'),
     cacheGood:             t('Good! Cache is saving cost.'),
     cacheLow:              t('Low cache reuse.'),
     noCacheReads:          t('No cache reads in this window.'),
@@ -884,6 +885,20 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
           '<span>' + fmtK(usage.tokensCacheRead5h) + ' tok = $' + rdCost.toFixed(4) + '</span></div>' +
           '<div class="cost-row"><span class="cost-label">' + i18n.cacheCreate + '</span>' +
           '<span>' + fmtK(usage.tokensCacheCreate5h) + ' tok = $' + crCost.toFixed(4) + '</span></div>';
+      }
+
+      // Per-model cost breakdown (5h window)
+      const byModel = usage.costByModel5h || {};
+      const models = Object.keys(byModel).sort((a, b) => byModel[b] - byModel[a]);
+      if (models.length > 0) {
+        html += '<div class="cost-row" style="margin-top:6px"><span class="cost-label" style="font-weight:600">' +
+          i18n.byModel + '</span></div>';
+        for (const m of models) {
+          // "claude-sonnet-4-5-20250929" → "sonnet-4-5"
+          const shortName = m.replace(/^claude-/, '').replace(/-\d{8}$/, '');
+          html += '<div class="cost-row"><span class="cost-label">' + esc(shortName) + '</span>' +
+            '<span>$' + byModel[m].toFixed(4) + '</span></div>';
+        }
       }
 
       html += '<div class="cache-efficiency">';

@@ -26,6 +26,7 @@
   "config.claudeProvider.claudeAi": "Claude.ai subscription — shows rate limit utilization (5h window, 7d window if available).",
   "config.claudeProvider.awsBedrock": "AWS Bedrock — no rate limits, shows token cost only.",
   "config.claudeProvider.apiKey": "Anthropic API key — no rate limits, shows token cost only.",
+  "config.pricing.useModelPricing.desc": "Use built-in per-model rates (Opus/Sonnet/Haiku) based on each entry's model field for more accurate cost estimates. When disabled, or when a model is not recognized, the manual claudeStatus.pricing.* rates are used for every entry.",
   "config.pricing.inputPerMillion.desc": "Cost per 1M input tokens in USD. Default: $3.00 (Claude Sonnet 4.x). Update this if Anthropic changes pricing.",
   "config.pricing.outputPerMillion.desc": "Cost per 1M output tokens in USD. Default: $15.00 (Claude Sonnet 4.x). Update this if Anthropic changes pricing.",
   "config.pricing.cacheReadPerMillion.desc": "Cost per 1M cache-read tokens in USD. Default: $0.30 (Claude Sonnet 4.x). Update this if Anthropic changes pricing.",

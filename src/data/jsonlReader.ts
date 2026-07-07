@@ -21,6 +21,7 @@ interface JsonlEntry {
   requestId?: string
   message?: {
     id?: string
+    model?: string
     usage?: TokenUsage
   }
 }
@@ -33,6 +34,7 @@ export interface AggregatedUsage {
   tokensOut5h: number
   tokensCacheRead5h: number
   tokensCacheCreate5h: number
+  costByModel5h: Record<string, number>  // model id → cost in the 5h window
 }
 
 export interface TokenPricing {
@@ -48,6 +50,51 @@ export const DEFAULT_PRICING: TokenPricing = {
   cacheReadPerMillion: 0.30,
   cacheCreatePerMillion: 3.75,
 };
+
+// Built-in per-model rates (USD per 1M tokens), matched against the JSONL
+// entry's message.model. Anthropic's published pricing: cache read = 0.1x
+// input, 5-minute cache write = 1.25x input. Order matters — first match wins,
+// so legacy patterns must precede their generic family pattern.
+const MODEL_PRICING_RULES: ReadonlyArray<{ pattern: RegExp; pricing: TokenPricing }> = [
+  // Fable 5 / Mythos 5: $10 / $50
+  { pattern: /fable|mythos/i, pricing: { inputPerMillion: 10.00, outputPerMillion: 50.00, cacheReadPerMillion: 1.00, cacheCreatePerMillion: 12.50 } },
+  // Legacy Opus (3.x, 4.0, 4.1): $15 / $75
+  { pattern: /claude-3-opus|opus-4-0|opus-4-1|opus-4-2025/i, pricing: { inputPerMillion: 15.00, outputPerMillion: 75.00, cacheReadPerMillion: 1.50, cacheCreatePerMillion: 18.75 } },
+  // Opus 4.5 and later: $5 / $25
+  { pattern: /opus/i, pricing: { inputPerMillion: 5.00, outputPerMillion: 25.00, cacheReadPerMillion: 0.50, cacheCreatePerMillion: 6.25 } },
+  // Haiku (4.5): $1 / $5
+  { pattern: /haiku/i, pricing: { inputPerMillion: 1.00, outputPerMillion: 5.00, cacheReadPerMillion: 0.10, cacheCreatePerMillion: 1.25 } },
+  // Sonnet (3.x–5): $3 / $15
+  { pattern: /sonnet/i, pricing: { inputPerMillion: 3.00, outputPerMillion: 15.00, cacheReadPerMillion: 0.30, cacheCreatePerMillion: 3.75 } },
+];
+
+// Returns the built-in rate for a recognized model, or the fallback (the
+// user-configured claudeStatus.pricing.* rates) when the model is unknown
+export function resolveModelPricing(model: string | undefined, fallback: TokenPricing): TokenPricing {
+  if (model) {
+    for (const rule of MODEL_PRICING_RULES) {
+      if (rule.pattern.test(model)) { return rule.pricing; }
+    }
+  }
+  return fallback;
+}
+
+export interface CostOptions {
+  pricing: TokenPricing      // manual rates; also the fallback for unknown models
+  useModelPricing: boolean   // when true, recognized models use built-in rates
+}
+
+export const DEFAULT_COST_OPTIONS: CostOptions = {
+  pricing: DEFAULT_PRICING,
+  useModelPricing: true,
+};
+
+export function entryCost(entry: UsageEntry, options: CostOptions = DEFAULT_COST_OPTIONS): number {
+  const pricing = options.useModelPricing
+    ? resolveModelPricing(entry.model, options.pricing)
+    : options.pricing;
+  return calculateCost(entry.usage, pricing);
+}
 
 export function calculateCost(usage: TokenUsage, pricing: TokenPricing = DEFAULT_PRICING): number {
   return (
@@ -148,6 +195,7 @@ export interface UsageEntry {
   timestamp: number  // ms since epoch, guaranteed valid
   usage: TokenUsage  // all four fields normalized to numbers
   cwd?: string
+  model?: string     // e.g. "claude-sonnet-4-5-20250929"
 }
 
 export async function readUsageEntries(filePath: string): Promise<UsageEntry[]> {
@@ -167,12 +215,13 @@ export async function readUsageEntries(filePath: string): Promise<UsageEntry[]> 
         cache_creation_input_tokens: rawUsage.cache_creation_input_tokens || 0,
       },
       cwd: typeof entry.cwd === 'string' ? entry.cwd : undefined,
+      model: typeof entry.message?.model === 'string' ? entry.message.model : undefined,
     });
   }
   return result;
 }
 
-export async function readAllUsage(pricing: TokenPricing = DEFAULT_PRICING): Promise<AggregatedUsage> {
+export async function readAllUsage(options: CostOptions = DEFAULT_COST_OPTIONS): Promise<AggregatedUsage> {
   const now = Date.now();
   const window5h = 5 * 3600 * 1000;
   const window7d = 7 * 24 * 3600 * 1000;
@@ -187,6 +236,7 @@ export async function readAllUsage(pricing: TokenPricing = DEFAULT_PRICING): Pro
     tokensOut5h: 0,
     tokensCacheRead5h: 0,
     tokensCacheCreate5h: 0,
+    costByModel5h: {},
   };
 
   // Skip files untouched for over 7 days (+1h margin) — they cannot contain
@@ -197,7 +247,7 @@ export async function readAllUsage(pricing: TokenPricing = DEFAULT_PRICING): Pro
     const entries = await readUsageEntries(file);
     for (const entry of entries) {
       const { timestamp: ts, usage } = entry;
-      const cost = calculateCost(usage, pricing);
+      const cost = entryCost(entry, options);
 
       const age = now - ts;
       if (age <= window7d) {
@@ -212,6 +262,9 @@ export async function readAllUsage(pricing: TokenPricing = DEFAULT_PRICING): Pro
         result.tokensOut5h += usage.output_tokens || 0;
         result.tokensCacheRead5h += usage.cache_read_input_tokens || 0;
         result.tokensCacheCreate5h += usage.cache_creation_input_tokens || 0;
+        if (entry.model) {
+          result.costByModel5h[entry.model] = (result.costByModel5h[entry.model] || 0) + cost;
+        }
       }
     }
   }

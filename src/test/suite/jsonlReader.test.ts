@@ -2,7 +2,10 @@ import * as assert from 'assert';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
-import { calculateCost, findAllJsonlFiles, readJsonlFile, readUsageEntries, wasJsonlUpdatedRecently } from '../../data/jsonlReader';
+import {
+  calculateCost, entryCost, findAllJsonlFiles, readJsonlFile, readUsageEntries,
+  resolveModelPricing, wasJsonlUpdatedRecently, DEFAULT_PRICING, UsageEntry,
+} from '../../data/jsonlReader';
 
 suite('JsonlReader', () => {
   test('calculateCost returns 0 for zero tokens', () => {
@@ -188,6 +191,61 @@ suite('JsonlReader', () => {
     test('returns empty array for missing file', async () => {
       const entries = await readUsageEntries(path.join(os.tmpdir(), 'does-not-exist.jsonl'));
       assert.deepStrictEqual(entries, []);
+    });
+  });
+
+  suite('model-aware pricing', () => {
+    const usage = { input_tokens: 1_000_000, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
+    const entryFor = (model?: string): UsageEntry => ({ timestamp: Date.now(), usage, model });
+
+    test('resolves Opus 4.5+ rates', () => {
+      const p = resolveModelPricing('claude-opus-4-5-20251101', DEFAULT_PRICING);
+      assert.strictEqual(p.inputPerMillion, 5.00);
+      assert.strictEqual(p.outputPerMillion, 25.00);
+    });
+
+    test('resolves legacy Opus (4.1 and older) rates', () => {
+      for (const m of ['claude-opus-4-1-20250805', 'claude-opus-4-20250514', 'claude-3-opus-20240229']) {
+        const p = resolveModelPricing(m, DEFAULT_PRICING);
+        assert.strictEqual(p.inputPerMillion, 15.00, m);
+        assert.strictEqual(p.outputPerMillion, 75.00, m);
+      }
+    });
+
+    test('resolves Sonnet and Haiku rates', () => {
+      assert.strictEqual(resolveModelPricing('claude-sonnet-4-5-20250929', DEFAULT_PRICING).inputPerMillion, 3.00);
+      assert.strictEqual(resolveModelPricing('claude-haiku-4-5-20251001', DEFAULT_PRICING).inputPerMillion, 1.00);
+      assert.strictEqual(resolveModelPricing('claude-haiku-4-5-20251001', DEFAULT_PRICING).cacheReadPerMillion, 0.10);
+    });
+
+    test('falls back to provided pricing for unknown or missing model', () => {
+      const custom = { inputPerMillion: 9, outputPerMillion: 9, cacheReadPerMillion: 9, cacheCreatePerMillion: 9 };
+      assert.deepStrictEqual(resolveModelPricing('<synthetic>', custom), custom);
+      assert.deepStrictEqual(resolveModelPricing(undefined, custom), custom);
+    });
+
+    test('entryCost uses model rates when enabled and manual rates when disabled', () => {
+      const opts = { pricing: DEFAULT_PRICING, useModelPricing: true };
+      assert.strictEqual(entryCost(entryFor('claude-haiku-4-5-20251001'), opts), 1.00);
+      assert.strictEqual(entryCost(entryFor('claude-opus-4-6'), opts), 5.00);
+      const manual = { pricing: DEFAULT_PRICING, useModelPricing: false };
+      assert.strictEqual(entryCost(entryFor('claude-haiku-4-5-20251001'), manual), 3.00);
+    });
+
+    test('readUsageEntries surfaces the model field', async () => {
+      const tmpFile = path.join(os.tmpdir(), `model-test-${Date.now()}.jsonl`);
+      try {
+        await fs.writeFile(tmpFile, JSON.stringify({
+          type: 'assistant',
+          timestamp: new Date().toISOString(),
+          requestId: 'r1',
+          message: { model: 'claude-sonnet-4-5-20250929', usage: { input_tokens: 1, output_tokens: 1 } },
+        }));
+        const entries = await readUsageEntries(tmpFile);
+        assert.strictEqual(entries[0].model, 'claude-sonnet-4-5-20250929');
+      } finally {
+        await fs.unlink(tmpFile).catch(() => {});
+      }
     });
   });
 

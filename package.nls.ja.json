@@ -26,6 +26,7 @@
   "config.claudeProvider.claudeAi": "Claude.ai サブスクリプション — レート制限の利用率を表示します（5h ウィンドウ、利用可能な場合は 7d ウィンドウ）。",
   "config.claudeProvider.awsBedrock": "AWS Bedrock — レート制限なし、トークンコストのみ表示。",
   "config.claudeProvider.apiKey": "Anthropic API キー — レート制限なし、トークンコストのみ表示。",
+  "config.pricing.useModelPricing.desc": "各エントリの model フィールドに基づき、モデル別の組み込み料金（Opus/Sonnet/Haiku）を使用してより正確なコストを推定します。無効の場合、またはモデルを認識できない場合は、手動設定の claudeStatus.pricing.* 料金がすべてのエントリに使用されます。",
   "config.pricing.inputPerMillion.desc": "入力トークン 1M あたりのコスト（USD）。デフォルト: $3.00（Claude Sonnet 4.x）。Anthropic が料金を変更した場合は更新してください。",
   "config.pricing.outputPerMillion.desc": "出力トークン 1M あたりのコスト（USD）。デフォルト: $15.00（Claude Sonnet 4.x）。Anthropic が料金を変更した場合は更新してください。",
   "config.pricing.cacheReadPerMillion.desc": "キャッシュ読み取りトークン 1M あたりのコスト（USD）。デフォルト: $0.30（Claude Sonnet 4.x）。Anthropic が料金を変更した場合は更新してください。",

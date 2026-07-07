@@ -68,6 +68,7 @@
   "Output": "输出",
   "Cache read": "缓存读取",
   "Cache create": "缓存创建",
+  "By model (5h)": "按模型（5h）",
   "Good! Cache is saving cost.": "很好！缓存正在节省费用。",
   "Low cache reuse.": "缓存复用率低。",
   "No cache reads in this window.": "此窗口内无缓存读取。",

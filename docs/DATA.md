@@ -76,8 +76,31 @@ Always keep a margin on the cutoff — never filter with the exact window start.
 
 ### Cost Calculation
 
+#### Model-aware pricing (default)
+
+Each JSONL entry carries `message.model`. When `claudeStatus.pricing.useModelPricing`
+is `true` (default), the cost of each entry is computed with the built-in rate for
+its model family (`resolveModelPricing()` in `jsonlReader.ts`). Rules are matched
+in order — first match wins:
+
+| Match (case-insensitive) | Model family | Input | Output | Cache read | Cache write |
+|--------------------------|--------------|-------|--------|------------|-------------|
+| `fable`, `mythos` | Fable 5 / Mythos 5 | $10.00 | $50.00 | $1.00 | $12.50 |
+| `claude-3-opus`, `opus-4-0`, `opus-4-1`, `opus-4-2025` | Legacy Opus (≤ 4.1) | $15.00 | $75.00 | $1.50 | $18.75 |
+| `opus` | Opus 4.5+ | $5.00 | $25.00 | $0.50 | $6.25 |
+| `haiku` | Haiku | $1.00 | $5.00 | $0.10 | $1.25 |
+| `sonnet` | Sonnet | $3.00 | $15.00 | $0.30 | $3.75 |
+
+Unrecognized models (e.g. `<synthetic>`) fall back to the manual rates below.
+Cost aggregation also produces `costByModel5h` (model id → USD in the 5h window),
+shown in the dashboard token breakdown.
+
+#### Manual rates (fallback / opt-out)
+
 Default rates are based on Claude Sonnet 4.x pricing.
-**All four rates are user-configurable** via `claudeStatus.pricing.*` settings.
+**All four rates are user-configurable** via `claudeStatus.pricing.*` settings and
+apply to **every** entry when `useModelPricing` is `false`, or to entries whose
+model is not recognized.
 
 | Token type | Setting key | Default (USD / 1M) |
 |------------|-------------|-------------------|

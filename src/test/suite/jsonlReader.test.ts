@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
-import { calculateCost, readJsonlFile, readUsageEntries } from '../../data/jsonlReader';
+import { calculateCost, findAllJsonlFiles, readJsonlFile, readUsageEntries, wasJsonlUpdatedRecently } from '../../data/jsonlReader';
 
 suite('JsonlReader', () => {
   test('calculateCost returns 0 for zero tokens', () => {
@@ -188,6 +188,55 @@ suite('JsonlReader', () => {
     test('returns empty array for missing file', async () => {
       const entries = await readUsageEntries(path.join(os.tmpdir(), 'does-not-exist.jsonl'));
       assert.deepStrictEqual(entries, []);
+    });
+  });
+
+  suite('findAllJsonlFiles mtime filter', () => {
+    let tmpHome: string;
+    let savedHome: string | undefined;
+    let savedUserProfile: string | undefined;
+    let freshFile: string;
+    let oldFile: string;
+
+    setup(async () => {
+      tmpHome = await fs.mkdtemp(path.join(os.tmpdir(), 'jsonl-home-'));
+      // os.homedir() resolves HOME (POSIX) / USERPROFILE (Windows)
+      savedHome = process.env.HOME;
+      savedUserProfile = process.env.USERPROFILE;
+      process.env.HOME = tmpHome;
+      process.env.USERPROFILE = tmpHome;
+
+      const projectDir = path.join(tmpHome, '.claude', 'projects', '-test-project');
+      await fs.mkdir(projectDir, { recursive: true });
+      freshFile = path.join(projectDir, 'fresh.jsonl');
+      oldFile = path.join(projectDir, 'old.jsonl');
+      await fs.writeFile(freshFile, '');
+      await fs.writeFile(oldFile, '');
+      const tenDaysAgo = new Date(Date.now() - 10 * 24 * 3600 * 1000);
+      await fs.utimes(oldFile, tenDaysAgo, tenDaysAgo);
+    });
+
+    teardown(async () => {
+      if (savedHome === undefined) { delete process.env.HOME; } else { process.env.HOME = savedHome; }
+      if (savedUserProfile === undefined) { delete process.env.USERPROFILE; } else { process.env.USERPROFILE = savedUserProfile; }
+      await fs.rm(tmpHome, { recursive: true, force: true });
+    });
+
+    test('returns all files when no cutoff is given', async () => {
+      const files = await findAllJsonlFiles();
+      assert.deepStrictEqual(files.sort(), [freshFile, oldFile].sort());
+    });
+
+    test('skips files whose mtime is older than the cutoff', async () => {
+      const files = await findAllJsonlFiles(Date.now() - 8 * 24 * 3600 * 1000);
+      assert.deepStrictEqual(files, [freshFile]);
+    });
+
+    test('wasJsonlUpdatedRecently reflects the freshest file', async () => {
+      assert.strictEqual(await wasJsonlUpdatedRecently(300), true);
+      const old = new Date(Date.now() - 3600 * 1000);
+      await fs.utimes(freshFile, old, old);
+      assert.strictEqual(await wasJsonlUpdatedRecently(300), false);
     });
   });
 });

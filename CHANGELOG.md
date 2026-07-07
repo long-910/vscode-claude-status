@@ -11,6 +11,11 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Weekday × hour punch card** — the dashboard's Usage History card gains a
+  7 × 24 matrix showing where in the week cost is spent (last 30 days, local
+  time), using the same intensity scale as the heatmap. Cell tooltips show the
+  exact cost per weekday/hour.
+
 - **Model-aware pricing** (`claudeStatus.pricing.useModelPricing`, default `true`) —
   cost is now computed per JSONL entry using built-in rates for the entry's
   `message.model` (Opus 4.5+ $5/$25, legacy Opus ≤4.1 $15/$75, Sonnet $3/$15,

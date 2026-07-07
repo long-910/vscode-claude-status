@@ -224,6 +224,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | `claudeStatus.heatmap.days` | `30 \| 60 \| 90` | `90` | 使用ヒートマップに表示する日数 |
 | `claudeStatus.credentials.path` | `string \| null` | `null` | カスタム認証情報ファイルパス |
 | `claudeStatus.claudeProvider` | `"auto"` \| `"claude-ai"` \| `"aws-bedrock"` \| `"api-key"` | `"auto"` | プロバイダータイプ（自動検出または明示的指定） |
+| `claudeStatus.pricing.useModelPricing` | `boolean` | `true` | モデル別の組み込み料金（Opus/Sonnet/Haiku）で正確なコストを計算。下記の手動料金はフォールバック |
 | `claudeStatus.pricing.inputPerMillion` | `number` | `3.00` | 入力トークン 1M あたりの USD 単価 |
 | `claudeStatus.pricing.outputPerMillion` | `number` | `15.00` | 出力トークン 1M あたりの USD 単価 |
 | `claudeStatus.pricing.cacheReadPerMillion` | `number` | `0.30` | キャッシュ読み取りトークン 1M あたりの USD 単価 |

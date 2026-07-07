@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import * as vscode from 'vscode';
-import { calculateCost, readUsageEntries, TokenPricing, DEFAULT_PRICING } from './jsonlReader';
+import { entryCost, readUsageEntries, CostOptions, DEFAULT_COST_OPTIONS } from './jsonlReader';
 
 export interface ProjectCostData {
   projectName: string
@@ -76,7 +76,7 @@ export async function workspacePathToProjectDir(workspacePath: string): Promise<
   return null;
 }
 
-async function getProjectCostForDir(projectDir: string, projectName: string, pricing: TokenPricing = DEFAULT_PRICING): Promise<ProjectCostData> {
+async function getProjectCostForDir(projectDir: string, projectName: string, options: CostOptions = DEFAULT_COST_OPTIONS): Promise<ProjectCostData> {
   const now = Date.now();
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -100,7 +100,7 @@ async function getProjectCostForDir(projectDir: string, projectName: string, pri
       const entries = await readUsageEntries(path.join(projectDir, file));
       for (const entry of entries) {
         const tsMs = entry.timestamp;
-        const cost = calculateCost(entry.usage, pricing);
+        const cost = entryCost(entry, options);
         const ageMs = now - tsMs;
 
         if (ageMs < w30d) { cost30d += cost; }
@@ -124,7 +124,7 @@ async function getProjectCostForDir(projectDir: string, projectName: string, pri
   };
 }
 
-export async function getAllProjectCosts(pricing: TokenPricing = DEFAULT_PRICING): Promise<ProjectCostData[]> {
+export async function getAllProjectCosts(options: CostOptions = DEFAULT_COST_OPTIONS): Promise<ProjectCostData[]> {
   const folders = vscode.workspace.workspaceFolders ?? [];
   if (folders.length === 0) { return []; }
 
@@ -134,7 +134,7 @@ export async function getAllProjectCosts(pricing: TokenPricing = DEFAULT_PRICING
       const projectDir = await workspacePathToProjectDir(workspacePath);
       if (!projectDir) { return null; }
       const projectName = path.basename(workspacePath);
-      return getProjectCostForDir(projectDir, projectName, pricing);
+      return getProjectCostForDir(projectDir, projectName, options);
     })
   );
 

@@ -26,6 +26,7 @@
   "config.claudeProvider.claudeAi": "Claude.ai 订阅 — 显示速率限制利用率（5h 窗口，如可用则显示 7d 窗口）。",
   "config.claudeProvider.awsBedrock": "AWS Bedrock — 无速率限制，仅显示令牌费用。",
   "config.claudeProvider.apiKey": "Anthropic API 密钥 — 无速率限制，仅显示令牌费用。",
+  "config.pricing.useModelPricing.desc": "根据每条记录的 model 字段使用内置的按模型费率（Opus/Sonnet/Haiku），以获得更准确的成本估算。禁用时或无法识别模型时，所有记录都将使用手动设置的 claudeStatus.pricing.* 费率。",
   "config.pricing.inputPerMillion.desc": "每百万输入令牌的费用（USD）。默认：$3.00（Claude Sonnet 4.x）。Anthropic 调整定价后请更新此值。",
   "config.pricing.outputPerMillion.desc": "每百万输出令牌的费用（USD）。默认：$15.00（Claude Sonnet 4.x）。Anthropic 调整定价后请更新此值。",
   "config.pricing.cacheReadPerMillion.desc": "每百万缓存读取令牌的费用（USD）。默认：$0.30（Claude Sonnet 4.x）。Anthropic 调整定价后请更新此值。",

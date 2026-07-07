@@ -1,4 +1,4 @@
-import { findAllJsonlFiles, calculateCost, readUsageEntries } from './jsonlReader';
+import { findAllJsonlFiles, entryCost, readUsageEntries, CostOptions, DEFAULT_COST_OPTIONS } from './jsonlReader';
 
 export type RecommendationKey = 'safe' | 'caution' | 'warning' | 'critical' | 'rate-limit-reached';
 
@@ -18,7 +18,7 @@ interface TimestampedCost {
   cost: number       // USD
 }
 
-async function readRecentCosts(windowMs: number): Promise<TimestampedCost[]> {
+async function readRecentCosts(windowMs: number, options: CostOptions): Promise<TimestampedCost[]> {
   const now = Date.now();
   const cutoff = now - windowMs;
   const result: TimestampedCost[] = [];
@@ -31,7 +31,7 @@ async function readRecentCosts(windowMs: number): Promise<TimestampedCost[]> {
     const entries = await readUsageEntries(file);
     for (const entry of entries) {
       if (entry.timestamp < cutoff) { continue; }
-      const cost = calculateCost(entry.usage);
+      const cost = entryCost(entry, options);
       if (cost > 0) { result.push({ timestamp: entry.timestamp, cost }); }
     }
   }
@@ -67,8 +67,9 @@ export async function computePrediction(
   cost5h: number,
   costToday: number,
   dailyBudget: number | null,
+  costOptions: CostOptions = DEFAULT_COST_OPTIONS,
 ): Promise<PredictionData> {
-  const entries = await readRecentCosts(30 * 60 * 1000);
+  const entries = await readRecentCosts(30 * 60 * 1000, costOptions);
   const burnRateUsdPerHour = calculateBurnRate(entries);
 
   // --- Rate limit exhaustion ---

@@ -9,6 +9,19 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Model-aware pricing** (`claudeStatus.pricing.useModelPricing`, default `true`) —
+  cost is now computed per JSONL entry using built-in rates for the entry's
+  `message.model` (Opus 4.5+ $5/$25, legacy Opus ≤4.1 $15/$75, Sonnet $3/$15,
+  Haiku $1/$5, Fable/Mythos 5 $10/$50 per 1M tokens, with matching cache rates).
+  Previously every entry was priced at the flat Sonnet-based `claudeStatus.pricing.*`
+  rates, overestimating Haiku usage 3× and underestimating Opus usage up to 5×.
+  Unrecognized models — and all entries when the setting is disabled — fall back
+  to the manual `claudeStatus.pricing.*` rates.
+- **Per-model cost breakdown in dashboard** — the token breakdown section now lists
+  the 5h-window cost per model (e.g. `sonnet-4-5: $0.42`, `haiku-4-5: $0.03`).
+
 ### Performance
 
 - **Skip stale JSONL files by mtime** — the 60-second status bar poll and the

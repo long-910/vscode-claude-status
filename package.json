@@ -195,6 +195,11 @@
           "default": "auto",
           "description": "%config.claudeProvider.desc%"
         },
+        "claudeStatus.pricing.useModelPricing": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.pricing.useModelPricing.desc%"
+        },
         "claudeStatus.pricing.inputPerMillion": {
           "type": "number",
           "default": 3.0,

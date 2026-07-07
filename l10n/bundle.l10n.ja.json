@@ -68,6 +68,7 @@
   "Output": "出力",
   "Cache read": "キャッシュ読み取り",
   "Cache create": "キャッシュ作成",
+  "By model (5h)": "モデル別（5h）",
   "Good! Cache is saving cost.": "良好！キャッシュがコストを節約しています。",
   "Low cache reuse.": "キャッシュの再利用が少ないです。",
   "No cache reads in this window.": "このウィンドウ内にキャッシュ読み取りはありません。",

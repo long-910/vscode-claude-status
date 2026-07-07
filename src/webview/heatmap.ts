@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import { calculateCost, readUsageEntries } from '../data/jsonlReader';
+import { entryCost, readUsageEntries, CostOptions, DEFAULT_COST_OPTIONS } from '../data/jsonlReader';
 
 export interface DailyUsage {
   date: string        // "YYYY-MM-DD" local time
@@ -42,6 +42,7 @@ function toLocalDateKey(ts: number): string {
 async function readJsonlForHeatmap(
   filePath: string,
   cutoff: number,
+  options: CostOptions,
 ): Promise<EntryForHeatmap[]> {
   // Deduplicated read — streaming duplicates would inflate daily/hourly costs
   const entries = await readUsageEntries(filePath);
@@ -50,7 +51,7 @@ async function readJsonlForHeatmap(
     if (e.timestamp < cutoff) { continue; }
     result.push({
       timestamp: e.timestamp,
-      cost: calculateCost(e.usage),
+      cost: entryCost(e, options),
       tokens: e.usage.input_tokens + e.usage.output_tokens,
       hour: new Date(e.timestamp).getHours(),
     });
@@ -100,7 +101,7 @@ export function aggregateByHour(entries: EntryForHeatmap[], days: number): Hourl
 
 // ---- main entry point -------------------------------------------------------
 
-export async function getHeatmapData(days = 90): Promise<HeatmapData> {
+export async function getHeatmapData(days = 90, options: CostOptions = DEFAULT_COST_OPTIONS): Promise<HeatmapData> {
   const claudeProjectsDir = path.join(os.homedir(), '.claude', 'projects');
   const cutoff = Date.now() - days * 24 * 3600 * 1000;
   const allEntries: EntryForHeatmap[] = [];
@@ -128,7 +129,7 @@ export async function getHeatmapData(days = 90): Promise<HeatmapData> {
     }
 
     // Read all qualifying files in parallel
-    const chunks = await Promise.all(filePaths.map(fp => readJsonlForHeatmap(fp, cutoff)));
+    const chunks = await Promise.all(filePaths.map(fp => readJsonlForHeatmap(fp, cutoff, options)));
     for (const chunk of chunks) { allEntries.push(...chunk); }
 
   } catch { /* ~/.claude/projects doesn't exist — return empty data */ }

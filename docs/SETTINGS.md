@@ -163,7 +163,13 @@ What the status bar and dashboard show, depending on your Claude plan and key se
     "description": "Claude provider type. Controls whether rate limit percentages or cost is shown in the status bar."
   },
 
-  // --- Token pricing (user-adjustable when Anthropic changes rates) ---
+  // --- Token pricing ---
+  "claudeStatus.pricing.useModelPricing": {
+    "type": "boolean",
+    "default": true,
+    "description": "Use built-in per-model rates (Opus/Sonnet/Haiku) based on each entry's model field for more accurate cost estimates. When disabled, or when a model is not recognized, the manual claudeStatus.pricing.* rates are used for every entry."
+  },
+  // --- Manual token pricing (fallback for unknown models; all entries when useModelPricing is false) ---
   "claudeStatus.pricing.inputPerMillion": {
     "type": "number",
     "default": 3.00,

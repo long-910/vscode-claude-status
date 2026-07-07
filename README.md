@@ -244,6 +244,7 @@ All settings are under the `claudeStatus` namespace in VS Code Settings.
 | `claudeStatus.heatmap.days` | `30 \| 60 \| 90` | `90` | Days shown in usage heatmap |
 | `claudeStatus.credentials.path` | `string \| null` | `null` | Custom credentials file path |
 | `claudeStatus.claudeProvider` | `"auto"` \| `"claude-ai"` \| `"aws-bedrock"` \| `"api-key"` | `"auto"` | Provider type (auto-detect or explicit) |
+| `claudeStatus.pricing.useModelPricing` | `boolean` | `true` | Use built-in per-model rates (Opus/Sonnet/Haiku) for accurate costs; manual rates below are the fallback |
 | `claudeStatus.pricing.inputPerMillion` | `number` | `3.00` | USD per 1M input tokens |
 | `claudeStatus.pricing.outputPerMillion` | `number` | `15.00` | USD per 1M output tokens |
 | `claudeStatus.pricing.cacheReadPerMillion` | `number` | `0.30` | USD per 1M cache-read tokens |

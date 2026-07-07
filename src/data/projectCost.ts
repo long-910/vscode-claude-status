@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import * as vscode from 'vscode';
-import { calculateCost, TokenUsage, TokenPricing, DEFAULT_PRICING } from './jsonlReader';
+import { calculateCost, readUsageEntries, TokenPricing, DEFAULT_PRICING } from './jsonlReader';
 
 export interface ProjectCostData {
   projectName: string
@@ -95,40 +95,18 @@ async function getProjectCostForDir(projectDir: string, projectName: string, pri
       if (!file.endsWith('.jsonl')) { continue; }
       sessionCount++;
 
-      const content = await fs.readFile(path.join(projectDir, file), 'utf-8');
-      for (const line of content.split('\n')) {
-        const trimmed = line.trim();
-        if (!trimmed) { continue; }
-        try {
-          const entry = JSON.parse(trimmed) as Record<string, unknown>;
-          if (entry.type !== 'assistant') { continue; }
-          if (typeof entry.timestamp !== 'string') { continue; }
+      // Deduplicated read — streaming responses write one line per content
+      // block sharing the same requestId; count each API call once
+      const entries = await readUsageEntries(path.join(projectDir, file));
+      for (const entry of entries) {
+        const tsMs = entry.timestamp;
+        const cost = calculateCost(entry.usage, pricing);
+        const ageMs = now - tsMs;
 
-          const msg = entry.message as Record<string, unknown> | undefined;
-          const rawUsage = msg?.usage as Record<string, number> | undefined;
-          if (!rawUsage) { continue; }
-
-          const usage: TokenUsage = {
-            input_tokens: rawUsage.input_tokens || 0,
-            output_tokens: rawUsage.output_tokens || 0,
-            cache_read_input_tokens: rawUsage.cache_read_input_tokens || 0,
-            cache_creation_input_tokens: rawUsage.cache_creation_input_tokens || 0,
-          };
-
-          const ts = new Date(entry.timestamp as string);
-          const tsMs = ts.getTime();
-          if (isNaN(tsMs)) { continue; }
-
-          const cost = calculateCost(usage, pricing);
-          const ageMs = now - tsMs;
-
-          if (ageMs < w30d) { cost30d += cost; }
-          if (ageMs < w7d) { cost7d += cost; }
-          if (tsMs >= todayStart.getTime()) { costToday += cost; }
-          if (!lastActive || ts > lastActive) { lastActive = ts; }
-        } catch {
-          // skip malformed lines
-        }
+        if (ageMs < w30d) { cost30d += cost; }
+        if (ageMs < w7d) { cost7d += cost; }
+        if (tsMs >= todayStart.getTime()) { costToday += cost; }
+        if (!lastActive || tsMs > lastActive.getTime()) { lastActive = new Date(tsMs); }
       }
     }
   } catch {

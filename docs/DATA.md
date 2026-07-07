@@ -35,6 +35,29 @@ Each line is a JSON object. Relevant fields (verified against Claude Code v2.1.x
 > - `cwd` is at the top level of every entry
 > - Skip lines that fail to parse or lack required fields — never throw on parse errors
 
+### Streaming Deduplication (applies to ALL readers)
+
+Claude Code writes **one JSONL line per content block** in a streaming response
+(thinking, text, each tool-use call). All lines of one API call share the same
+`requestId` and identical usage counts, so naive summing inflates costs 2–4×.
+
+Every feature must read entries through the shared deduplicated reader in
+`jsonlReader.ts` — never parse usage lines ad hoc:
+
+```typescript
+// Returns entries deduplicated by requestId (fallback: message.id),
+// with a validated ms timestamp and all four usage fields normalized to numbers.
+export interface UsageEntry {
+  timestamp: number  // ms since epoch
+  usage: TokenUsage
+  cwd?: string
+}
+export async function readUsageEntries(filePath: string): Promise<UsageEntry[]>
+```
+
+Consumers: `readAllUsage` (status bar cost), `projectCost.ts`, `prediction.ts`
+(burn rate), `webview/heatmap.ts`.
+
 ### Cost Calculation
 
 Default rates are based on Claude Sonnet 4.x pricing.

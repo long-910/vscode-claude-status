@@ -42,6 +42,7 @@ Read all files under `docs/features/` before implementing each feature:
 | [`docs/features/03-project-cost.md`](docs/features/03-project-cost.md) | Project-level cost tracking |
 | [`docs/features/04-prediction.md`](docs/features/04-prediction.md) | Usage prediction & budget alerts |
 | [`docs/features/05-heatmap.md`](docs/features/05-heatmap.md) | Session history heatmap |
+| [`docs/features/06-treeview.md`](docs/features/06-treeview.md) | Sidebar tree view |
 
 ## Data Layer
 

@@ -4,6 +4,7 @@ import * as path from 'path';
 import { DataManager, ClaudeUsageData, PredictionData } from './data/dataManager';
 import { dailyUsageToCsv, dailyUsageToJson } from './data/exportUsage';
 import { StatusBarManager } from './statusBar';
+import { ClaudeStatusTreeProvider } from './treeView';
 import { config } from './config';
 import { setClaudeHome } from './data/claudeHome';
 
@@ -66,6 +67,13 @@ export function activate(context: vscode.ExtensionContext) {
   setClaudeHome(config.claudeHome);
   const dataManager = DataManager.getInstance();
   const statusBar = new StatusBarManager();
+
+  // Sidebar tree view (refreshes itself on dataManager updates)
+  const treeProvider = new ClaudeStatusTreeProvider(dataManager);
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider('claudeStatus.overview', treeProvider),
+    treeProvider,
+  );
 
   // Helper: update status bar with latest usage + project costs
   function updateStatusBar(): void {
@@ -213,7 +221,10 @@ export function activate(context: vscode.ExtensionContext) {
   // Timer: re-render every 60 seconds from cache
   const timer = setInterval(() => {
     dataManager.getUsageData()
-      .then(data => statusBar.update(data, dataManager.getLastProjectCosts()))
+      .then(data => {
+        statusBar.update(data, dataManager.getLastProjectCosts());
+        treeProvider.refresh(); // keep "resets in" countdowns current
+      })
       .catch(() => {});
   }, 60_000);
 

@@ -111,5 +111,15 @@
   "Select export format": "选择导出格式",
   "No usage history to export yet.": "暂无可导出的使用历史。",
   "Usage history exported to {0}": "使用历史已导出到 {0}",
-  "Failed to export usage history: {0}": "导出使用历史失败: {0}"
+  "Failed to export usage history: {0}": "导出使用历史失败: {0}",
+  "Rate Limit": "速率限制",
+  "Projects": "项目",
+  "Actions": "操作",
+  "resets in {0}": "{0} 后重置",
+  "Loading…": "加载中…",
+  "Not logged in": "未登录",
+  "Refresh Now": "立即刷新",
+  "Toggle % / $ Display": "切换 % / $ 显示",
+  "Set Budget…": "设置预算…",
+  "Export Usage Data…": "导出使用数据…"
 }

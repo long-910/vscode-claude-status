@@ -33,5 +33,7 @@
   "config.pricing.outputPerMillion.desc": "每百万输出令牌的费用（USD）。默认：$15.00（Claude Sonnet 4.x）。Anthropic 调整定价后请更新此值。",
   "config.pricing.cacheReadPerMillion.desc": "每百万缓存读取令牌的费用（USD）。默认：$0.30（Claude Sonnet 4.x）。Anthropic 调整定价后请更新此值。",
   "config.pricing.cacheCreatePerMillion.desc": "每百万缓存创建令牌的费用（USD）。默认：$3.75（Claude Sonnet 4.x）。Anthropic 调整定价后请更新此值。",
-  "config.pricing.useModelPricing.desc": "按每条记录的模型（Opus、Sonnet、Haiku、Fable 等）使用内置的 Anthropic 费率计价。无法识别的模型（以及禁用时的所有记录）使用上方的 claudeStatus.pricing.* 费率。"
+  "config.pricing.useModelPricing.desc": "按每条记录的模型（Opus、Sonnet、Haiku、Fable 等）使用内置的 Anthropic 费率计价。无法识别的模型（以及禁用时的所有记录）使用上方的 claudeStatus.pricing.* 费率。",
+  "view.container.title": "Claude Status",
+  "view.overview.title": "使用情况概览"
 }

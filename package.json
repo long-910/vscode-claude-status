@@ -3,7 +3,7 @@
   "displayName": "%ext.displayName%",
   "description": "%ext.description%",
   "l10n": "./l10n",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "publisher": "long-kudo",
   "engines": {
     "vscode": "^1.73.0"
@@ -197,13 +197,13 @@
         },
         "claudeStatus.pricing.inputPerMillion": {
           "type": "number",
-          "default": 3.0,
+          "default": 3,
           "minimum": 0,
           "description": "%config.pricing.inputPerMillion.desc%"
         },
         "claudeStatus.pricing.outputPerMillion": {
           "type": "number",
-          "default": 15.0,
+          "default": 15,
           "minimum": 0,
           "description": "%config.pricing.outputPerMillion.desc%"
         },

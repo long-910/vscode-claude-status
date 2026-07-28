@@ -9,6 +9,10 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [0.6.3] — 2026-07-28
+
 ### Fixed
 
 - **Cache-creation cost understated for 1-hour TTL cache writes** — every cache-creation

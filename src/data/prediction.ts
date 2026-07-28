@@ -43,6 +43,7 @@ async function readRecentCosts(windowMs: number): Promise<TimestampedCost[]> {
             output_tokens: msg.usage.output_tokens ?? 0,
             cache_read_input_tokens: msg.usage.cache_read_input_tokens ?? 0,
             cache_creation_input_tokens: msg.usage.cache_creation_input_tokens ?? 0,
+            cache_creation: msg.usage.cache_creation,
           });
           if (cost > 0) { result.push({ timestamp: ts, cost }); }
         } catch { /* skip malformed lines */ }

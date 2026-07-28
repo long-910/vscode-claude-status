@@ -62,6 +62,7 @@ async function readJsonlForHeatmap(
           output_tokens: u.output_tokens ?? 0,
           cache_read_input_tokens: u.cache_read_input_tokens ?? 0,
           cache_creation_input_tokens: u.cache_creation_input_tokens ?? 0,
+          cache_creation: u.cache_creation,
         });
         result.push({
           timestamp: ts,

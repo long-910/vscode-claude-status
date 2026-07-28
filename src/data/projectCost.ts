@@ -105,7 +105,7 @@ async function getProjectCostForDir(projectDir: string, projectName: string, pri
           if (typeof entry.timestamp !== 'string') { continue; }
 
           const msg = entry.message as Record<string, unknown> | undefined;
-          const rawUsage = msg?.usage as Record<string, number> | undefined;
+          const rawUsage = msg?.usage as Partial<TokenUsage> | undefined;
           if (!rawUsage) { continue; }
 
           const usage: TokenUsage = {
@@ -113,6 +113,7 @@ async function getProjectCostForDir(projectDir: string, projectName: string, pri
             output_tokens: rawUsage.output_tokens || 0,
             cache_read_input_tokens: rawUsage.cache_read_input_tokens || 0,
             cache_creation_input_tokens: rawUsage.cache_creation_input_tokens || 0,
+            cache_creation: rawUsage.cache_creation,
           };
 
           const ts = new Date(entry.timestamp as string);

@@ -65,6 +65,74 @@ suite('JsonlReader', () => {
     assert.strictEqual(cost, 3.00 + 15.00 + 0.30 + 3.75);
   });
 
+  test('calculateCost prices 1-hour TTL cache writes at 2x input', () => {
+    const cost = calculateCost({
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 1_000_000,
+      cache_creation: {
+        ephemeral_5m_input_tokens: 0,
+        ephemeral_1h_input_tokens: 1_000_000,
+      },
+    });
+    assert.strictEqual(cost, 6.00);
+  });
+
+  test('calculateCost splits a mixed cache-creation bucket by TTL', () => {
+    const cost = calculateCost({
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 1_000_000,
+      cache_creation: {
+        ephemeral_5m_input_tokens: 400_000,
+        ephemeral_1h_input_tokens: 600_000,
+      },
+    });
+    assert.strictEqual(cost, 0.4 * 3.75 + 0.6 * 6.00);
+  });
+
+  test('calculateCost keeps the whole bucket at the 5-minute rate without a breakdown', () => {
+    const cost = calculateCost({
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 1_000_000,
+    });
+    assert.strictEqual(cost, 3.75);
+  });
+
+  test('calculateCost clamps a 1-hour count that exceeds the aggregate', () => {
+    const cost = calculateCost({
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 1_000_000,
+      cache_creation: { ephemeral_1h_input_tokens: 5_000_000 },
+    });
+    assert.strictEqual(cost, 6.00);
+  });
+
+  test('calculateCost respects custom pricing for 1-hour cache writes', () => {
+    const cost = calculateCost(
+      {
+        input_tokens: 0,
+        output_tokens: 0,
+        cache_read_input_tokens: 0,
+        cache_creation_input_tokens: 1_000_000,
+        cache_creation: { ephemeral_1h_input_tokens: 1_000_000 },
+      },
+      {
+        inputPerMillion: 1.00,
+        outputPerMillion: 5.00,
+        cacheReadPerMillion: 0.10,
+        cacheCreatePerMillion: 1.25,
+      }
+    );
+    assert.strictEqual(cost, 2.00);
+  });
+
   suite('readJsonlFile deduplication', () => {
     let tmpFile: string;
 

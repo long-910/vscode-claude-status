@@ -2,11 +2,17 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 
+export interface CacheCreationBreakdown {
+  ephemeral_5m_input_tokens?: number
+  ephemeral_1h_input_tokens?: number
+}
+
 export interface TokenUsage {
   input_tokens: number
   output_tokens: number
   cache_read_input_tokens: number
   cache_creation_input_tokens: number
+  cache_creation?: CacheCreationBreakdown
 }
 
 // Actual Claude Code JSONL structure (verified against real data):
@@ -49,12 +55,22 @@ export const DEFAULT_PRICING: TokenPricing = {
   cacheCreatePerMillion: 3.75,
 };
 
+const ONE_HOUR_CACHE_WRITE_MULTIPLIER = 2;
+
 export function calculateCost(usage: TokenUsage, pricing: TokenPricing = DEFAULT_PRICING): number {
+  const cacheCreateTotal = usage.cache_creation_input_tokens || 0;
+  const cacheCreate1h = Math.min(
+    Math.max(usage.cache_creation?.ephemeral_1h_input_tokens || 0, 0),
+    cacheCreateTotal
+  );
+  const cacheCreate5m = cacheCreateTotal - cacheCreate1h;
+
   return (
     ((usage.input_tokens || 0) / 1_000_000) * pricing.inputPerMillion +
     ((usage.output_tokens || 0) / 1_000_000) * pricing.outputPerMillion +
     ((usage.cache_read_input_tokens || 0) / 1_000_000) * pricing.cacheReadPerMillion +
-    ((usage.cache_creation_input_tokens || 0) / 1_000_000) * pricing.cacheCreatePerMillion
+    (cacheCreate5m / 1_000_000) * pricing.cacheCreatePerMillion +
+    (cacheCreate1h / 1_000_000) * pricing.inputPerMillion * ONE_HOUR_CACHE_WRITE_MULTIPLIER
   );
 }
 

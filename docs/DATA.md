@@ -45,7 +45,13 @@ Default rates are based on Claude Sonnet 4.x pricing.
 | Input | `claudeStatus.pricing.inputPerMillion` | $3.00 |
 | Output | `claudeStatus.pricing.outputPerMillion` | $15.00 |
 | Cache read | `claudeStatus.pricing.cacheReadPerMillion` | $0.30 |
-| Cache create | `claudeStatus.pricing.cacheCreatePerMillion` | $3.75 |
+| Cache create (5-minute TTL) | `claudeStatus.pricing.cacheCreatePerMillion` | $3.75 |
+
+Cache writes with a **1-hour TTL** are billed by Anthropic at 2x the input rate rather than
+the 1.25x of the 5-minute tier, so they are priced as `inputPerMillion * 2` and follow the
+`inputPerMillion` setting. Claude Code reports the split in `usage.cache_creation`
+(`ephemeral_5m_input_tokens` / `ephemeral_1h_input_tokens`); entries predating that field
+keep the whole `cache_creation_input_tokens` bucket on the 5-minute rate.
 
 > [!WARNING]
 > **Pricing disclaimer — costs are estimates only.**
@@ -62,12 +68,22 @@ export interface TokenPricing {
   cacheCreatePerMillion: number
 }
 
+const ONE_HOUR_CACHE_WRITE_MULTIPLIER = 2
+
 function calculateCost(usage: TokenUsage, pricing: TokenPricing): number {
+  const cacheCreateTotal = usage.cache_creation_input_tokens || 0
+  const cacheCreate1h = Math.min(
+    Math.max(usage.cache_creation?.ephemeral_1h_input_tokens || 0, 0),
+    cacheCreateTotal
+  )
+  const cacheCreate5m = cacheCreateTotal - cacheCreate1h
+
   return (
     ((usage.input_tokens || 0) / 1_000_000) * pricing.inputPerMillion +
     ((usage.output_tokens || 0) / 1_000_000) * pricing.outputPerMillion +
     ((usage.cache_read_input_tokens || 0) / 1_000_000) * pricing.cacheReadPerMillion +
-    ((usage.cache_creation_input_tokens || 0) / 1_000_000) * pricing.cacheCreatePerMillion
+    (cacheCreate5m / 1_000_000) * pricing.cacheCreatePerMillion +
+    (cacheCreate1h / 1_000_000) * pricing.inputPerMillion * ONE_HOUR_CACHE_WRITE_MULTIPLIER
   )
 }
 ```

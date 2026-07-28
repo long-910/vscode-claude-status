@@ -9,6 +9,16 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Cache-creation cost understated for 1-hour TTL cache writes** — every cache-creation
+  token was priced at the 5-minute rate (1.25x input). Anthropic bills a 1-hour TTL cache
+  write at 2x input, and Claude Code writes most of its cache with the 1-hour TTL, so
+  reported cost came out low. `calculateCost` now reads the per-TTL breakdown from
+  `usage.cache_creation` and prices each portion at its own rate. Entries without the
+  breakdown keep the whole bucket on the 5-minute rate.
+  ([#44](https://github.com/long-910/vscode-claude-status/issues/44))
+
 ---
 
 ## [0.6.2] — 2026-06-13

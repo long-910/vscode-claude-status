@@ -70,6 +70,12 @@ Real-time usage summary pinned to the VS Code status bar.
 
 Hover for a detailed tooltip with full token breakdown and reset times.
 
+### 🧭 Sidebar Overview *(VS Code-native)*
+
+A dedicated Activity Bar icon opens a native tree view with rate-limit windows,
+token costs (5h / today / 7d), per-project costs, and quick actions — all the
+key numbers without opening the dashboard panel.
+
 ### 🗂 Dashboard Panel
 
 Click the status bar item to open a rich dashboard panel with:

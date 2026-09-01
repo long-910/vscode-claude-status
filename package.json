@@ -60,6 +60,23 @@
         "title": "%cmd.setBudget%"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "claude-status",
+          "title": "%view.container.title%",
+          "icon": "images/activitybar.svg"
+        }
+      ]
+    },
+    "views": {
+      "claude-status": [
+        {
+          "id": "claudeStatus.overview",
+          "name": "%view.overview.title%"
+        }
+      ]
+    },
     "keybindings": [
       {
         "command": "vscode-claude-status.toggleDisplayMode",

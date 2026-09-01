@@ -103,5 +103,14 @@
   "⚙ Set format": "⚙ 書式を設定",
   "Format string:": "書式文字列:",
   "Reset to default": "デフォルトに戻す",
-  "(default)": "（デフォルト）"
+  "(default)": "（デフォルト）",
+  "Rate Limit": "レート制限",
+  "Projects": "プロジェクト",
+  "Actions": "アクション",
+  "resets in {0}": "{0} 後にリセット",
+  "Loading…": "読み込み中…",
+  "Not logged in": "未ログイン",
+  "Refresh Now": "今すぐ更新",
+  "Toggle % / $ Display": "% / $ 表示を切り替え",
+  "Set Budget…": "予算を設定…"
 }

@@ -251,9 +251,25 @@ Set `claudeStatus.statusBar.format` to a template string to replace the default 
   {
     "command": "vscode-claude-status.setBudget",
     "title": "Claude Status: Set Budget..."
+  },
+  {
+    "command": "vscode-claude-status.exportUsage",
+    "title": "Claude Status: Export Usage Data..."
   }
 ]
 ```
+
+### Export Usage Data
+
+`vscode-claude-status.exportUsage` exports the daily usage history (the same
+aggregation that powers the heatmap, covering `claudeStatus.heatmap.days` days)
+to a file chosen via a save dialog:
+
+- **CSV** — `date,cost_usd,messages,tokens`, one row per day (zero-activity days
+  included), cost with 4 decimal places.
+- **JSON** — `{ exportedAt, days, totalCostUsd, daily: [{date, costUsd, messages, tokens}] }`.
+
+Serializers live in `src/data/exportUsage.ts` (pure functions, unit-tested).
 
 ---
 

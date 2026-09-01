@@ -9,6 +9,13 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Export Usage Data command** (`Claude Status: Export Usage Data...`) — export the
+  daily usage history (date, cost, message count, tokens; same aggregation as the
+  heatmap, covering `claudeStatus.heatmap.days` days) to a **CSV** or **JSON** file
+  via a save dialog. Useful for expense reports and external analysis.
+
 ---
 
 ## [0.6.3] — 2026-07-28

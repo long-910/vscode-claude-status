@@ -219,6 +219,7 @@ The extension activates automatically on VS Code startup (`onStartupFinished`).
 | **Claude Status: Open Dashboard** | Open dashboard panel |
 | **Claude Status: Toggle % / $ Display** | Switch display mode |
 | **Claude Status: Set Budget…** | Set or disable daily USD budget |
+| **Claude Status: Export Usage Data…** | Export daily usage history to CSV or JSON |
 
 ---
 

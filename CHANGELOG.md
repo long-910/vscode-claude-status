@@ -9,6 +9,13 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Status bar sparkline** (`claudeStatus.statusBar.showSparkline`, default `false`) —
+  show a compact utilization meter (`▰▰▰▱▱`) next to the 5h percentage so remaining
+  capacity is visible at a glance. Custom status bar formats gain matching
+  `${bar5h}` / `${bar7d}` placeholders.
+
 ---
 
 ## [0.6.3] — 2026-07-28

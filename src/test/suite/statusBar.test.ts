@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { buildLabel, buildTooltip, formatDuration } from '../../statusBar';
+import { buildLabel, buildTooltip, buildUtilizationBar, formatDuration } from '../../statusBar';
 import { ClaudeUsageData } from '../../data/dataManager';
 
 function makeData(overrides: Partial<ClaudeUsageData> = {}): ClaudeUsageData {
@@ -51,6 +51,30 @@ suite('formatDuration', () => {
     assert.strictEqual(formatDuration(86400), '1d');
     assert.strictEqual(formatDuration(90000), '1d 1h');
     assert.strictEqual(formatDuration(172800), '2d');
+  });
+});
+
+suite('buildUtilizationBar', () => {
+  test('renders empty, partial, and full bars', () => {
+    assert.strictEqual(buildUtilizationBar(0), '▱▱▱▱▱');
+    assert.strictEqual(buildUtilizationBar(0.6), '▰▰▰▱▱');
+    assert.strictEqual(buildUtilizationBar(1), '▰▰▰▰▰');
+  });
+
+  test('rounds to the nearest cell', () => {
+    assert.strictEqual(buildUtilizationBar(0.09), '▱▱▱▱▱');  // 0.45 cells → 0
+    assert.strictEqual(buildUtilizationBar(0.11), '▰▱▱▱▱');  // 0.55 cells → 1
+    assert.strictEqual(buildUtilizationBar(0.5), '▰▰▰▱▱');   // 2.5 cells → 3 (round half up)
+  });
+
+  test('clamps out-of-range utilization', () => {
+    assert.strictEqual(buildUtilizationBar(-0.5), '▱▱▱▱▱');
+    assert.strictEqual(buildUtilizationBar(1.7), '▰▰▰▰▰');
+  });
+
+  test('respects a custom width', () => {
+    assert.strictEqual(buildUtilizationBar(0.5, 8), '▰▰▰▰▱▱▱▱');
+    assert.strictEqual(buildUtilizationBar(0.5, 8).length, 8);
   });
 });
 

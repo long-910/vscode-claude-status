@@ -33,6 +33,13 @@ function buildBar(utilization: number, width: number): string {
   return 'X'.repeat(filled) + '.'.repeat(width - filled);
 }
 
+// Compact utilization meter for the status bar label (e.g. "▰▰▰▱▱" at 60%)
+export function buildUtilizationBar(utilization: number, width = 5): string {
+  const clamped = Math.min(1, Math.max(0, utilization));
+  const filled = Math.round(clamped * width);
+  return '▰'.repeat(filled) + '▱'.repeat(width - filled);
+}
+
 function truncateName(name: string): string {
   return name.length > 12 ? name.slice(0, 11) + '…' : name;
 }
@@ -42,6 +49,8 @@ function applyFormat(format: string, data: ClaudeUsageData): string {
   return format
     .replace(/\$\{usage5h\}/g, `${Math.round(utilization5h * 100)}`)
     .replace(/\$\{usage7d\}/g, `${Math.round(utilization7d * 100)}`)
+    .replace(/\$\{bar5h\}/g, buildUtilizationBar(utilization5h))
+    .replace(/\$\{bar7d\}/g, buildUtilizationBar(utilization7d))
     .replace(/\$\{cost5h\}/g, cost5h.toFixed(2))
     .replace(/\$\{cost7d\}/g, cost7d.toFixed(2))
     .replace(/\$\{costDay\}/g, costDay.toFixed(2));
@@ -81,8 +90,9 @@ export function buildLabel(data: ClaudeUsageData, projectCosts: ProjectCostData[
       part5h = `5h:100%✗`;
       part7d = '';
     } else {
+      const spark5h = config.showSparkline ? `${buildUtilizationBar(utilization5h)} ` : '';
       const warn5h = utilization5h >= 0.75 ? '⚠' : '';
-      part5h = `5h:${formatPercent(utilization5h)}${warn5h}`;
+      part5h = `5h:${spark5h}${formatPercent(utilization5h)}${warn5h}`;
       if (has7dLimit) {
         const warn7d = utilization7d >= 0.75 ? '⚠' : '';
         part7d = ` 7d:${formatPercent(utilization7d)}${warn7d}`;

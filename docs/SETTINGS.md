@@ -72,7 +72,13 @@ What the status bar and dashboard show, depending on your Claude plan and key se
   "claudeStatus.statusBar.format": {
     "type": ["string", "null"],
     "default": null,
-    "description": "Custom status bar format string. Use placeholders: ${usage5h}, ${usage7d}, ${cost5h}, ${cost7d}, ${costDay}. null = default auto-generated label."
+    "description": "Custom status bar format string. Use placeholders: ${usage5h}, ${usage7d}, ${bar5h}, ${bar7d}, ${cost5h}, ${cost7d}, ${costDay}. null = default auto-generated label."
+  },
+
+  "claudeStatus.statusBar.showSparkline": {
+    "type": "boolean",
+    "default": false,
+    "description": "Show a compact utilization meter (▰▰▰▱▱) next to the 5h percentage in the status bar (percent mode, Claude.ai only). Custom formats can use the ${bar5h} / ${bar7d} placeholders instead."
   },
 
   "claudeStatus.cache.ttlSeconds": {
@@ -203,6 +209,8 @@ Set `claudeStatus.statusBar.format` to a template string to replace the default 
 |-------------|------|----------------|-------|
 | `${usage5h}` | integer 0–100 | `35` | 5h rate-limit utilization. Always `0` for non-claude-ai providers. |
 | `${usage7d}` | integer 0–100 | `72` | 7d rate-limit utilization. `0` if no 7d window. |
+| `${bar5h}` | 5-char meter | `▰▰▱▱▱` | 5h utilization as a compact meter (rounded to nearest fifth). |
+| `${bar7d}` | 5-char meter | `▰▰▰▰▱` | 7d utilization as a compact meter. All-empty if no 7d window. |
 | `${cost5h}` | decimal string | `1.23` | Local token cost in the last 5h (USD, 2 decimal places). |
 | `${cost7d}` | decimal string | `5.67` | Local token cost in the last 7 days (USD, 2 decimal places). |
 | `${costDay}` | decimal string | `2.34` | Local token cost today (USD, 2 decimal places). |

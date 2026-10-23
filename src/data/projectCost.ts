@@ -1,8 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import * as os from 'os';
 import * as vscode from 'vscode';
-import { calculateCost, TokenUsage, TokenPricing, DEFAULT_PRICING } from './jsonlReader';
+import { calculateCost, TokenUsage, TokenPricing, DEFAULT_PRICING, getClaudeProjectsDir } from './jsonlReader';
 
 export interface ProjectCostData {
   projectName: string
@@ -54,7 +53,7 @@ async function dirMatchesWorkspace(projectDir: string, workspacePath: string): P
 }
 
 export async function workspacePathToProjectDir(workspacePath: string): Promise<string | null> {
-  const claudeProjectsDir = path.join(os.homedir(), '.claude', 'projects');
+  const claudeProjectsDir = getClaudeProjectsDir();
 
   // Strategy 1: Direct path conversion (Claude Code's known scheme)
   const hash = workspacePathToHash(workspacePath);

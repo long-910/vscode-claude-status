@@ -1,6 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import * as os from 'os';
+import { getClaudeHome } from './claudeHome';
 import { RateLimitData } from './apiClient';
 
 interface CacheFile {
@@ -18,7 +18,7 @@ interface CacheFile {
 }
 
 function getCachePath(): string {
-  return path.join(os.homedir(), '.claude', 'vscode-claude-status-cache.json');
+  return path.join(getClaudeHome(), 'vscode-claude-status-cache.json');
 }
 
 export async function readCache(): Promise<CacheFile | null> {

@@ -1,6 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import * as os from 'os';
+import { getClaudeHome } from './claudeHome';
 
 export interface CacheCreationBreakdown {
   ephemeral_5m_input_tokens?: number
@@ -75,7 +75,7 @@ export function calculateCost(usage: TokenUsage, pricing: TokenPricing = DEFAULT
 }
 
 export function getClaudeProjectsDir(): string {
-  return path.join(os.homedir(), '.claude', 'projects');
+  return path.join(getClaudeHome(), 'projects');
 }
 
 export async function findAllJsonlFiles(): Promise<string[]> {

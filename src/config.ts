@@ -68,6 +68,10 @@ export class ExtensionConfig {
     return v || null;
   }
 
+  get claudeHome(): string {
+    return this.cfg.get('claudeHome', '.claude');
+  }
+
   get claudeProvider(): 'auto' | ClaudeProvider {
     return this.cfg.get('claudeProvider', 'auto');
   }

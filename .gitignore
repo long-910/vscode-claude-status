@@ -23,4 +23,5 @@ Thumbs.db
 
 # Editor
 .vscode/*.log
+.vs/
 *Zone.Identifier

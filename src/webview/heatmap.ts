@@ -1,7 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import * as os from 'os';
-import { calculateCost, TokenUsage } from '../data/jsonlReader';
+import { calculateCost, TokenUsage, getClaudeProjectsDir } from '../data/jsonlReader';
 
 export interface DailyUsage {
   date: string        // "YYYY-MM-DD" local time
@@ -119,7 +118,7 @@ export function aggregateByHour(entries: EntryForHeatmap[], days: number): Hourl
 // ---- main entry point -------------------------------------------------------
 
 export async function getHeatmapData(days = 90): Promise<HeatmapData> {
-  const claudeProjectsDir = path.join(os.homedir(), '.claude', 'projects');
+  const claudeProjectsDir = getClaudeProjectsDir();
   const cutoff = Date.now() - days * 24 * 3600 * 1000;
   const allEntries: EntryForHeatmap[] = [];
 

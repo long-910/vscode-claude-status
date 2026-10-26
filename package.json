@@ -170,6 +170,11 @@
           ],
           "description": "%config.heatmap.days.desc%"
         },
+        "claudeStatus.claudeHome": {
+          "type": "string",
+          "default": ".claude",
+          "description": "%config.claudeHome.desc%"
+        },
         "claudeStatus.credentials.path": {
           "type": [
             "string",

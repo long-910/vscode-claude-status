@@ -1,6 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import * as os from 'os';
+import { getClaudeHome } from './claudeHome';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -69,7 +69,7 @@ async function readCredentialsFromKeychain(): Promise<string> {
 }
 
 async function readCredentials(customPath?: string | null): Promise<string> {
-  const credPath = customPath ?? path.join(os.homedir(), '.claude', '.credentials.json');
+  const credPath = customPath ?? path.join(getClaudeHome(), '.credentials.json');
   try {
     const content = await fs.readFile(credPath, 'utf-8');
     const creds = JSON.parse(content) as ClaudeCredentials;

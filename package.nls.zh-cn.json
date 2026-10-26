@@ -20,6 +20,7 @@
   "config.notifications.rateLimitWarningThresholdMinutes.desc": "在速率限制耗尽前多少分钟显示警告。",
   "config.notifications.budgetWarning.desc": "超过预算阈值时显示通知。",
   "config.heatmap.days.desc": "使用热力图中显示的天数。",
+  "config.claudeHome.desc": "Claude Code 数据目录（projects、凭证、缓存）。相对路径基于用户主目录解析；支持绝对路径和 ~。默认值：.claude（~/.claude）。",
   "config.credentials.path.desc": "Claude 凭证文件的自定义路径。设为 null 使用默认路径（~/.claude/.credentials.json）。",
   "config.claudeProvider.desc": "Claude 提供商类型。控制状态栏显示速率限制百分比还是费用。",
   "config.claudeProvider.auto": "自动检测：检查凭证文件，然后检查 AWS/API 密钥环境变量。",

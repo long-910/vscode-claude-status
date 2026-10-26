@@ -20,6 +20,7 @@
   "config.notifications.rateLimitWarningThresholdMinutes.desc": "Show rate limit warning this many minutes before exhaustion.",
   "config.notifications.budgetWarning.desc": "Show notification when budget threshold is exceeded.",
   "config.heatmap.days.desc": "Number of days shown in the usage heatmap.",
+  "config.claudeHome.desc": "Claude Code data directory (projects, credentials, cache). Relative paths resolve against the home directory; absolute paths and ~ are supported. Default: .claude (~/.claude).",
   "config.credentials.path.desc": "Custom path to Claude credentials file. Leave null to use default (~/.claude/.credentials.json).",
   "config.claudeProvider.desc": "Claude provider type. Controls whether rate limit percentages or cost is shown in the status bar.",
   "config.claudeProvider.auto": "Auto-detect: checks credentials file, then AWS/API key environment variables.",

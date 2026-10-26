@@ -9,6 +9,17 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `claudeStatus.claudeHome` setting to configure the Claude Code data directory (default `.claude`, resolved against the home directory). Projects, credentials, and cache paths all follow it; changes apply without reload.
+
+### Changed
+
+- Project cost and prediction now deduplicate streaming entries by `requestId` /
+  `message.id`, like the status bar totals already did since 0.5.x
+  ([#31](https://github.com/long-910/vscode-claude-status/issues/31)). Their values may be
+  lower than before (previously over-counted).
+
 ### Fixed
 
 - **Extension host crashes (out of memory) while Claude Code is streaming** — every append
@@ -24,13 +35,6 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     remembered, and each refresh reads only the appended bytes. Usage, project cost and
     prediction share one in-memory index instead of each re-reading every file.
   - The heatmap is computed only while the dashboard is open.
-
-### Changed
-
-- Project cost and prediction now deduplicate streaming entries by `requestId` /
-  `message.id`, like the status bar totals already did since 0.5.x
-  ([#31](https://github.com/long-910/vscode-claude-status/issues/31)). Their values may be
-  lower than before (previously over-counted).
   ([#48](https://github.com/long-910/vscode-claude-status/issues/48),
   [#47](https://github.com/long-910/vscode-claude-status/issues/47))
 

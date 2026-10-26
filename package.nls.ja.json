@@ -20,6 +20,7 @@
   "config.notifications.rateLimitWarningThresholdMinutes.desc": "制限の何分前に警告を表示するか。",
   "config.notifications.budgetWarning.desc": "予算の閾値を超えたときに通知を表示します。",
   "config.heatmap.days.desc": "使用ヒートマップに表示する日数。",
+  "config.claudeHome.desc": "Claude Code のデータディレクトリ（projects・認証情報・キャッシュ）。相対パスはホームディレクトリ基準で解決されます。絶対パスと ~ も使用できます。デフォルト: .claude（~/.claude）。",
   "config.credentials.path.desc": "Claude 認証情報ファイルのカスタムパス。null でデフォルト（~/.claude/.credentials.json）を使用します。",
   "config.claudeProvider.desc": "Claude プロバイダーの種類。ステータスバーにレート制限の割合またはコストを表示するかどうかを制御します。",
   "config.claudeProvider.auto": "自動検出: 認証情報ファイルを確認し、次に AWS/API キーの環境変数を確認します。",

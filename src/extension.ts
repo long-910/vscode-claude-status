@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { DataManager, ClaudeUsageData, PredictionData } from './data/dataManager';
 import { StatusBarManager } from './statusBar';
 import { config } from './config';
+import { setClaudeHome } from './data/claudeHome';
 
 // --- Notification system ---
 // Deduplication: keys are cleared when the 5h rate-limit window resets
@@ -59,6 +60,7 @@ async function checkAndNotify(data: ClaudeUsageData, prediction: PredictionData 
 }
 
 export function activate(context: vscode.ExtensionContext) {
+  setClaudeHome(config.claudeHome);
   const dataManager = DataManager.getInstance();
   const statusBar = new StatusBarManager();
 
@@ -122,6 +124,11 @@ export function activate(context: vscode.ExtensionContext) {
   // Re-render on settings change without restart
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration(e => {
+      if (e.affectsConfiguration('claudeStatus.claudeHome')) {
+        setClaudeHome(config.claudeHome);
+        dataManager.restartWatching();
+        dataManager.refresh().catch(() => {});
+      }
       if (e.affectsConfiguration('claudeStatus')) {
         updateStatusBar();
       }

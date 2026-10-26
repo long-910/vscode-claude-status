@@ -144,6 +144,12 @@ What the status bar and dashboard show, depending on your Claude plan and key se
     "description": "Number of days shown in the usage heatmap."
   },
 
+  "claudeStatus.claudeHome": {
+    "type": "string",
+    "default": ".claude",
+    "description": "Claude Code data directory (projects, credentials, cache). Relative paths resolve against the home directory; absolute paths and ~ are supported. Default: .claude (~/.claude)."
+  },
+
   "claudeStatus.credentials.path": {
     "type": ["string", "null"],
     "default": null,

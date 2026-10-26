@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import * as os from 'os';
 import * as readline from 'readline';
+import { getClaudeHome } from './claudeHome';
 import { readUsageRecords } from './usageIndex';
 
 export interface CacheCreationBreakdown {
@@ -77,7 +77,7 @@ export function calculateCost(usage: TokenUsage, pricing: TokenPricing = DEFAULT
 }
 
 export function getClaudeProjectsDir(): string {
-  return path.join(os.homedir(), '.claude', 'projects');
+  return path.join(getClaudeHome(), 'projects');
 }
 
 /**

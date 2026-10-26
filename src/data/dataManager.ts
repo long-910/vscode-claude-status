@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
-import * as os from 'os';
-import { readAllUsage, wasJsonlUpdatedRecently } from './jsonlReader';
+import { readAllUsage, wasJsonlUpdatedRecently, getClaudeProjectsDir } from './jsonlReader';
+import { clearUsageIndex } from './usageIndex';
 import { fetchRateLimitData, detectProvider, RateLimitData, ClaudeProvider } from './apiClient';
 import { readCache, writeCache, isCacheValid, getCacheAge } from './cache';
 import { getAllProjectCosts, ProjectCostData } from './projectCost';
@@ -241,7 +240,7 @@ export class DataManager {
 
   startWatching(): void {
     const pattern = new vscode.RelativePattern(
-      vscode.Uri.file(path.join(os.homedir(), '.claude', 'projects')),
+      vscode.Uri.file(getClaudeProjectsDir()),
       '**/*.jsonl'
     );
     this.watcher = vscode.workspace.createFileSystemWatcher(pattern);
@@ -257,6 +256,13 @@ export class DataManager {
       this.watchTimer = undefined;
       this.refresh().catch(() => {});
     }, this.watchDelayMs);
+  }
+
+  restartWatching(): void {
+    // The data directory changed — drop transcripts indexed from the old one
+    clearUsageIndex();
+    this.watcher?.dispose();
+    this.startWatching();
   }
 
   async getPrediction(): Promise<PredictionData | null> {

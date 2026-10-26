@@ -9,6 +9,10 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [0.7.0] — 2026-10-26
+
 ### Added
 
 - `claudeStatus.claudeHome` setting to configure the Claude Code data directory (default `.claude`, resolved against the home directory). Projects, credentials, and cache paths all follow it; changes apply without reload.
@@ -551,6 +555,7 @@ and project-level cost tracking.
 
 ---
 
+[0.7.0]: https://github.com/long-910/vscode-claude-status/compare/v0.6.3...v0.7.0
 [0.6.1]: https://github.com/long-910/vscode-claude-status/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/long-910/vscode-claude-status/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/long-910/vscode-claude-status/compare/v0.5.0...v0.5.1

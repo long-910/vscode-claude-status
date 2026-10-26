@@ -270,6 +270,8 @@ npm run package       # → vscode-claude-status-*.vsix
 | 料金 & 設定カード（ダッシュボード内） | ✅ v0.4.0 |
 | i18n — 英語 / 日本語 / 中国語 | ✅ v0.4.1 |
 | macOS キーチェーン認証情報フォールバック（Claude Code v2.x+） | ✅ v0.6.0 |
+| Claude Code データディレクトリの設定（`claudeStatus.claudeHome`） | ✅ v0.7.0 |
+| 拡張ホストOOMクラッシュ修正 — 差分JSONLリード・ウォッチャー集約 | ✅ v0.7.0 |
 
 ---
 

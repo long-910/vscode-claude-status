@@ -1,5 +1,5 @@
-import * as fs from 'fs/promises';
-import { findAllJsonlFiles, calculateCost, TokenUsage } from './jsonlReader';
+import { findAllJsonlFiles, calculateCost } from './jsonlReader';
+import { readUsageRecords } from './usageIndex';
 
 export type RecommendationKey = 'safe' | 'caution' | 'warning' | 'critical' | 'rate-limit-reached';
 
@@ -24,31 +24,10 @@ async function readRecentCosts(windowMs: number): Promise<TimestampedCost[]> {
   const cutoff = now - windowMs;
   const result: TimestampedCost[] = [];
 
-  const files = await findAllJsonlFiles();
-  for (const file of files) {
-    try {
-      const content = await fs.readFile(file, 'utf-8');
-      for (const line of content.split('\n')) {
-        const trimmed = line.trim();
-        if (!trimmed) { continue; }
-        try {
-          const obj = JSON.parse(trimmed) as Record<string, unknown>;
-          if (obj.type !== 'assistant' || typeof obj.timestamp !== 'string') { continue; }
-          const ts = new Date(obj.timestamp).getTime();
-          if (isNaN(ts) || ts < cutoff) { continue; }
-          const msg = obj.message as { usage?: Partial<TokenUsage> } | undefined;
-          if (!msg?.usage) { continue; }
-          const cost = calculateCost({
-            input_tokens: msg.usage.input_tokens ?? 0,
-            output_tokens: msg.usage.output_tokens ?? 0,
-            cache_read_input_tokens: msg.usage.cache_read_input_tokens ?? 0,
-            cache_creation_input_tokens: msg.usage.cache_creation_input_tokens ?? 0,
-            cache_creation: msg.usage.cache_creation,
-          });
-          if (cost > 0) { result.push({ timestamp: ts, cost }); }
-        } catch { /* skip malformed lines */ }
-      }
-    } catch { /* skip unreadable files */ }
+  const files = await findAllJsonlFiles(cutoff);
+  for (const { timestamp, usage } of await readUsageRecords(files, cutoff)) {
+    const cost = calculateCost(usage);
+    if (cost > 0) { result.push({ timestamp, cost }); }
   }
 
   return result.sort((a, b) => a.timestamp - b.timestamp);

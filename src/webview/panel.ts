@@ -1312,6 +1312,7 @@ export class DashboardPanel {
 
     // Clean up when panel is closed
     this.panel.onDidDispose(() => this.dispose(), undefined, this.disposables);
+    dataManager.setDashboardOpen(true);
   }
 
   static createOrShow(dataManager: DataManager): void {
@@ -1331,13 +1332,12 @@ export class DashboardPanel {
       case 'ready':
         // Fast first update (usage + prediction, cached heatmap or null)
         this.dataManager.getUsageData().then(data => this.sendUpdate(data)).catch(() => {});
-        // Trigger heatmap computation; send a second update when ready
-        if (!this.dataManager.getLastHeatmapData()) {
-          this.dataManager.getHeatmapData().then(() => {
-            const data = this.dataManager.getLastData();
-            if (data) { this.sendUpdate(data).catch(() => {}); }
-          }).catch(() => {});
-        }
+        // Trigger heatmap computation (no-op while its cache is fresh); it is not
+        // refreshed while the dashboard is closed, so cached data may be stale
+        this.dataManager.getHeatmapData().then(() => {
+          const data = this.dataManager.getLastData();
+          if (data) { this.sendUpdate(data).catch(() => {}); }
+        }).catch(() => {});
         break;
 
       case 'refresh':
@@ -1397,6 +1397,7 @@ export class DashboardPanel {
 
   private dispose(): void {
     DashboardPanel.instance = undefined;
+    this.dataManager.setDashboardOpen(false);
     this.panel.dispose();
     for (const d of this.disposables) {
       d.dispose();

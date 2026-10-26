@@ -1,6 +1,8 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as readline from 'readline';
 import { getClaudeHome } from './claudeHome';
+import { readUsageRecords } from './usageIndex';
 
 export interface CacheCreationBreakdown {
   ephemeral_5m_input_tokens?: number
@@ -78,7 +80,40 @@ export function getClaudeProjectsDir(): string {
   return path.join(getClaudeHome(), 'projects');
 }
 
-export async function findAllJsonlFiles(): Promise<string[]> {
+/**
+ * Stream a JSONL file and call `onLine` for each non-empty, trimmed line.
+ * Peak memory is one line rather than the whole file, which matters because
+ * a single Claude Code transcript can grow to ~100 MB (#48).
+ * Return `false` from `onLine` to stop reading early.
+ * Rejects if the file cannot be opened.
+ */
+export async function forEachJsonlLine(
+  filePath: string,
+  onLine: (line: string) => boolean | void,
+): Promise<void> {
+  const handle = await fs.open(filePath, 'r');
+  const stream = handle.createReadStream({ encoding: 'utf-8' });
+  const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+  try {
+    for await (const line of rl) {
+      const trimmed = line.trim();
+      if (!trimmed) { continue; }
+      if (onLine(trimmed) === false) { break; }
+    }
+  } finally {
+    rl.close();
+    stream.destroy();
+    await handle.close().catch(() => {});
+  }
+}
+
+/**
+ * List every `~/.claude/projects/<project>/<session>.jsonl` file.
+ * When `modifiedSinceMs` is given, files whose mtime is older are skipped:
+ * Claude Code only appends to a transcript, so a file's mtime is >= the
+ * timestamp of every entry inside it.
+ */
+export async function findAllJsonlFiles(modifiedSinceMs?: number): Promise<string[]> {
   const projectsDir = getClaudeProjectsDir();
   const files: string[] = [];
 
@@ -91,9 +126,17 @@ export async function findAllJsonlFiles(): Promise<string[]> {
         if (!stat.isDirectory()) { continue; }
         const entries = await fs.readdir(dirPath);
         for (const entry of entries) {
-          if (entry.endsWith('.jsonl')) {
-            files.push(path.join(dirPath, entry));
+          if (!entry.endsWith('.jsonl')) { continue; }
+          const filePath = path.join(dirPath, entry);
+          if (modifiedSinceMs !== undefined) {
+            try {
+              const fstat = await fs.stat(filePath);
+              if (fstat.mtimeMs < modifiedSinceMs) { continue; }
+            } catch {
+              continue;
+            }
           }
+          files.push(filePath);
         }
       } catch {
         // skip unreadable dirs
@@ -113,10 +156,7 @@ export async function readJsonlFile(filePath: string): Promise<JsonlEntry[]> {
   // API call exactly once.
   const seenRequestIds = new Set<string>();
   try {
-    const content = await fs.readFile(filePath, 'utf-8');
-    for (const line of content.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed) { continue; }
+    await forEachJsonlLine(filePath, trimmed => {
       try {
         const obj = JSON.parse(trimmed) as Record<string, unknown>;
         // Only 'assistant' entries have usage data in message.usage
@@ -131,15 +171,22 @@ export async function readJsonlFile(filePath: string): Promise<JsonlEntry[]> {
               (obj.message as Record<string, unknown>).id as string) ||
             null;
           if (dedupeKey) {
-            if (seenRequestIds.has(dedupeKey)) { continue; }
+            if (seenRequestIds.has(dedupeKey)) { return; }
             seenRequestIds.add(dedupeKey);
           }
-          entries.push(obj as unknown as JsonlEntry);
+          // Keep only the fields callers use — message content can be large
+          const message = obj.message as JsonlEntry['message'];
+          entries.push({
+            type: obj.type,
+            timestamp: obj.timestamp,
+            requestId: typeof obj.requestId === 'string' ? obj.requestId : undefined,
+            message: { id: message?.id, usage: message?.usage },
+          });
         }
       } catch {
         // skip malformed lines
       }
-    }
+    });
   } catch {
     // skip unreadable files
   }
@@ -163,31 +210,25 @@ export async function readAllUsage(pricing: TokenPricing = DEFAULT_PRICING): Pro
     tokensCacheCreate5h: 0,
   };
 
-  const files = await findAllJsonlFiles();
-  for (const file of files) {
-    const entries = await readJsonlFile(file);
-    for (const entry of entries) {
-      const ts = new Date(entry.timestamp).getTime();
-      if (isNaN(ts)) { continue; }
+  // Files untouched for 7 days cannot contain entries inside any window below
+  const files = await findAllJsonlFiles(now - window7d);
+  const records = await readUsageRecords(files, now - window7d);
+  for (const { timestamp: ts, usage } of records) {
+    const cost = calculateCost(usage, pricing);
 
-      const usage = entry.message?.usage;
-      if (!usage) { continue; }
-      const cost = calculateCost(usage, pricing);
-
-      const age = now - ts;
-      if (age <= window7d) {
-        result.cost7d += cost;
-      }
-      if (ts >= startOfToday.getTime()) {
-        result.costDay += cost;
-      }
-      if (age <= window5h) {
-        result.cost5h += cost;
-        result.tokensIn5h += usage.input_tokens || 0;
-        result.tokensOut5h += usage.output_tokens || 0;
-        result.tokensCacheRead5h += usage.cache_read_input_tokens || 0;
-        result.tokensCacheCreate5h += usage.cache_creation_input_tokens || 0;
-      }
+    const age = now - ts;
+    if (age <= window7d) {
+      result.cost7d += cost;
+    }
+    if (ts >= startOfToday.getTime()) {
+      result.costDay += cost;
+    }
+    if (age <= window5h) {
+      result.cost5h += cost;
+      result.tokensIn5h += usage.input_tokens || 0;
+      result.tokensOut5h += usage.output_tokens || 0;
+      result.tokensCacheRead5h += usage.cache_read_input_tokens || 0;
+      result.tokensCacheCreate5h += usage.cache_creation_input_tokens || 0;
     }
   }
 
@@ -195,15 +236,6 @@ export async function readAllUsage(pricing: TokenPricing = DEFAULT_PRICING): Pro
 }
 
 export async function wasJsonlUpdatedRecently(seconds: number): Promise<boolean> {
-  const files = await findAllJsonlFiles();
-  const threshold = Date.now() - seconds * 1000;
-  for (const file of files) {
-    try {
-      const stat = await fs.stat(file);
-      if (stat.mtimeMs >= threshold) { return true; }
-    } catch {
-      // skip
-    }
-  }
-  return false;
+  const files = await findAllJsonlFiles(Date.now() - seconds * 1000);
+  return files.length > 0;
 }

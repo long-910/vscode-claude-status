@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { readAllUsage, wasJsonlUpdatedRecently, getClaudeProjectsDir } from './jsonlReader';
+import { clearUsageIndex } from './usageIndex';
 import { fetchRateLimitData, detectProvider, RateLimitData, ClaudeProvider } from './apiClient';
 import { readCache, writeCache, isCacheValid, getCacheAge } from './cache';
 import { getAllProjectCosts, ProjectCostData } from './projectCost';
@@ -51,6 +52,15 @@ export class DataManager {
   private heatmapComputedAt = 0;
   private readonly heatmapTtlMs = 5 * 60 * 1000; // 5-minute in-memory TTL
   private heatmapPending = false;
+  // Heatmap reads up to heatmapDays of history — only compute it while the dashboard can show it
+  private dashboardOpen = false;
+
+  // Claude Code appends to its transcript many times per second while streaming.
+  // Coalesce watcher events and never run two refreshes at once (#48).
+  private readonly watchDelayMs = 5000;
+  private watchTimer: ReturnType<typeof setTimeout> | undefined;
+  private refreshInFlight: Promise<void> | undefined;
+  private refreshQueued = false;
 
   private constructor() {}
 
@@ -163,6 +173,25 @@ export class DataManager {
   }
 
   async refresh(): Promise<void> {
+    if (this.refreshInFlight) {
+      // Run once more after the current pass so its result is not stale
+      this.refreshQueued = true;
+      return this.refreshInFlight;
+    }
+    this.refreshInFlight = (async () => {
+      try {
+        do {
+          this.refreshQueued = false;
+          await this.refreshOnce();
+        } while (this.refreshQueued);
+      } finally {
+        this.refreshInFlight = undefined;
+      }
+    })();
+    return this.refreshInFlight;
+  }
+
+  private async refreshOnce(): Promise<void> {
     try {
       const [data] = await Promise.all([
         this.getUsageData(false),
@@ -195,8 +224,12 @@ export class DataManager {
     }
   }
 
+  setDashboardOpen(open: boolean): void {
+    this.dashboardOpen = open;
+  }
+
   private refreshHeatmapBackground(): void {
-    if (this.heatmapPending) { return; }
+    if (!this.dashboardOpen || this.heatmapPending) { return; }
     this.heatmapPending = true;
     this.getHeatmapData().then(() => {
       this.heatmapPending = false;
@@ -211,11 +244,23 @@ export class DataManager {
       '**/*.jsonl'
     );
     this.watcher = vscode.workspace.createFileSystemWatcher(pattern);
-    this.watcher.onDidChange(() => this.refresh());
-    this.watcher.onDidCreate(() => this.refresh());
+    this.watcher.onDidChange(() => this.scheduleRefresh());
+    this.watcher.onDidCreate(() => this.scheduleRefresh());
+  }
+
+  // Not reset by later events, so a long streaming response still refreshes
+  // every watchDelayMs instead of being postponed until it ends
+  private scheduleRefresh(): void {
+    if (this.watchTimer) { return; }
+    this.watchTimer = setTimeout(() => {
+      this.watchTimer = undefined;
+      this.refresh().catch(() => {});
+    }, this.watchDelayMs);
   }
 
   restartWatching(): void {
+    // The data directory changed — drop transcripts indexed from the old one
+    clearUsageIndex();
     this.watcher?.dispose();
     this.startWatching();
   }
@@ -265,6 +310,7 @@ export class DataManager {
   }
 
   dispose(): void {
+    if (this.watchTimer) { clearTimeout(this.watchTimer); }
     this.watcher?.dispose();
     this._onDidUpdate.dispose();
   }

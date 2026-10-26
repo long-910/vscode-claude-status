@@ -124,9 +124,34 @@ const watcher = vscode.workspace.createFileSystemWatcher(
     '**/*.jsonl'
   )
 )
-watcher.onDidChange(() => dataManager.refresh())
-watcher.onDidCreate(() => dataManager.refresh())
+// Coalesced: at most one refresh per 5 s while Claude Code is streaming
+watcher.onDidChange(() => dataManager.scheduleRefresh())
+watcher.onDidCreate(() => dataManager.scheduleRefresh())
 ```
+
+`refresh()` is single-flight: a call made while one is running waits for it and
+triggers exactly one more pass afterwards.
+
+### Incremental Reading (`src/data/usageIndex.ts`)
+
+Transcripts can grow to ~100 MB and Claude Code appends to them many times per
+second while streaming. To keep the extension host's memory and CPU flat (#48):
+
+- **Never read a whole file into memory.** Files are read in 1 MiB chunks and
+  split on `\n` at the byte level.
+- **Read each byte once.** Per file, the index keeps the byte offset consumed so
+  far, the dedupe keys seen, and slim usage records (timestamp + token counts).
+  On the next refresh only the appended bytes are read. A trailing line without
+  `\n` is deferred until it is complete. A file that shrinks or gets a new inode
+  is re-read from the start.
+- **Skip old files.** A transcript's mtime is >= every entry in it, so files
+  whose mtime is older than the window being aggregated are not read at all.
+- **Bounded retention.** Records older than 30 days (the widest window, project
+  cost) are dropped, and files not modified in 30 days are evicted.
+
+`readAllUsage()`, project cost and prediction all share this index. The heatmap
+(up to `heatmap.days` of history) is computed separately, only while the
+dashboard is open, reading at most 4 files at a time.
 
 ---
 

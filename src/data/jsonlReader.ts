@@ -2,6 +2,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import * as readline from 'readline';
+import { readUsageRecords } from './usageIndex';
 
 export interface CacheCreationBreakdown {
   ephemeral_5m_input_tokens?: number
@@ -211,30 +212,23 @@ export async function readAllUsage(pricing: TokenPricing = DEFAULT_PRICING): Pro
 
   // Files untouched for 7 days cannot contain entries inside any window below
   const files = await findAllJsonlFiles(now - window7d);
-  for (const file of files) {
-    const entries = await readJsonlFile(file);
-    for (const entry of entries) {
-      const ts = new Date(entry.timestamp).getTime();
-      if (isNaN(ts)) { continue; }
+  const records = await readUsageRecords(files, now - window7d);
+  for (const { timestamp: ts, usage } of records) {
+    const cost = calculateCost(usage, pricing);
 
-      const usage = entry.message?.usage;
-      if (!usage) { continue; }
-      const cost = calculateCost(usage, pricing);
-
-      const age = now - ts;
-      if (age <= window7d) {
-        result.cost7d += cost;
-      }
-      if (ts >= startOfToday.getTime()) {
-        result.costDay += cost;
-      }
-      if (age <= window5h) {
-        result.cost5h += cost;
-        result.tokensIn5h += usage.input_tokens || 0;
-        result.tokensOut5h += usage.output_tokens || 0;
-        result.tokensCacheRead5h += usage.cache_read_input_tokens || 0;
-        result.tokensCacheCreate5h += usage.cache_creation_input_tokens || 0;
-      }
+    const age = now - ts;
+    if (age <= window7d) {
+      result.cost7d += cost;
+    }
+    if (ts >= startOfToday.getTime()) {
+      result.costDay += cost;
+    }
+    if (age <= window5h) {
+      result.cost5h += cost;
+      result.tokensIn5h += usage.input_tokens || 0;
+      result.tokensOut5h += usage.output_tokens || 0;
+      result.tokensCacheRead5h += usage.cache_read_input_tokens || 0;
+      result.tokensCacheCreate5h += usage.cache_creation_input_tokens || 0;
     }
   }
 

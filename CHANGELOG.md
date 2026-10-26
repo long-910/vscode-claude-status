@@ -20,6 +20,17 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - Watcher events are coalesced (at most one refresh per 5 s), and refreshes never overlap.
   - Files not modified within the relevant window (7 / 30 days) are skipped without reading.
   - Heatmap file reads are capped at 4 concurrent.
+  - Transcripts are read incrementally: per file, the byte offset already consumed is
+    remembered, and each refresh reads only the appended bytes. Usage, project cost and
+    prediction share one in-memory index instead of each re-reading every file.
+  - The heatmap is computed only while the dashboard is open.
+
+### Changed
+
+- Project cost and prediction now deduplicate streaming entries by `requestId` /
+  `message.id`, like the status bar totals already did since 0.5.x
+  ([#31](https://github.com/long-910/vscode-claude-status/issues/31)). Their values may be
+  lower than before (previously over-counted).
   ([#48](https://github.com/long-910/vscode-claude-status/issues/48),
   [#47](https://github.com/long-910/vscode-claude-status/issues/47))
 

@@ -96,14 +96,15 @@ class DataManager {
 
 ```
 FileWatcher detects JSONL change
-  → DataManager.refresh()
-    → JsonlReader.readAllUsage()   [always — fast, local]
+  → DataManager.scheduleRefresh()  [coalesced: at most once per 5 s]
+  → DataManager.refresh()          [single-flight]
+    → JsonlReader.readAllUsage()   [always — reads only bytes appended since last refresh]
     → ApiClient.fetchRateLimitData() [1 call — if cache stale AND rateLimitApi.enabled]
     → Cache.write()
     → onDidUpdate.fire()
       → StatusBar.update()
       → WebViewPanel.postMessage()
-    → getHeatmapData() [background, fires second onDidUpdate when done]
+    → getHeatmapData() [background, only while the dashboard is open; fires second onDidUpdate when done]
 ```
 
 #### When Claude Code is idle:

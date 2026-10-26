@@ -53,6 +53,8 @@ export class DataManager {
   private heatmapComputedAt = 0;
   private readonly heatmapTtlMs = 5 * 60 * 1000; // 5-minute in-memory TTL
   private heatmapPending = false;
+  // Heatmap reads up to heatmapDays of history — only compute it while the dashboard can show it
+  private dashboardOpen = false;
 
   // Claude Code appends to its transcript many times per second while streaming.
   // Coalesce watcher events and never run two refreshes at once (#48).
@@ -223,8 +225,12 @@ export class DataManager {
     }
   }
 
+  setDashboardOpen(open: boolean): void {
+    this.dashboardOpen = open;
+  }
+
   private refreshHeatmapBackground(): void {
-    if (this.heatmapPending) { return; }
+    if (!this.dashboardOpen || this.heatmapPending) { return; }
     this.heatmapPending = true;
     this.getHeatmapData().then(() => {
       this.heatmapPending = false;

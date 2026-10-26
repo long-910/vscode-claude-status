@@ -1,5 +1,4 @@
-import * as fs from 'fs/promises';
-import { findAllJsonlFiles, calculateCost, TokenUsage } from './jsonlReader';
+import { findAllJsonlFiles, forEachJsonlLine, calculateCost, TokenUsage } from './jsonlReader';
 
 export type RecommendationKey = 'safe' | 'caution' | 'warning' | 'critical' | 'rate-limit-reached';
 
@@ -24,20 +23,17 @@ async function readRecentCosts(windowMs: number): Promise<TimestampedCost[]> {
   const cutoff = now - windowMs;
   const result: TimestampedCost[] = [];
 
-  const files = await findAllJsonlFiles();
+  const files = await findAllJsonlFiles(cutoff);
   for (const file of files) {
     try {
-      const content = await fs.readFile(file, 'utf-8');
-      for (const line of content.split('\n')) {
-        const trimmed = line.trim();
-        if (!trimmed) { continue; }
+      await forEachJsonlLine(file, trimmed => {
         try {
           const obj = JSON.parse(trimmed) as Record<string, unknown>;
-          if (obj.type !== 'assistant' || typeof obj.timestamp !== 'string') { continue; }
+          if (obj.type !== 'assistant' || typeof obj.timestamp !== 'string') { return; }
           const ts = new Date(obj.timestamp).getTime();
-          if (isNaN(ts) || ts < cutoff) { continue; }
+          if (isNaN(ts) || ts < cutoff) { return; }
           const msg = obj.message as { usage?: Partial<TokenUsage> } | undefined;
-          if (!msg?.usage) { continue; }
+          if (!msg?.usage) { return; }
           const cost = calculateCost({
             input_tokens: msg.usage.input_tokens ?? 0,
             output_tokens: msg.usage.output_tokens ?? 0,
@@ -47,7 +43,7 @@ async function readRecentCosts(windowMs: number): Promise<TimestampedCost[]> {
           });
           if (cost > 0) { result.push({ timestamp: ts, cost }); }
         } catch { /* skip malformed lines */ }
-      }
+      });
     } catch { /* skip unreadable files */ }
   }
 

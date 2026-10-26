@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import { calculateCost, TokenUsage } from '../data/jsonlReader';
+import { calculateCost, forEachJsonlLine, TokenUsage } from '../data/jsonlReader';
 
 export interface DailyUsage {
   date: string        // "YYYY-MM-DD" local time
@@ -45,17 +45,14 @@ async function readJsonlForHeatmap(
 ): Promise<EntryForHeatmap[]> {
   const result: EntryForHeatmap[] = [];
   try {
-    const content = await fs.readFile(filePath, 'utf-8');
-    for (const line of content.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed) { continue; }
+    await forEachJsonlLine(filePath, trimmed => {
       try {
         const obj = JSON.parse(trimmed) as Record<string, unknown>;
-        if (obj.type !== 'assistant' || typeof obj.timestamp !== 'string') { continue; }
+        if (obj.type !== 'assistant' || typeof obj.timestamp !== 'string') { return; }
         const ts = new Date(obj.timestamp).getTime();
-        if (isNaN(ts) || ts < cutoff) { continue; }
+        if (isNaN(ts) || ts < cutoff) { return; }
         const msg = obj.message as { usage?: Partial<TokenUsage> } | undefined;
-        if (!msg?.usage) { continue; }
+        if (!msg?.usage) { return; }
         const u = msg.usage;
         const cost = calculateCost({
           input_tokens: u.input_tokens ?? 0,
@@ -71,10 +68,14 @@ async function readJsonlForHeatmap(
           hour: new Date(ts).getHours(),
         });
       } catch { /* skip malformed lines */ }
-    }
+    });
   } catch { /* skip unreadable files */ }
   return result;
 }
+
+// Max JSONL files read at once — reading every qualifying file in parallel
+// spiked extension-host memory on large histories (#47, #48)
+const READ_CONCURRENCY = 4;
 
 // ---- aggregation (exported for tests) --------------------------------------
 
@@ -145,9 +146,15 @@ export async function getHeatmapData(days = 90): Promise<HeatmapData> {
       } catch { /* skip unreadable project dirs */ }
     }
 
-    // Read all qualifying files in parallel
-    const chunks = await Promise.all(filePaths.map(fp => readJsonlForHeatmap(fp, cutoff)));
-    for (const chunk of chunks) { allEntries.push(...chunk); }
+    // Read qualifying files with bounded concurrency
+    let next = 0;
+    const workers = Array.from({ length: Math.min(READ_CONCURRENCY, filePaths.length) }, async () => {
+      while (next < filePaths.length) {
+        const chunk = await readJsonlForHeatmap(filePaths[next++], cutoff);
+        for (const entry of chunk) { allEntries.push(entry); }
+      }
+    });
+    await Promise.all(workers);
 
   } catch { /* ~/.claude/projects doesn't exist — return empty data */ }
 

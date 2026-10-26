@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import * as vscode from 'vscode';
-import { calculateCost, TokenUsage, TokenPricing, DEFAULT_PRICING } from './jsonlReader';
+import { calculateCost, forEachJsonlLine, TokenUsage, TokenPricing, DEFAULT_PRICING } from './jsonlReader';
 
 export interface ProjectCostData {
   projectName: string
@@ -37,17 +37,19 @@ async function dirMatchesWorkspace(projectDir: string, workspacePath: string): P
     const jsonlFile = files.find(f => f.endsWith('.jsonl'));
     if (!jsonlFile) { return false; }
 
-    const content = await fs.readFile(path.join(projectDir, jsonlFile), 'utf-8');
-    const lines = content.split('\n').filter(Boolean).slice(0, 30);
-    for (const line of lines) {
+    // Only the first 30 lines are inspected — stop reading there
+    let matched = false;
+    let seen = 0;
+    await forEachJsonlLine(path.join(projectDir, jsonlFile), line => {
       try {
         const obj = JSON.parse(line) as Record<string, unknown>;
-        if (obj.cwd === workspacePath) { return true; }
+        if (obj.cwd === workspacePath) { matched = true; return false; }
       } catch {
         // skip malformed lines
       }
-    }
-    return false;
+      return ++seen < 30;
+    });
+    return matched;
   } catch {
     return false;
   }
@@ -88,6 +90,9 @@ async function getProjectCostForDir(projectDir: string, projectName: string, pri
   let cost30d = 0;
   let sessionCount = 0;
   let lastActive: Date | null = null;
+  // mtime of the newest file skipped by the 30-day filter, used as a lastActive
+  // fallback when no file inside the window was read
+  let newestSkippedMtime = 0;
 
   try {
     const files = await fs.readdir(projectDir);
@@ -95,18 +100,28 @@ async function getProjectCostForDir(projectDir: string, projectName: string, pri
       if (!file.endsWith('.jsonl')) { continue; }
       sessionCount++;
 
-      const content = await fs.readFile(path.join(projectDir, file), 'utf-8');
-      for (const line of content.split('\n')) {
-        const trimmed = line.trim();
-        if (!trimmed) { continue; }
+      const filePath = path.join(projectDir, file);
+      // Transcripts are append-only, so a file untouched for 30 days holds no
+      // entries inside any window below — skip reading it
+      try {
+        const fstat = await fs.stat(filePath);
+        if (now - fstat.mtimeMs >= w30d) {
+          newestSkippedMtime = Math.max(newestSkippedMtime, fstat.mtimeMs);
+          continue;
+        }
+      } catch {
+        continue;
+      }
+
+      await forEachJsonlLine(filePath, trimmed => {
         try {
           const entry = JSON.parse(trimmed) as Record<string, unknown>;
-          if (entry.type !== 'assistant') { continue; }
-          if (typeof entry.timestamp !== 'string') { continue; }
+          if (entry.type !== 'assistant') { return; }
+          if (typeof entry.timestamp !== 'string') { return; }
 
           const msg = entry.message as Record<string, unknown> | undefined;
           const rawUsage = msg?.usage as Partial<TokenUsage> | undefined;
-          if (!rawUsage) { continue; }
+          if (!rawUsage) { return; }
 
           const usage: TokenUsage = {
             input_tokens: rawUsage.input_tokens || 0,
@@ -118,7 +133,7 @@ async function getProjectCostForDir(projectDir: string, projectName: string, pri
 
           const ts = new Date(entry.timestamp as string);
           const tsMs = ts.getTime();
-          if (isNaN(tsMs)) { continue; }
+          if (isNaN(tsMs)) { return; }
 
           const cost = calculateCost(usage, pricing);
           const ageMs = now - tsMs;
@@ -130,10 +145,14 @@ async function getProjectCostForDir(projectDir: string, projectName: string, pri
         } catch {
           // skip malformed lines
         }
-      }
+      }).catch(() => { /* skip unreadable files */ });
     }
   } catch {
     // graceful degradation
+  }
+
+  if (!lastActive && newestSkippedMtime > 0) {
+    lastActive = new Date(newestSkippedMtime);
   }
 
   return {

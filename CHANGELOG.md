@@ -9,6 +9,20 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Extension host crashes (out of memory) while Claude Code is streaming** — every append
+  to a transcript fired a full rescan, with no debounce, and overlapping rescans stacked up.
+  Each rescan read every `.jsonl` file whole into memory, several times over (usage, project
+  cost, prediction, heatmap). With large transcripts (~100 MB) the extension host hit its
+  heap limit and was killed. The fix:
+  - JSONL files are now streamed line by line instead of read whole.
+  - Watcher events are coalesced (at most one refresh per 5 s), and refreshes never overlap.
+  - Files not modified within the relevant window (7 / 30 days) are skipped without reading.
+  - Heatmap file reads are capped at 4 concurrent.
+  ([#48](https://github.com/long-910/vscode-claude-status/issues/48),
+  [#47](https://github.com/long-910/vscode-claude-status/issues/47))
+
 ---
 
 ## [0.6.3] — 2026-07-28

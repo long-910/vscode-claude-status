@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
-import { calculateCost, readJsonlFile } from '../../data/jsonlReader';
+import { calculateCost, forEachJsonlLine, readJsonlFile } from '../../data/jsonlReader';
 
 suite('JsonlReader', () => {
   test('calculateCost returns 0 for zero tokens', () => {
@@ -193,6 +193,41 @@ suite('JsonlReader', () => {
 
       const entries = await readJsonlFile(tmpFile);
       assert.strictEqual(entries.length, 2, 'entries without dedup key should all be included');
+    });
+  });
+
+  suite('forEachJsonlLine', () => {
+    let tmpFile: string;
+
+    setup(async () => {
+      tmpFile = path.join(os.tmpdir(), `jsonlReader-lines-${Date.now()}.jsonl`);
+    });
+
+    teardown(async () => {
+      try { await fs.unlink(tmpFile); } catch { /* ignore */ }
+    });
+
+    test('yields trimmed non-empty lines, handling CRLF', async () => {
+      await fs.writeFile(tmpFile, '{"a":1}\r\n\r\n  {"b":2}  \n\n{"c":3}');
+      const lines: string[] = [];
+      await forEachJsonlLine(tmpFile, line => { lines.push(line); });
+      assert.deepStrictEqual(lines, ['{"a":1}', '{"b":2}', '{"c":3}']);
+    });
+
+    test('stops reading when the callback returns false', async () => {
+      await fs.writeFile(tmpFile, ['1', '2', '3', '4'].join('\n'));
+      const lines: string[] = [];
+      await forEachJsonlLine(tmpFile, line => { lines.push(line); return lines.length < 2; });
+      assert.deepStrictEqual(lines, ['1', '2']);
+    });
+
+    test('rejects for a missing file', async () => {
+      await assert.rejects(forEachJsonlLine(path.join(os.tmpdir(), 'does-not-exist-claude-status.jsonl'), () => {}));
+    });
+
+    test('readJsonlFile returns [] for a missing file', async () => {
+      const entries = await readJsonlFile(path.join(os.tmpdir(), 'does-not-exist-claude-status.jsonl'));
+      assert.deepStrictEqual(entries, []);
     });
   });
 });

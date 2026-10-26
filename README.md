@@ -242,7 +242,7 @@ All settings are under the `claudeStatus` namespace in VS Code Settings.
 | `claudeStatus.notifications.rateLimitWarningThresholdMinutes` | `number` (5–120) | `30` | Minutes before limit to show warning |
 | `claudeStatus.notifications.budgetWarning` | `boolean` | `true` | Warn when budget threshold exceeded |
 | `claudeStatus.heatmap.days` | `30 \| 60 \| 90` | `90` | Days shown in usage heatmap |
-| `claudeStatus.claudeHome` | `string` | `".claude"` | Claude Code data directory. Relative to home dir; absolute paths and `~` supported. On macOS the Keychain fallback always reads the default profile |
+| `claudeStatus.claudeHome` | `string` | `".claude"` | Claude Code data directory. Relative to home dir; absolute paths and `~` supported. User settings only. On macOS the Keychain fallback always reads the default profile |
 | `claudeStatus.credentials.path` | `string \| null` | `null` | Custom credentials file path |
 | `claudeStatus.claudeProvider` | `"auto"` \| `"claude-ai"` \| `"aws-bedrock"` \| `"api-key"` | `"auto"` | Provider type (auto-detect or explicit) |
 | `claudeStatus.pricing.inputPerMillion` | `number` | `3.00` | USD per 1M input tokens |

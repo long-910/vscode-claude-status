@@ -222,7 +222,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | `claudeStatus.notifications.rateLimitWarningThresholdMinutes` | `number` (5–120) | `30` | 制限の何分前に警告を表示 |
 | `claudeStatus.notifications.budgetWarning` | `boolean` | `true` | 予算閾値超過時に警告 |
 | `claudeStatus.heatmap.days` | `30 \| 60 \| 90` | `90` | 使用ヒートマップに表示する日数 |
-| `claudeStatus.claudeHome` | `string` | `".claude"` | Claude Code データディレクトリ（相対パスはホーム基準、絶対パス・`~` 可）。macOS の Keychain フォールバックは常に既定プロファイルを参照 |
+| `claudeStatus.claudeHome` | `string` | `".claude"` | Claude Code データディレクトリ（相対パスはホーム基準、絶対パス・`~` 可）。ユーザー設定のみ。macOS の Keychain フォールバックは常に既定プロファイルを参照 |
 | `claudeStatus.credentials.path` | `string \| null` | `null` | カスタム認証情報ファイルパス |
 | `claudeStatus.claudeProvider` | `"auto"` \| `"claude-ai"` \| `"aws-bedrock"` \| `"api-key"` | `"auto"` | プロバイダータイプ（自動検出または明示的指定） |
 | `claudeStatus.pricing.inputPerMillion` | `number` | `3.00` | 入力トークン 1M あたりの USD 単価 |

@@ -290,6 +290,8 @@ All settings are under the `claudeStatus` namespace in VS Code Settings.
 | Pricing & Settings card in dashboard | ✅ v0.4.0 |
 | i18n — English / Japanese / Chinese | ✅ v0.4.1 |
 | macOS Keychain credential fallback (Claude Code v2.x+) | ✅ v0.6.0 |
+| Configurable Claude Code data directory (`claudeStatus.claudeHome`) | ✅ v0.7.0 |
+| Extension host OOM fix — incremental JSONL reads, coalesced watcher | ✅ v0.7.0 |
 
 ---
 

@@ -265,6 +265,8 @@ npm run package       # → vscode-claude-status-*.vsix
 | 仪表板内定价与设置卡片 | ✅ v0.4.0 |
 | i18n — 英语 / 日语 / 中文 | ✅ v0.4.1 |
 | macOS 钥匙串凭证回退（Claude Code v2.x+） | ✅ v0.6.0 |
+| 可配置 Claude Code 数据目录（`claudeStatus.claudeHome`） | ✅ v0.7.0 |
+| 扩展宿主 OOM 崩溃修复 — 增量 JSONL 读取、监视器事件合并 | ✅ v0.7.0 |
 
 ---
 

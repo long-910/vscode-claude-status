@@ -217,7 +217,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | `claudeStatus.notifications.rateLimitWarningThresholdMinutes` | `number` (5–120) | `30` | 限制前多少分钟发出警告 |
 | `claudeStatus.notifications.budgetWarning` | `boolean` | `true` | 超过预算阈值时发出警告 |
 | `claudeStatus.heatmap.days` | `30 \| 60 \| 90` | `90` | 使用热力图显示的天数 |
-| `claudeStatus.claudeHome` | `string` | `".claude"` | Claude Code 数据目录（相对路径基于主目录，支持绝对路径和 `~`） |
+| `claudeStatus.claudeHome` | `string` | `".claude"` | Claude Code 数据目录（相对路径基于主目录，支持绝对路径和 `~`）。仅限用户设置。macOS 的钥匙串回退始终读取默认配置 |
 | `claudeStatus.credentials.path` | `string \| null` | `null` | 自定义凭证文件路径 |
 | `claudeStatus.claudeProvider` | `"auto"` \| `"claude-ai"` \| `"aws-bedrock"` \| `"api-key"` | `"auto"` | 提供商类型（自动检测或显式指定） |
 | `claudeStatus.pricing.inputPerMillion` | `number` | `3.00` | 每百万输入令牌的 USD 单价 |

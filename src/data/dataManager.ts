@@ -261,6 +261,8 @@ export class DataManager {
   restartWatching(): void {
     // The data directory changed — drop transcripts indexed from the old one
     clearUsageIndex();
+    this.lastHeatmapData = null;
+    this.heatmapComputedAt = 0;
     this.watcher?.dispose();
     this.startWatching();
   }
@@ -291,8 +293,11 @@ export class DataManager {
     if (this.lastHeatmapData && now - this.heatmapComputedAt < this.heatmapTtlMs) {
       return this.lastHeatmapData;
     }
+    const projectsDir = getClaudeProjectsDir();
     try {
       const data = await computeHeatmapData(config.heatmapDays);
+      // The data directory changed mid-computation — recompute from the new one
+      if (projectsDir !== getClaudeProjectsDir()) { return this.getHeatmapData(); }
       this.lastHeatmapData = data;
       this.heatmapComputedAt = now;
       return data;

@@ -147,12 +147,14 @@ What the status bar and dashboard show, depending on your Claude plan and key se
   "claudeStatus.claudeHome": {
     "type": "string",
     "default": ".claude",
+    "scope": "machine",
     "description": "Claude Code data directory (projects, credentials, cache). Relative paths resolve against the home directory; absolute paths and ~ are supported. Default: .claude (~/.claude)."
   },
 
   "claudeStatus.credentials.path": {
     "type": ["string", "null"],
     "default": null,
+    "scope": "machine",
     "description": "Custom path to Claude credentials file. Leave null to use default (~/.claude/.credentials.json)."
   },
 
@@ -196,6 +198,17 @@ What the status bar and dashboard show, depending on your Claude plan and key se
   }
 }
 ```
+
+### Data directory notes
+
+- `claudeStatus.claudeHome` and `claudeStatus.credentials.path` are `machine`-scoped: they can be
+  set in user (or remote) settings only, never in a workspace's `.vscode/settings.json`, so an
+  opened repository cannot redirect where the extension reads credentials or writes its cache.
+- On macOS, when no `.credentials.json` exists in the data directory, the extension falls back to
+  the default Keychain entry (`Claude Code-credentials`). That entry belongs to the default
+  `~/.claude` profile, so with a custom `claudeHome` the rate-limit numbers may come from a
+  different account than the token cost. Point `claudeStatus.credentials.path` at the profile's
+  credentials file if this matters.
 
 ---
 

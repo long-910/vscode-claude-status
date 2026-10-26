@@ -15,9 +15,6 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- `claudeStatus.claudeHome` and `claudeStatus.credentials.path` are now `machine`-scoped, so a
-  workspace's `.vscode/settings.json` can no longer redirect where credentials are read from or
-  where the cache is written.
 - Project cost and prediction now deduplicate streaming entries by `requestId` /
   `message.id`, like the status bar totals already did since 0.5.x
   ([#31](https://github.com/long-910/vscode-claude-status/issues/31)). Their values may be
@@ -25,9 +22,6 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- The usage heatmap now switches to the new data directory immediately when
-  `claudeStatus.claudeHome` changes, instead of showing the old directory's data for up to
-  5 minutes.
 - **Extension host crashes (out of memory) while Claude Code is streaming** — every append
   to a transcript fired a full rescan, with no debounce, and overlapping rescans stacked up.
   Each rescan read every `.jsonl` file whole into memory, several times over (usage, project

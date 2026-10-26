@@ -173,6 +173,7 @@
         "claudeStatus.claudeHome": {
           "type": "string",
           "default": ".claude",
+          "scope": "machine",
           "description": "%config.claudeHome.desc%"
         },
         "claudeStatus.credentials.path": {
@@ -181,6 +182,7 @@
             "null"
           ],
           "default": null,
+          "scope": "machine",
           "description": "%config.credentials.path.desc%"
         },
         "claudeStatus.claudeProvider": {

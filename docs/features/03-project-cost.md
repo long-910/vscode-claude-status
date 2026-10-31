@@ -12,112 +12,43 @@ This is the most differentiated feature from the tmux version.
 
 ## Workspace Detection
 
-```typescript
-async function getAllProjectCosts(pricing: TokenPricing): Promise<ProjectCostData[]> {
-  const folders = vscode.workspace.workspaceFolders ?? []
-  if (folders.length === 0) return []
-
-  const results = await Promise.all(
-    folders.map(async folder => {
-      const workspacePath = folder.uri.fsPath
-      const projectDir = await workspacePathToProjectDir(workspacePath)
-      if (!projectDir) return null
-      const projectName = path.basename(workspacePath)
-      return getProjectCostForDir(projectDir, projectName, pricing)
-    })
-  )
-
-  return results
-    .filter((r): r is ProjectCostData => r !== null)
-    .sort((a, b) => b.costToday - a.costToday)
-}
-```
+`getAllProjectCosts(options: CostOptions)` (`src/data/projectCost.ts`) maps every workspace
+folder to its Claude Code project directory and returns one `ProjectCostData` per match,
+sorted by today's cost. Folders without a matching directory are skipped.
 
 ### Path Mapping Logic
 
-Claude Code converts workspace paths by replacing **every non-alphanumeric character** with `-`:
+Claude Code names a project directory after the workspace path, replacing **every
+non-alphanumeric character** with `-`:
 
 ```
-/home/user/sb_git/my-app  →  -home-user-sb-git-my-app
+/home/user/sb_git/my-app  →  <claudeHome>/projects/-home-user-sb-git-my-app
 ```
 
-```typescript
-export function workspacePathToHash(workspacePath: string): string {
-  return workspacePath.replace(/[^a-zA-Z0-9]/g, '-')  // NOT just '/'
-}
+`workspacePathToProjectDir()` tries, in order:
 
-export async function workspacePathToProjectDir(workspacePath: string): Promise<string | null> {
-  const claudeProjectsDir = path.join(os.homedir(), '.claude', 'projects')
+1. **Direct conversion** — `workspacePathToHash()` (`path.replace(/[^a-zA-Z0-9]/g, '-')`);
+   used when that directory exists.
+2. **`cwd` scan** — for each project directory, stream the first 30 lines of one transcript
+   (`forEachJsonlLine()`, stops early) and match the top-level `cwd` field against the
+   workspace path.
 
-  // Strategy 1: Direct path conversion (Claude Code's known scheme)
-  const hash = workspacePathToHash(workspacePath)
-  const candidate = path.join(claudeProjectsDir, hash)
-  if (await dirExists(candidate)) return candidate
-
-  // Strategy 2: Scan all project dirs and match by top-level cwd field in JSONL
-  try {
-    const dirs = await fs.readdir(claudeProjectsDir)
-    for (const dir of dirs) {
-      const projectPath = path.join(claudeProjectsDir, dir)
-      if (!(await dirExists(projectPath))) continue
-      if (await dirMatchesWorkspace(projectPath, workspacePath)) return projectPath
-    }
-  } catch {
-    // graceful degradation if projects dir is unreadable
-  }
-
-  return null
-}
-
-async function dirMatchesWorkspace(projectDir: string, workspacePath: string): Promise<boolean> {
-  // Check top-level cwd field in first 30 lines of any JSONL in the directory
-  try {
-    const files = await fs.readdir(projectDir)
-    const jsonlFile = files.find(f => f.endsWith('.jsonl'))
-    if (!jsonlFile) return false
-
-    const content = await fs.readFile(path.join(projectDir, jsonlFile), 'utf-8')
-    const lines = content.split('\n').filter(Boolean).slice(0, 30)
-    for (const line of lines) {
-      try {
-        const obj = JSON.parse(line) as Record<string, unknown>
-        if (obj.cwd === workspacePath) return true
-      } catch { /* skip malformed lines */ }
-    }
-    return false
-  } catch {
-    return false
-  }
-}
-```
+Returns `null` when neither matches (graceful degradation if the projects directory is
+missing or unreadable).
 
 ---
 
 ## Cost Aggregation
 
-> [!WARNING]
-> Token costs shown here are **estimates only**, calculated from Anthropic's
-> publicly announced pricing at the time of implementation.
-> Rates may change — update `claudeStatus.pricing.*` settings if needed.
-> See [DATA.md](../DATA.md) for the full rate table.
+`getProjectCostForDir()` reads the project's transcripts through the shared usage index
+(only files modified in the last 30 days; appended bytes only), prices each entry with the
+same `CostOptions` as every other view ([PRICING.md](../PRICING.md)), and accumulates:
 
-```typescript
-async function getProjectCostForDir(
-  projectDir: string,
-  projectName: string,
-  pricing: TokenPricing
-): Promise<ProjectCostData> {
-  // Reads all .jsonl files in the directory
-  // Parses type === 'assistant' entries only
-  // Usage is at entry.message.usage (NOT entry.usage; no costUSD field)
-  // Accumulates: costToday, cost7d, cost30d, sessionCount, lastActive
-}
-```
-
-Key points:
-- `sessionCount` = number of `.jsonl` files in the project directory
-- `lastActive` = most recent timestamp across all entries
-- Cost always calculated from tokens via `calculateCost(usage, pricing)`
+| Field | Meaning |
+|---|---|
+| `costToday` / `cost7d` / `cost30d` | cost since local midnight / in the last 7 / 30 days |
+| `sessionCount` | number of `.jsonl` files in the project directory |
+| `lastActive` | newest entry timestamp; falls back to the newest transcript mtime when nothing is inside 30 days |
 
 ---
 

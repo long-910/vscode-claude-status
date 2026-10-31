@@ -37,6 +37,16 @@ Lightweight, non-blocking, updates automatically.
 🤖 5h:$14.21 7d:$53.17 | my-app:$3.21
 ```
 
+### Pay-as-you-go with `payAsYouGo.showTimeWindows: false`
+```
+🤖 Today:$14.21 | my-app:$3.21
+```
+
+### Meter (`statusBar.showSparkline: true`, percent mode)
+```
+🤖 5h:▰▰▰▱▱ 62% 7d:41%
+```
+
 ### No data yet (initial state)
 ```
 🤖 Claude: run refresh
@@ -51,12 +61,9 @@ Lightweight, non-blocking, updates automatically.
 
 ## Provider Behavior
 
-| Provider | Rate % shown | Mode |
-|----------|-------------|------|
-| `claude-ai`, API enabled | Yes | percent (default) or cost |
-| `claude-ai`, API disabled, cache exists | Yes (stale) | percent with `[X ago]` (m / h / d) |
-| `claude-ai`, API disabled, no cache | No | cost only |
-| `aws-bedrock` / `api-key` / `unknown` | No | cost only (always) |
+Which of the formats above appears for each plan is listed in
+[PLANS.md](../PLANS.md#what-each-provider-shows). In short: percentages only for `claude-ai`;
+every other provider is always in cost mode.
 
 ---
 
@@ -144,6 +151,7 @@ Token Cost (local)
 5h:   in:38.5K out:127.8K  $14.21
 day:  $14.21
 7d:   $53.17
+This month: $121.40 / $400.00 (30%)     ← "/ budget (%)" only with budget.monthlyUsd
 
 Project: my-app
   Today: $3.21  |  7d: $18.45
@@ -162,17 +170,13 @@ Token Cost (local)
 5h:   in:38.5K out:127.8K  $14.21
 day:  $14.21
 7d:   $53.17
+This month: $121.40
 
 Last updated: just now
 Click to open dashboard →
 ```
 
-### Pay-as-you-go without time windows
-
-5h / 7d windows are Claude.ai subscription rate limits. With
-`claudeStatus.payAsYouGo.showTimeWindows: false`, non-claude-ai providers (API key, AWS
-Bedrock, usage-based Claude.ai plans such as usage-based Enterprise, unknown) show today's cost instead — label `🤖 Today:$14.21 | my-app:$3.21`,
-tooltip:
+### Pay-as-you-go without time windows (`payAsYouGo.showTimeWindows: false`)
 ```
 Claude Code (API Key)
 ─────────────────────────────
@@ -180,13 +184,12 @@ Claude Code (API Key)
 Token Cost (local)
 ─────────────────────────────
 Today: $14.21
+This month: $121.40
 
 Last updated: just now
 Click to open dashboard →
 ```
-Claude.ai subscriptions and custom `statusBar.format` strings are not affected. The sidebar
-Token Cost section and the dashboard follow the same setting (the dashboard hides the
-Current Usage card, the 5h / 7d rows and the 5h token breakdown).
+Applies to every non-`claude-ai` provider; see [PLANS.md](../PLANS.md#pay-as-you-go-usage-based-claudeai-api-key-bedrock).
 
 Build with `\n`-separated string. VSCode renders tooltip as plain text.
 
@@ -221,16 +224,8 @@ Users can override the auto-generated label with a template string containing pl
 // → Claude Usage 5h:35% 7d:72%
 ```
 
-### Available placeholders
-
-| Placeholder | Resolves to |
-|-------------|-------------|
-| `${usage5h}` | 5h utilization as integer 0–100 (always `0` for non-claude-ai) |
-| `${usage7d}` | 7d utilization as integer 0–100 (`0` if no 7d window) |
-| `${cost5h}` | 5h local token cost, USD 2 d.p. (e.g. `1.23`) |
-| `${cost7d}` | 7d local token cost, USD 2 d.p. |
-| `${costDay}` | Today's local token cost, USD 2 d.p. |
-| `${costMonth}` | This calendar month's local token cost, USD 2 d.p. |
+Placeholders (`${usage5h}`, `${bar5h}`, `${costDay}`, `${costMonth}`, …) are listed in
+[SETTINGS.md](../SETTINGS.md#placeholders).
 
 ### Priority and fallback rules
 

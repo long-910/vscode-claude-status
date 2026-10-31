@@ -39,9 +39,9 @@
 > 无缓存时，仅显示费用。
 
 > [!WARNING]
-> **费用数据为估算值。** 默认单价基于实现时 Anthropic 的公开定价，可能不反映最新变化。
-> 如定价有变，请更新 `claudeStatus.pricing.*` 设置以匹配
-> [Anthropic 定价页面](https://www.anthropic.com/pricing) 的最新费率。
+> **费用数据为估算值。** 根据本地会话记录，按 Anthropic 的 API 标价（2026-10-31 核对）计算。
+> 不含协议折扣、席位费以及合作平台（Bedrock / Vertex）的定价。
+> 新模型或价格调整可通过 `claudeStatus.pricing.modelOverrides` 设置 — 参见 [docs/PRICING.md](docs/PRICING.md)。
 
 ---
 
@@ -58,7 +58,9 @@
 | 达到速率限制 | `🤖 5h:100%✗` |
 | 仅 5 小时套餐（无 7d 窗口） | `🤖 5h:45%` |
 | 费用模式 | `🤖 5h:$14.21 7d:$53.17` |
-| AWS Bedrock / API 密钥（仅费用） | `🤖 5h:$0.15 7d:$0.42` |
+| 按量付费（API 密钥、Bedrock、按量付费 Enterprise） | `🤖 5h:$0.15 7d:$0.42` |
+| 按量付费且 `payAsYouGo.showTimeWindows: false` | `🤖 Today:$0.15` |
+| 带进度条（`statusBar.showSparkline`） | `🤖 5h:▰▰▰▱▱ 62% 7d:41%` |
 | 含项目费用 | `🤖 5h:78% 7d:84% \| my-app:$3.21` |
 | 缓存过期 | `🤖 5h:78% 7d:84% [10m ago]` |
 | 未登录 | `🤖 Not logged in` |
@@ -67,7 +69,7 @@
 
 ### 🧭 侧边栏概览 *(VS Code 原生)*
 
-通过活动栏的专用图标打开原生树视图，查看速率限制窗口、令牌费用（5h / 今日 / 7d）、
+通过活动栏的专用图标打开原生树视图，查看速率限制窗口、令牌费用（5h / 今日 / 7d / 本月及月预算）、
 按项目费用和快捷操作 — 无需打开仪表板即可查看关键数据。
 
 ### 🗂 仪表板面板
@@ -75,11 +77,11 @@
 点击状态栏项可打开功能丰富的仪表板面板，包含：
 
 - **当前用量** — 5 小时和 7 天窗口的彩色进度条
-- **令牌费用** — 5 小时 / 今日 / 7 天 / 月度（估算）费用；展开**令牌明细**可查看各类型（输入 / 输出 / 缓存读取 / 缓存创建）的令牌数、5 小时内按模型的费用及缓存命中率
+- **令牌费用** — 5 小时 / 今日 / 7 天 / 本月 / 月度（估算）费用；展开**令牌明细**可查看各类型（输入 / 输出 / 缓存读取 / 缓存创建）的令牌数、5 小时内按模型的费用及缓存命中率
 - **项目费用** — 按工作区细分（今日 / 7 天 / 30 天）
-- **预测** — 消耗速率（$/小时）、耗尽时间、日 / 周预算跟踪；**速率限制时间线图**可视化从当前到重置的 5h 利用率预测
+- **预测** — 消耗速率（$/小时）、耗尽时间、日 / 周 / 月预算跟踪；**速率限制时间线图**可视化从当前到重置的 5h 利用率预测
 - **定价与设置** — 始终显示当前令牌单价、提供商、API 状态和缓存 TTL；一键打开 VS Code 设置
-- **使用历史** — GitHub 风格的每日热力图 + 每小时规律柱状图
+- **使用历史** — GitHub 风格的每日热力图 + 每小时规律柱状图 + 星期 × 小时打卡图
 
 面板原生支持 VS Code 的浅色、深色和高对比度主题。
 
@@ -108,7 +110,7 @@
 - **日预算** — 可设置 USD 上限；达到配置阈值（默认 80%）时触发进度条和告警
 - **周预算** — 可选的每周 USD 上限（`claudeStatus.budget.weeklyUsd`）与进度条
 - **月预算** — 可选的自然月 USD 上限（`claudeStatus.budget.monthlyUsd`），例如用于跟踪按量付费 Enterprise 的支出限额；“本月”累计也显示在侧边栏和提示中
-- **VS Code 通知** — ≤30 分钟时非阻塞警告，≤10 分钟时带"打开仪表板"操作的错误对话框；预算告警每个窗口触发一次
+- **VS Code 通知** — ≤30 分钟时非阻塞警告，≤10 分钟时带"打开仪表板"操作的错误对话框；预算告警每天 / 每月最多一次
 
 通过**设置 → Claude Status** 或命令面板进行配置：
 
@@ -131,40 +133,28 @@ Claude Status: Set Budget...
 ## 系统要求
 
 - **VS Code** 1.73 或更高版本
-- **Claude Code CLI** 且有活跃会话 — 扩展从 `~/.claude/projects/**/*.jsonl` 读取令牌费用数据
-
-**认证方式取决于提供商（可选）：**
-
-| 提供商 | 认证方式 | 显示内容 |
-|--------|---------|---------|
-| Claude.ai 订阅 | `claude login` — v2.x+（Mac）凭证存储于 macOS 钥匙串，旧版本使用 `~/.claude/.credentials.json`，均自动检测 | 速率限制 % + 费用 |
-| Claude.ai 按量付费方案（如按量付费 Enterprise） | `claude login`；根据 Claude Code 账户信息（`billingType: "usage_based"`）自动检测 | 仅费用（API 费率） |
-| AWS Bedrock | AWS 凭证（环境变量或 `~/.aws/`） | 仅费用 |
-| Anthropic API 密钥 | `ANTHROPIC_API_KEY` 环境变量 | 仅费用 |
+- **Claude Code** 至少有一个会话 — 令牌费用从
+  `~/.claude/projects/**/*.jsonl`（或 `claudeStatus.claudeHome`）读取
 
 ---
 
-## 套餐兼容性
+## 支持的方案
 
-> **注意：** 本扩展由作者在 **Claude.ai Pro 套餐**（同时提供 5 小时和 7 天速率限制窗口）上开发和测试。
->
-> AWS Bedrock、直接 API 密钥、Claude.ai Free 及仅有 5 小时窗口的套餐等其他套餐和提供商，通过自动检测以尽力支持的方式提供。如在您的套餐上遇到意外行为，请[提交 Issue](https://github.com/long-910/vscode-claude-status/issues) 并注明套餐类型，我们会及时跟进处理。
+方案会自动识别，无需额外登录。
 
-**各套餐类型的行为：**
+| 方案 | 识别依据 | 状态栏 | 速率限制 API |
+|---|---|---|---|
+| Claude.ai Pro / Max、席位制 Team / Enterprise | `claude login` 凭证（`~/.claude/.credentials.json` 或 macOS 钥匙串） | `5h:45% 7d:32%` — 没有每周窗口的方案自动隐藏 7d | 仅在 Claude Code 运行时，最多每 5 分钟一次 |
+| 按量付费的 Claude.ai 方案（如按量付费 Enterprise） | Claude Code 账户信息（`~/.claude.json` 中的 `billingType: "usage_based"`） | 仅费用 | 从不调用 |
+| Anthropic API 密钥 | `ANTHROPIC_API_KEY` | 仅费用 | 从不调用 |
+| AWS Bedrock | AWS 环境变量 | 仅费用 | 从不调用 |
 
-| 套餐 | 速率限制显示 | 7d 窗口 |
-|------|------------|--------|
-| Claude.ai Pro / Max（5h + 7d） | `5h:45% 7d:32%` | ✅ |
-| Claude.ai Pro / 仅 5h 套餐 | `5h:45%` | 自动隐藏 |
-| Claude.ai 按量付费（如按量付费 Enterprise） | 仅费用（`5h:$0.15 7d:$0.42`，`payAsYouGo.showTimeWindows: false` 时为 `Today:$0.15`） | N/A |
-| AWS Bedrock | 仅费用（`5h:$0.15 7d:$0.42`） | N/A |
-| Anthropic API 密钥 | 仅费用 | N/A |
+按量付费方案可通过 `claudeStatus.payAsYouGo.showTimeWindows: false` 显示今日费用代替 5h / 7d，
+并通过 `claudeStatus.budget.monthlyUsd` 跟踪支出限额。识别有误时请设置 `claudeStatus.claudeProvider`。
+详情：[docs/PLANS.md](docs/PLANS.md)（英文）。
 
-按量付费的 Claude.ai 方案（席位费 + 全部用量按标准 API 费率计费，无按席位的 5 小时 / 每周限额）与 Claude Code
-本身的判断方式相同，根据 `~/.claude.json` 中的 `oauthAccount.billingType` 检测。此时仅显示费用，且**完全不调用速率限制 API**。
-有用量限额的席位制 Team / Enterprise 仍正常显示速率限制。费用为按 API 标价的估算，不含协议折扣和席位费。
-
-如果自动检测无法正常工作，请在 VS Code 设置中显式设置 `claudeStatus.claudeProvider`。
+> 作者在 Claude.ai Pro 方案上开发和测试；其他方案为尽力支持。如有异常，请附上方案类型
+> [提交 Issue](https://github.com/long-910/vscode-claude-status/issues)。
 
 ---
 
@@ -213,54 +203,67 @@ npm run package       # → vscode-claude-status-*.vsix
 
 ## 配置
 
-所有设置均在 VS Code 设置的 `claudeStatus` 命名空间下。
+所有设置均位于 VS Code 设置的 `claudeStatus` 命名空间下。完整参考：
+[docs/SETTINGS.md](docs/SETTINGS.md)（英文）。
 
-| 设置 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `claudeStatus.displayMode` | `"percent"` \| `"cost"` | `"percent"` | 状态栏显示模式 |
-| `claudeStatus.statusBar.alignment` | `"left"` \| `"right"` | `"left"` | 状态栏位置 |
-| `claudeStatus.statusBar.showProjectCost` | `boolean` | `true` | 在状态栏显示项目费用 |
-| `claudeStatus.statusBar.format` | `string \| null` | `null` | 自定义标签模板。占位符：`${usage5h}`, `${usage7d}`, `${bar5h}`, `${bar7d}`, `${cost5h}`, `${cost7d}`, `${costDay}`, `${costMonth}`。`null` = 默认自动生成 |
-| `claudeStatus.statusBar.showSparkline` | `boolean` | `false` | 在状态栏显示紧凑的 5h 利用率仪表（▰▰▰▱▱） |
-| `claudeStatus.payAsYouGo.showTimeWindows` | `boolean` | `true` | 按量付费（API 密钥、Bedrock）时显示 5h / 7d 窗口用量。关闭后改为显示今日费用（不影响订阅） |
-| `claudeStatus.cache.ttlSeconds` | `number` (60–3600) | `300` | API 缓存 TTL（秒） |
-| `claudeStatus.rateLimitApi.enabled` | `boolean` | `true` | 从 Anthropic API 获取速率限制 %。禁用时停止新的 API 调用；若有缓存，仍以 `[Xm ago]` 显示 % |
-| `claudeStatus.realtime.enabled` | `boolean` | `false` | 每隔 TTL 秒轮询速率限制 API（需启用 `rateLimitApi.enabled`） |
-| `claudeStatus.budget.dailyUsd` | `number \| null` | `null` | 每日预算（USD）（`null` = 禁用） |
-| `claudeStatus.budget.weeklyUsd` | `number \| null` | `null` | 每周预算（USD） |
-| `claudeStatus.budget.monthlyUsd` | `number \| null` | `null` | 自然月预算（USD，达到阈值时每月提醒一次） |
-| `claudeStatus.budget.alertThresholdPercent` | `number` (1–100) | `80` | 预算告警阈值（%） |
-| `claudeStatus.notifications.rateLimitWarning` | `boolean` | `true` | 速率限制临近时发出警告 |
-| `claudeStatus.notifications.rateLimitWarningThresholdMinutes` | `number` (5–120) | `30` | 限制前多少分钟发出警告 |
-| `claudeStatus.notifications.budgetWarning` | `boolean` | `true` | 超过预算阈值时发出警告 |
-| `claudeStatus.heatmap.days` | `30 \| 60 \| 90` | `90` | 使用热力图显示的天数 |
-| `claudeStatus.claudeHome` | `string` | `".claude"` | Claude Code 数据目录（相对路径基于主目录，支持绝对路径和 `~`）。仅限用户设置。macOS 的钥匙串回退始终读取默认配置 |
-| `claudeStatus.credentials.path` | `string \| null` | `null` | 自定义凭证文件路径 |
-| `claudeStatus.claudeProvider` | `"auto"` \| `"claude-ai"` \| `"claude-ai-usage"` \| `"aws-bedrock"` \| `"api-key"` | `"auto"` | 提供商类型（自动检测或显式指定；`claude-ai-usage` = 按量付费的 Claude.ai 方案） |
-| `claudeStatus.pricing.inputPerMillion` | `number` | `3.00` | 每百万输入令牌的 USD 单价 |
-| `claudeStatus.pricing.outputPerMillion` | `number` | `15.00` | 每百万输出令牌的 USD 单价 |
-| `claudeStatus.pricing.cacheReadPerMillion` | `number` | `0.30` | 每百万缓存读取令牌的 USD 单价 |
-| `claudeStatus.pricing.cacheCreatePerMillion` | `number` | `3.75` | 每百万缓存创建令牌的 USD 单价 |
-| `claudeStatus.pricing.useModelPricing` | `boolean` | `true` | 按模型使用内置费率计价；上述四项适用于无法识别的模型（为 `false` 时适用于全部记录） |
-| `claudeStatus.pricing.modelOverrides` | `object` | `{}` | 用于新模型或价格调整的按模型费率，例如 `{ "claude-opus-6": { "inputPerMillion": 4, "outputPerMillion": 20 } }` |
+### 显示
+
+| 设置 | 默认值 | 说明 |
+|------|--------|------|
+| `claudeStatus.displayMode` | `"percent"` | 状态栏显示 `"percent"`（%）或 `"cost"`（$） |
+| `claudeStatus.statusBar.alignment` | `"left"` | `"left"` 或 `"right"` |
+| `claudeStatus.statusBar.showProjectCost` | `true` | 在状态栏显示当前项目费用 |
+| `claudeStatus.statusBar.format` | `null` | 自定义标签，例如 `"${usage5h}% \| $${costDay}"`。占位符：`${usage5h}`, `${usage7d}`, `${bar5h}`, `${bar7d}`, `${cost5h}`, `${cost7d}`, `${costDay}`, `${costMonth}` |
+| `claudeStatus.statusBar.showSparkline` | `false` | 在百分比旁显示紧凑的 5h 进度条（▰▰▰▱▱） |
+| `claudeStatus.payAsYouGo.showTimeWindows` | `true` | 按量付费方案设为 `false` 时显示今日费用代替 5h / 7d（不影响订阅） |
+| `claudeStatus.heatmap.days` | `90` | 使用历史热力图天数（30 / 60 / 90） |
+
+### 方案、数据源与 API
+
+| 设置 | 默认值 | 说明 |
+|------|--------|------|
+| `claudeStatus.claudeProvider` | `"auto"` | `"auto"`、`"claude-ai"`、`"claude-ai-usage"`（按量付费的 Claude.ai 方案）、`"aws-bedrock"`、`"api-key"` |
+| `claudeStatus.claudeHome` | `".claude"` | Claude Code 数据目录（相对主目录；支持绝对路径和 `~`）。仅用户设置 |
+| `claudeStatus.credentials.path` | `null` | 自定义凭证文件路径。仅用户设置 |
+| `claudeStatus.rateLimitApi.enabled` | `true` | 获取速率限制 %（订阅）。关闭后不调用 API，继续显示上次缓存的 % 并附 `[Xm ago]` |
+| `claudeStatus.cache.ttlSeconds` | `300` | 速率限制缓存 TTL（60–3600 秒） |
+| `claudeStatus.realtime.enabled` | `false` | 尚未实现 — 无任何效果 |
+
+### 预算与通知
+
+| 设置 | 默认值 | 说明 |
+|------|--------|------|
+| `claudeStatus.budget.dailyUsd` | `null` | 每日预算（USD，`null` = 关闭） |
+| `claudeStatus.budget.weeklyUsd` | `null` | 最近 7 天的预算（仪表板进度条） |
+| `claudeStatus.budget.monthlyUsd` | `null` | 自然月预算，例如 Enterprise 的支出限额 |
+| `claudeStatus.budget.alertThresholdPercent` | `80` | 达到每日 / 每月预算的此百分比时提醒 |
+| `claudeStatus.notifications.budgetWarning` | `true` | 预算通知（每天 / 每月最多一次） |
+| `claudeStatus.notifications.rateLimitWarning` | `true` | 5h 限额即将用尽前提醒（订阅） |
+| `claudeStatus.notifications.rateLimitWarningThresholdMinutes` | `30` | 提前多少分钟提醒（5–120） |
+
+### 定价
+
+| 设置 | 默认值 | 说明 |
+|------|--------|------|
+| `claudeStatus.pricing.useModelPricing` | `true` | 按模型使用内置费率计价 |
+| `claudeStatus.pricing.modelOverrides` | `{}` | 按模型的准确费率，例如 `{ "claude-opus-6": { "inputPerMillion": 4, "outputPerMillion": 20 } }` |
+| `claudeStatus.pricing.inputPerMillion` | `3.00` | 手动费率（USD / 百万令牌），用于无法识别的模型，或关闭按模型计价时的全部记录 |
+| `claudeStatus.pricing.outputPerMillion` | `15.00` | 〃 |
+| `claudeStatus.pricing.cacheReadPerMillion` | `0.30` | 〃 |
+| `claudeStatus.pricing.cacheCreatePerMillion` | `3.75` | 〃 |
 
 ```jsonc
-// 示例: settings.json
+// 示例：每月支出限额 $400 的按量付费 Enterprise
+{
+  "claudeStatus.payAsYouGo.showTimeWindows": false,   // 显示 🤖 Today:$3.21 代替 5h / 7d
+  "claudeStatus.budget.monthlyUsd": 400,
+  "claudeStatus.budget.dailyUsd": 30
+}
+
+// 示例：Claude.ai 订阅，显示费用，不对外调用 API
 {
   "claudeStatus.displayMode": "cost",
-  "claudeStatus.cache.ttlSeconds": 120,
-  "claudeStatus.budget.dailyUsd": 5.00,
-  "claudeStatus.budget.alertThresholdPercent": 80,
-  "claudeStatus.statusBar.showProjectCost": true,
-  // AWS Bedrock 用户 — 跳过 OAuth 检测，仅显示费用：
-  "claudeStatus.claudeProvider": "aws-bedrock",
-  // 禁用新的速率限制 API 调用（有缓存时仍显示带过期提示的 %）：
-  // "claudeStatus.rateLimitApi.enabled": false,
-  // 如 Anthropic 调整定价，请更新以下值：
-  "claudeStatus.pricing.inputPerMillion": 3.00,
-  "claudeStatus.pricing.outputPerMillion": 15.00,
-  "claudeStatus.pricing.cacheReadPerMillion": 0.30,
-  "claudeStatus.pricing.cacheCreatePerMillion": 3.75
+  "claudeStatus.rateLimitApi.enabled": false
 }
 ```
 
@@ -270,24 +273,20 @@ npm run package       # → vscode-claude-status-*.vsix
 
 | 功能 | 状态 |
 |------|------|
-| 数据层（JSONL 读取器、API 客户端、缓存） | ✅ v0.1.0 |
-| 状态栏 % / $ 显示 | ✅ v0.1.0 |
-| WebView 仪表板框架 | ✅ v0.1.0 |
-| 项目级费用追踪 | ✅ v0.1.0 |
-| 用量预测与预算告警 | ✅ v0.2.0 |
-| 会话历史热力图 | ✅ v0.3.0 |
-| VS Code Marketplace 发布 | ✅ v0.3.0 |
-| 速率限制时间线图 | ✅ v0.4.0 |
-| 令牌明细与缓存效率 | ✅ v0.4.0 |
-| 月度费用预测 | ✅ v0.4.0 |
-| 每周预算进度条 | ✅ v0.4.0 |
-| 仪表板内定价与设置卡片 | ✅ v0.4.0 |
+| 状态栏、仪表板、项目费用、预测与预算告警、热力图 | ✅ v0.1.0 – v0.3.0 |
+| 速率限制时间线、令牌明细、周预算、定价与设置卡片 | ✅ v0.4.0 |
 | i18n — 英语 / 日语 / 中文 | ✅ v0.4.1 |
 | macOS 钥匙串凭证回退（Claude Code v2.x+） | ✅ v0.6.0 |
-| 可配置 Claude Code 数据目录（`claudeStatus.claudeHome`） | ✅ v0.7.0 |
-| 扩展宿主 OOM 崩溃修复 — 增量 JSONL 读取、监视器事件合并 | ✅ v0.7.0 |
-| 按模型计价与按模型费用明细 | ✅ Unreleased |
+| 可配置数据目录、OOM 修复（增量读取） | ✅ v0.7.0 |
+| 按模型计价（已与官方价格表核对）、按模型费用明细、费率覆盖设置 | ✅ Unreleased |
+| 按量付费 Enterprise 支持、按量付费视图、月预算 | ✅ Unreleased |
 | 侧边栏树视图、状态栏进度条、使用数据导出（CSV / JSON）、打卡图 | ✅ Unreleased |
+
+---
+
+## 文档
+
+规格说明、各方案的行为、定价以及完整的设置参考位于 [docs/](docs/README.md)（英文）。
 
 ---
 

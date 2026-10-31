@@ -42,73 +42,59 @@ The extension is split into two webpack chunks to minimise startup parse time:
 
 | File | Size | When loaded |
 |------|------|-------------|
-| `dist/extension.js` | ~100 KiB | Always — at extension activation |
-| `dist/panel.js` | ~55 KiB | On demand — first time dashboard is opened |
+| `dist/extension.js` | ~120 KiB | Always — at extension activation |
+| `dist/panel.js` | ~60 KiB | On demand — first time the dashboard is opened |
 
 `src/webview/panel.ts` is loaded via dynamic `import()` inside the `openDashboard`
 command handler and is never parsed during the critical activation path.
 
 ---
 
-## Core Components
+## Modules
+
+| Module | Responsibility | Spec |
+|---|---|---|
+| `extension.ts` | Activation, commands, settings listener, notifications (`checkAndNotify`) | [04](features/04-prediction.md#notification-system) |
+| `config.ts` | Typed accessors for every `claudeStatus.*` setting, incl. `costOptions` | [SETTINGS](SETTINGS.md) |
+| `statusBar.ts` | Status bar label / tooltip / colour; shared display helpers (`formatDuration`, `providerLabel`, `formatMonthCost`, `showTimeWindows`) used by every surface | [01](features/01-statusbar.md) |
+| `treeView.ts` | Activity Bar *Usage Overview* — renders `getLastData()`, no I/O of its own | [06](features/06-treeview.md) |
+| `webview/panel.ts` | Dashboard panel: HTML / CSS / JS and the message protocol | [02](features/02-webview.md) |
+| `webview/heatmap.ts` | Daily / hourly / weekday × hour aggregation | [05](features/05-heatmap.md) |
+| `webview/formatDuration.ts` | The one duration algorithm (60m / 24h rollover); mirrored by the inline `fmt()` in the dashboard JS | — |
+| `data/dataManager.ts` | Singleton: refresh scheduling, provider choice, API vs cache, `onDidUpdate` | below |
+| `data/jsonlReader.ts` | File discovery (`findAllJsonlFiles`), line streaming, `readAllUsage()` totals | [DATA](DATA.md#1-jsonl-reader-srcdatajsonlreaderts) |
+| `data/usageIndex.ts` | Incremental per-file index; `parseUsageLine()` / `firstSeen()` — the only line parser and dedupe | [DATA](DATA.md#incremental-reading-srcdatausageindexts) |
+| `data/pricing.ts` | Manual rates, per-model table, overrides, modifiers, `usageCost()` | [PRICING](PRICING.md) |
+| `data/apiClient.ts` | Provider detection, rate-limit probe | [DATA](DATA.md#2-api-client-srcdataapiclientts), [PLANS](PLANS.md) |
+| `data/accountInfo.ts` | Reads `oauthAccount.billingType` (usage-based plans) | [PLANS](PLANS.md#detection-claudestatusclaudeprovider-auto) |
+| `data/cache.ts` | Rate-limit cache file | [DATA](DATA.md#3-cache-srcdatacachets) |
+| `data/claudeHome.ts` | Resolves `claudeStatus.claudeHome` | [SETTINGS](SETTINGS.md#data-directory) |
+| `data/projectCost.ts` | Workspace → project directory, per-project totals | [03](features/03-project-cost.md) |
+| `data/prediction.ts` | Burn rate, exhaustion and budget prediction | [04](features/04-prediction.md) |
+| `data/budget.ts` | Budget thresholds and once-per-period alert tracking | [04](features/04-prediction.md#notification-deduplication) |
+| `data/localTime.ts` | Local calendar helpers (`localDateKey`, `startOfMonth`) | — |
+| `data/exportUsage.ts` | CSV / JSON serializers for *Export Usage Data* | [SETTINGS](SETTINGS.md#export-usage-data) |
+
+Pure modules (`pricing`, `budget`, `localTime`, `exportUsage`, `webview/formatDuration`,
+`webview/heatmap` aggregations) have no `vscode` dependency and are unit-tested directly.
 
 ### DataManager (`src/data/dataManager.ts`)
 
-Central singleton. All UI components get data exclusively through this class.
+Central singleton; every UI surface gets its data through it.
 
-**Responsibilities:**
-- Orchestrate JsonlReader, ApiClient, and Cache
-- Decide when to make API calls (respect rate limits and `rateLimitApi.enabled`)
-- Emit `onDidUpdate` event when data changes
-- Provide typed data accessors for each feature
-
-**Key method signatures:**
-```typescript
-class DataManager {
-  // Singleton
-  static getInstance(): DataManager
-
-  // Events
-  readonly onDidUpdate: vscode.Event<ClaudeUsageData>
-
-  // Data accessors
-  async getUsageData(forceRefresh?: boolean): Promise<ClaudeUsageData>
-  async getPrediction(): Promise<PredictionData | null>
-  async getHeatmapData(): Promise<HeatmapData | null>
-
-  // Project costs (multi-root aware)
-  async refreshProjectCosts(): Promise<void>
-  getLastProjectCosts(): ProjectCostData[]
-
-  // Lifecycle
-  async refresh(): Promise<void>
-  async forceRefresh(): Promise<void>
-  startWatching(): void
-  dispose(): void
-}
-```
+- `getUsageData(force?)` — provider detection, local totals (`readAllUsage`), API or cache.
+- `refresh()` — single-flight; watcher events are coalesced (`scheduleRefresh`, 5 s).
+- `forceRefresh()` — the *Refresh* command / button; invalidates the heatmap cache.
+- `republish()` — re-sends the last data after a display-only setting change (no I/O).
+- `getPrediction()`, `refreshProjectCosts()`, `getHeatmapData()` (5-minute cache, only
+  computed while the dashboard is open — `setDashboardOpen()`), `invalidateHeatmap()`.
+- `onDidUpdate` — fired after each refresh, and again when a background heatmap finishes.
 
 ---
 
-### Sidebar Tree View (`src/treeView.ts`)
+## Data Flow
 
-`ClaudeStatusTreeProvider` renders the Activity Bar "Usage Overview" view from
-`getLastData()` / `getLastProjectCosts()` only — it performs no file reads or API
-calls of its own. It refreshes on `onDidUpdate` and on the 60-second status bar
-timer (to keep "resets in" countdowns current). See
-[`features/06-treeview.md`](features/06-treeview.md).
-
-### Usage Export (`src/data/exportUsage.ts`)
-
-The `exportUsage` command serializes `getHeatmapData().daily` (the same aggregation
-as the heatmap, `heatmap.days` days) to CSV or JSON. The serializers are pure
-functions with no `vscode` import. See [`SETTINGS.md`](SETTINGS.md#export-usage-data).
-
----
-
-### Data Flow
-
-#### When Claude Code is active (JSONL updated recently):
+### When Claude Code is active (JSONL updated recently):
 
 ```
 FileWatcher detects JSONL change
@@ -124,7 +110,7 @@ FileWatcher detects JSONL change
     → getHeatmapData() [background, only while the dashboard is open; fires second onDidUpdate when done]
 ```
 
-#### When Claude Code is idle:
+### When Claude Code is idle:
 
 ```
 StatusBar timer tick (every 60s)
@@ -133,16 +119,12 @@ StatusBar timer tick (every 60s)
     → onDidUpdate.fire() if data changed
 ```
 
-#### When `rateLimitApi.enabled: false` (claude-ai provider):
+### Which provider calls the API
 
-```
-DataManager.getUsageData()
-  → Cache.read()
-  → if cache exists → rateLimitData from cache, dataSource = 'stale'
-  → if no cache    → dataSource = 'local-only' (cost mode only)
-```
+Only `claude-ai`, and only under the rules in [PLANS.md](PLANS.md#rate-limit-api-calls-claude-ai-only).
+`claude-ai-usage`, `api-key`, `aws-bedrock` and `unknown` never call it.
 
-#### On WebView panel open:
+### On WebView panel open:
 
 ```
 User clicks status bar
@@ -158,118 +140,38 @@ User clicks status bar
 
 ## Data Types
 
-```typescript
-// Core usage data (from API + JSONL)
-interface ClaudeUsageData {
-  // From Anthropic API response headers (or cache)
-  utilization5h: number        // 0.0–1.0
-  utilization7d: number        // 0.0–1.0
-  resetIn5h: number            // seconds until 5h window resets
-  resetIn7d: number            // seconds until 7d window resets
-  limitStatus: 'allowed' | 'allowed_warning' | 'denied'
-  has7dLimit: boolean          // false on non-Max plans or non-claude-ai providers
+The shapes are defined in the source; the fields that matter across modules:
 
-  // From local JSONL aggregation (always calculated from tokens — no costUSD field)
-  cost5h: number               // USD
-  costDay: number              // USD
-  cost7d: number               // USD
-  tokensIn5h: number
-  tokensOut5h: number
-  tokensCacheRead5h: number
-  tokensCacheCreate5h: number
-
-  // Provider type (controls whether % or cost mode is used)
-  providerType: 'claude-ai' | 'aws-bedrock' | 'api-key' | 'unknown'
-
-  // Metadata
-  lastUpdated: Date
-  cacheAge: number             // seconds since last API call (0 if no cache)
-  dataSource: 'api' | 'cache' | 'stale' | 'local-only' | 'no-credentials' | 'no-data'
-}
-```
+| Type (file) | Key fields |
+|---|---|
+| `ClaudeUsageData` (`dataManager.ts`) | rate limits `utilization5h/7d`, `resetIn5h/7d`, `limitStatus`, `has7dLimit`; totals `cost5h`, `costDay`, `cost7d`, `costMonth`, `tokens*5h`, `costByModel5h`, `pricingByModel5h`; `providerType`, `dataSource`, `cacheAge` |
+| `ProjectCostData` (`projectCost.ts`) | `projectName`, `projectPath`, `costToday`, `cost7d`, `cost30d`, `sessionCount`, `lastActive` |
+| `PredictionData` (`prediction.ts`) | `currentBurnRate`, `estimatedExhaustionIn/Time`, `budgetRemaining`, `budgetExhaustionTime`, `recommendationKey` |
+| `HeatmapData` (`heatmap.ts`) | `daily[]` (`date`, `cost`, `sessionCount`, `tokensTotal`), `hourly[]`, `dowHour[7][24]` |
+| `UsageRecord` (`usageIndex.ts`) | `timestamp`, normalized `usage` (incl. `speed`, `inference_geo`), `model` |
 
 **`dataSource` values:**
 
 | Value | Meaning |
 |-------|---------|
-| `'api'` | Fresh data from Anthropic API this refresh |
+| `'api'` | Fresh data from the Anthropic API this refresh |
 | `'cache'` | Cache valid (within TTL), no API call needed |
-| `'stale'` | Cache expired or `rateLimitApi.enabled=false`; showing old rate data with `[Xm ago]` |
-| `'local-only'` | Non-claude-ai provider or no cache; cost mode only, no rate % |
-| `'no-credentials'` | No credentials / no JSONL data found |
-| `'no-data'` | Credentials OK but no JSONL data yet |
-
-```typescript
-// Per-project cost (JSONL only)
-interface ProjectCostData {
-  projectName: string          // derived from workspace folder name
-  projectPath: string          // ~/.claude/projects/<hash>/
-  costToday: number            // USD
-  cost7d: number               // USD
-  cost30d: number              // USD
-  sessionCount: number         // number of JSONL files in project dir
-  lastActive: Date
-}
-
-// Prediction
-interface PredictionData {
-  estimatedExhaustionTime: Date | null  // null if pace is slow
-  estimatedExhaustionIn: number | null  // seconds, null if safe
-  currentBurnRate: number               // USD/hour
-  budgetRemaining: number | null        // null if no budget set
-  budgetExhaustionTime: Date | null
-  safeToStartHeavyTask: boolean
-  recommendation: string                // human-readable advice
-}
-
-// Heatmap
-interface HeatmapData {
-  daily: DailyUsage[]          // last N days (configurable, default 90)
-  hourly: HourlyUsage[]        // last 30 days, by hour-of-day
-}
-
-interface DailyUsage {
-  date: string                 // ISO date "2026-02-24"
-  cost: number                 // USD
-  sessionCount: number
-  tokensTotal: number
-}
-
-interface HourlyUsage {
-  hour: number                 // 0–23
-  avgCost: number              // USD average per entry at this hour
-  count: number                // number of entries at this hour
-}
-```
-
----
-
-## API Call Budget
-
-The extension must minimize Anthropic API calls (same policy as claude-tmux-status).
-
-| Situation | API calls |
-|-----------|-----------|
-| JSONL updated (Claude active) | 1 call → cached |
-| Cache age < TTL, Claude idle | 0 calls (read cache) |
-| Cache stale, Claude idle | 0 calls (show stale data with age label) |
-| `rateLimitApi.enabled: false`, cache exists | 0 calls (show cached % with stale age) |
-| `rateLimitApi.enabled: false`, no cache | 0 calls (cost-only mode) |
-| User clicks "↻ Refresh" button | 1 call |
-| Extension activation | 0 calls (read cache first) |
-| Realtime mode (opt-in, every 5min) | ~288/day |
-
-Default cache TTL: **300 seconds** (configurable, see SETTINGS.md)
+| `'stale'` | Cache expired or `rateLimitApi.enabled: false`; old rate data shown with `[Xm ago]` |
+| `'local-only'` | No rate-limit data: pay-as-you-go provider (always for `claude-ai-usage`), or no cache; cost mode |
+| `'no-credentials'` | No credentials and no local cost data |
+| `'no-data'` | Fallback before any data is available (status bar: `Claude: run refresh`) |
 
 ---
 
 ## Security
 
-- The extension reads `~/.claude/.credentials.json` to obtain the OAuth access token
-- The token is **never** stored in VSCode settings, logged, or sent anywhere except `api.anthropic.com`
-- Authentication uses `Authorization: Bearer <token>` + `anthropic-beta: oauth-2025-04-20` header
-- The WebView uses a strict Content Security Policy (CSP)
-- External scripts loaded only from `https://cdn.jsdelivr.net` (Chart.js)
+- The OAuth access token is read from `<claudeHome>/.credentials.json`
+  (`claudeStatus.credentials.path`; on macOS the Keychain entry `Claude Code-credentials`).
+- The token is **never** stored in VS Code settings, logged, or sent anywhere except
+  `api.anthropic.com` (`Authorization: Bearer` + `anthropic-beta: oauth-2025-04-20`).
+- `claudeHome` and `credentials.path` are machine-scoped, so a workspace cannot redirect them.
+- The WebView uses a strict Content Security Policy; external scripts come only from
+  `https://cdn.jsdelivr.net` (Chart.js, pinned).
 
 ---
 
@@ -277,10 +179,7 @@ Default cache TTL: **300 seconds** (configurable, see SETTINGS.md)
 
 | Platform | Status |
 |----------|--------|
-| Linux (native) | ✅ Primary |
-| macOS | ✅ Supported |
-| Windows (WSL2) | ✅ Supported (homedir resolved via WSL path) |
-| Windows (native) | ⚠️ Limited (Claude Code itself requires WSL) |
-
-For WSL2: detect if running inside WSL via `process.env.WSL_DISTRO_NAME`, then resolve
-`~/.claude/` as `/home/<user>/.claude/` rather than the Windows home directory.
+| Linux | ✅ Primary |
+| macOS | ✅ Supported (Keychain credential fallback) |
+| Windows + WSL2 | ✅ Supported — run the extension in WSL (VS Code *WSL* remote), where `os.homedir()` is the Linux home that holds `~/.claude` |
+| Windows (native) | ⚠️ Not tested — paths come from `os.homedir()`; set `claudeStatus.claudeHome` if the data lives elsewhere |

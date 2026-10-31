@@ -39,10 +39,9 @@
 > キャッシュがない場合はコスト表示のみにフォールバックします。
 
 > [!WARNING]
-> **コスト表示は概算です。** デフォルトのレートは実装時点の Anthropic 公開料金をもとにしており、
-> 料金変更を即座に反映しない可能性があります。
-> 料金が変更された場合は `claudeStatus.pricing.*` 設定を更新してください。
-> 最新の料金は [Anthropic 料金ページ](https://www.anthropic.com/pricing) でご確認ください。
+> **コスト表示は概算です。** ローカルのトランスクリプトから、Anthropic の API 定価（2026-10-31 確認）で計算しています。
+> 個別契約の割引・シート料金・パートナー（Bedrock / Vertex）の料金は含みません。
+> 新しいモデルや価格改定には `claudeStatus.pricing.modelOverrides` で対応できます — [docs/PRICING.md](docs/PRICING.md) 参照。
 
 ---
 
@@ -59,7 +58,9 @@ VS Code ステータスバーにピン留めされたリアルタイム使用状
 | レート制限到達 | `🤖 5h:100%✗` |
 | 5時間のみのプラン（7dウィンドウなし） | `🤖 5h:45%` |
 | コストモード | `🤖 5h:$14.21 7d:$53.17` |
-| AWS Bedrock / APIキー（コストのみ） | `🤖 5h:$0.15 7d:$0.42` |
+| 従量課金（APIキー・Bedrock・従量課金のエンタープライズ） | `🤖 5h:$0.15 7d:$0.42` |
+| 従量課金で `payAsYouGo.showTimeWindows: false` | `🤖 Today:$0.15` |
+| メーター付き（`statusBar.showSparkline`） | `🤖 5h:▰▰▰▱▱ 62% 7d:41%` |
 | プロジェクトコスト付き | `🤖 5h:78% 7d:84% \| my-app:$3.21` |
 | キャッシュ古い | `🤖 5h:78% 7d:84% [10m ago]` |
 | 未ログイン | `🤖 Not logged in` |
@@ -68,7 +69,7 @@ VS Code ステータスバーにピン留めされたリアルタイム使用状
 
 ### 🧭 サイドバー概要 *(VS Code ネイティブ)*
 
-アクティビティバーの専用アイコンから、レート制限ウィンドウ・トークンコスト（5h / 今日 / 7d）・
+アクティビティバーの専用アイコンから、レート制限ウィンドウ・トークンコスト（5h / 今日 / 7d / 今月と月次予算）・
 プロジェクト別コスト・クイックアクションをネイティブのツリービューで確認できます。
 ダッシュボードを開かなくても主要な数値が見られます。
 
@@ -77,14 +78,14 @@ VS Code ステータスバーにピン留めされたリアルタイム使用状
 ステータスバーアイテムをクリックすると、以下を含むリッチなダッシュボードパネルが開きます：
 
 - **現在の使用量** — 5時間・7日間ウィンドウのカラーコード付きプログレスバー
-- **トークンコスト** — 5時間・今日・7日間・月次推計コスト。▶ トグルで**トークン内訳**を展開すると、
+- **トークンコスト** — 5時間・今日・7日間・今月・月次推計コスト。▶ トグルで**トークン内訳**を展開すると、
   Input / Output / Cache read / Cache create 別のトークン数・5時間のモデル別コスト・キャッシュヒット率を表示
 - **プロジェクトコスト** — ワークスペース別内訳（今日・7日間・30日間）
-- **予測** — 消費率（$/時間）、日次・週次予算追跡。**レート制限タイムラインチャート**で
+- **予測** — 消費率（$/時間）、日次・週次・月次予算追跡。**レート制限タイムラインチャート**で
   現在から次回リセットまでの5h利用率予測をグラフ表示
 - **料金 & 設定** — 現在のトークン単価・プロバイダー・API状態・キャッシュTTLを常時表示。
   ワンクリックでVS Code設定を開くリンク付き
-- **使用履歴** — GitHubスタイルの日次ヒートマップ＋時間帯別パターンバーチャート
+- **使用履歴** — GitHubスタイルの日次ヒートマップ＋時間帯別パターンバーチャート＋曜日 × 時間帯のパンチカード
 
 パネルはVS Codeのライト・ダーク・ハイコントラストテーマをネイティブにサポートします。
 
@@ -113,7 +114,7 @@ VS Code ステータスバーにピン留めされたリアルタイム使用状
 - **日次予算** — 任意のUSD上限を設定可能；設定した閾値（デフォルト80%）に達するとプログレスバーとアラートが表示
 - **週次予算** — 任意のUSD週次上限（`claudeStatus.budget.weeklyUsd`）とプログレスバー
 - **月次予算** — 暦月単位の任意のUSD上限（`claudeStatus.budget.monthlyUsd`）。従量課金のエンタープライズの利用上限（spend limit）の管理などに。「今月」の累計はサイドバーとツールチップにも表示
-- **VS Code通知** — ≤30分でノンブロッキング警告、≤10分で「ダッシュボードを開く」アクション付きエラーダイアログ；予算アラートはウィンドウにつき1回
+- **VS Code通知** — ≤30分でノンブロッキング警告、≤10分で「ダッシュボードを開く」アクション付きエラーダイアログ；予算アラートは1日 / 1か月に最大1回
 
 **設定 → Claude Status** またはコマンドパレットから設定可能：
 
@@ -135,43 +136,30 @@ Claude Status: Set Budget...
 
 ## 必要条件
 
-- **VS Code** 1.73以降
-- **Claude Code CLI** とアクティブなセッション — 拡張機能は
-  `~/.claude/projects/**/*.jsonl` からトークンコストデータを読み取ります
-
-**認証はプロバイダーによって任意です：**
-
-| プロバイダー | 認証方法 | 表示内容 |
-|-------------|---------|---------|
-| Claude.ai サブスクリプション | `claude login` — v2.x+ (Mac) はmacOSキーチェーンに保存、旧バージョンは `~/.claude/.credentials.json`。いずれも自動検出 | レート制限 % + コスト |
-| Claude.ai 従量課金プラン（従量課金のエンタープライズなど） | `claude login`。Claude Code のアカウント情報（`billingType: "usage_based"`）から自動検出 | コストのみ（API レート） |
-| AWS Bedrock | AWS認証情報（環境変数または `~/.aws/`） | コストのみ |
-| Anthropic APIキー | `ANTHROPIC_API_KEY` 環境変数 | コストのみ |
+- **VS Code** 1.73 以降
+- **Claude Code** のセッションが1つ以上あること — トークンコストは
+  `~/.claude/projects/**/*.jsonl`（または `claudeStatus.claudeHome`）から読み取ります
 
 ---
 
-## プラン互換性
+## 対応プラン
 
-> **注意：** この拡張機能は、作者が **Claude.ai Pro プラン**（5時間・7日間の両レート制限ウィンドウを持つ）で開発・テストしています。
->
-> AWS Bedrock、直接APIキー、Claude.ai Free、5時間ウィンドウのみのプランなど、その他のプランやプロバイダーは自動検出によるベストエフォートでサポートされています。お使いのプランで予期しない動作が発生した場合は、[Issueを開いて](https://github.com/long-910/vscode-claude-status/issues)プランの種類をお知らせください。迅速に対応します。
+プランは自動で判定されます。追加のログインは不要です。
 
-**プランタイプ別の動作：**
+| プラン | 判定に使う情報 | ステータスバー | レート制限 API |
+|---|---|---|---|
+| Claude.ai Pro / Max、シート型の Team / Enterprise | `claude login` の認証情報（`~/.claude/.credentials.json` または macOS キーチェーン） | `5h:45% 7d:32%` — 週間ウィンドウのないプランでは 7d は自動で非表示 | Claude Code の使用中のみ、最大5分に1回 |
+| 従量課金の Claude.ai プラン（従量課金のエンタープライズなど） | Claude Code のアカウント情報（`~/.claude.json` の `billingType: "usage_based"`） | コストのみ | 呼び出さない |
+| Anthropic API キー | `ANTHROPIC_API_KEY` | コストのみ | 呼び出さない |
+| AWS Bedrock | AWS の環境変数 | コストのみ | 呼び出さない |
 
-| プラン | レート制限表示 | 7dウィンドウ |
-|--------|-------------|------------|
-| Claude.ai Pro / Max（5h + 7d） | `5h:45% 7d:32%` | ✅ |
-| Claude.ai Pro / 5hのみのプラン | `5h:45%` | 自動非表示 |
-| Claude.ai 従量課金（従量課金のエンタープライズなど） | コストのみ（`5h:$0.15 7d:$0.42`、`payAsYouGo.showTimeWindows: false` なら `Today:$0.15`） | N/A |
-| AWS Bedrock | コストのみ（`5h:$0.15 7d:$0.42`） | N/A |
-| Anthropic APIキー | コストのみ | N/A |
+従量課金のプランでは、`claudeStatus.payAsYouGo.showTimeWindows: false` で 5h / 7d の代わりに今日のコストを表示でき、
+`claudeStatus.budget.monthlyUsd` で利用上限（spend limit）を管理できます。
+判定が合わない場合は `claudeStatus.claudeProvider` を指定してください。
+詳細: [docs/PLANS.md](docs/PLANS.md)（英語）。
 
-従量課金の Claude.ai プラン（シート料金＋全使用量を標準 API レートで課金、シートごとの5時間/週間上限なし）は、
-Claude Code 本体と同じく `~/.claude.json` の `oauthAccount.billingType` で判定します。この場合はコストのみを表示し、
-**レート制限 API は一切呼び出しません**。使用上限のあるシート型の Team / Enterprise は通常どおりレート制限を表示します。
-コストは API 定価での概算で、個別契約の割引やシート料金は含みません。
-
-自動検出がうまく機能しない場合は、VS Code設定で `claudeStatus.claudeProvider` を明示的に設定してください。
+> 作者は Claude.ai Pro プランで開発・テストしています。その他のプランはベストエフォートでの対応です。
+> 想定外の動作があれば、プラン種別を添えて [Issue](https://github.com/long-910/vscode-claude-status/issues) を作成してください。
 
 ---
 
@@ -220,54 +208,67 @@ npm run package       # → vscode-claude-status-*.vsix
 
 ## 設定
 
-すべての設定はVS Code設定の `claudeStatus` 名前空間にあります。
+すべての設定は VS Code 設定の `claudeStatus` 名前空間にあります。全項目のリファレンス:
+[docs/SETTINGS.md](docs/SETTINGS.md)（英語）。
 
-| 設定 | 型 | デフォルト | 説明 |
-|------|-----|---------|------|
-| `claudeStatus.displayMode` | `"percent"` \| `"cost"` | `"percent"` | ステータスバー表示モード |
-| `claudeStatus.statusBar.alignment` | `"left"` \| `"right"` | `"left"` | ステータスバーの位置 |
-| `claudeStatus.statusBar.showProjectCost` | `boolean` | `true` | ステータスバーにプロジェクトコストを表示 |
-| `claudeStatus.statusBar.format` | `string \| null` | `null` | カスタムラベルテンプレート。プレースホルダー: `${usage5h}`, `${usage7d}`, `${bar5h}`, `${bar7d}`, `${cost5h}`, `${cost7d}`, `${costDay}`, `${costMonth}`。`null` = デフォルト自動生成 |
-| `claudeStatus.statusBar.showSparkline` | `boolean` | `false` | ステータスバーにコンパクトな 5h 利用率メーター（▰▰▰▱▱）を表示 |
-| `claudeStatus.payAsYouGo.showTimeWindows` | `boolean` | `true` | 従量課金（APIキー・Bedrock）で 5h / 7d ウィンドウの使用量を表示。オフにすると代わりに今日のコストを表示（サブスクには影響なし） |
-| `claudeStatus.cache.ttlSeconds` | `number` (60–3600) | `300` | APIキャッシュTTL（秒） |
-| `claudeStatus.rateLimitApi.enabled` | `boolean` | `true` | レート制限%をAnthropicAPIから取得。`false` で新規APIコール停止。キャッシュがあれば `[Xm ago]` 付きで % を継続表示 |
-| `claudeStatus.realtime.enabled` | `boolean` | `false` | TTL秒ごとにAPIをポーリング（`rateLimitApi.enabled` が必要） |
-| `claudeStatus.budget.dailyUsd` | `number \| null` | `null` | 日次予算（USD）（`null` = 無効） |
-| `claudeStatus.budget.weeklyUsd` | `number \| null` | `null` | 週次予算（USD） |
-| `claudeStatus.budget.monthlyUsd` | `number \| null` | `null` | 暦月の予算（USD。しきい値に達すると月に1回警告） |
-| `claudeStatus.budget.alertThresholdPercent` | `number` (1–100) | `80` | 予算アラート閾値（%） |
-| `claudeStatus.notifications.rateLimitWarning` | `boolean` | `true` | レート制限が近い時に警告 |
-| `claudeStatus.notifications.rateLimitWarningThresholdMinutes` | `number` (5–120) | `30` | 制限の何分前に警告を表示 |
-| `claudeStatus.notifications.budgetWarning` | `boolean` | `true` | 予算閾値超過時に警告 |
-| `claudeStatus.heatmap.days` | `30 \| 60 \| 90` | `90` | 使用ヒートマップに表示する日数 |
-| `claudeStatus.claudeHome` | `string` | `".claude"` | Claude Code データディレクトリ（相対パスはホーム基準、絶対パス・`~` 可）。ユーザー設定のみ。macOS の Keychain フォールバックは常に既定プロファイルを参照 |
-| `claudeStatus.credentials.path` | `string \| null` | `null` | カスタム認証情報ファイルパス |
-| `claudeStatus.claudeProvider` | `"auto"` \| `"claude-ai"` \| `"claude-ai-usage"` \| `"aws-bedrock"` \| `"api-key"` | `"auto"` | プロバイダータイプ（自動検出または明示的指定。`claude-ai-usage` = 従量課金の Claude.ai プラン） |
-| `claudeStatus.pricing.inputPerMillion` | `number` | `3.00` | 入力トークン 1M あたりの USD 単価 |
-| `claudeStatus.pricing.outputPerMillion` | `number` | `15.00` | 出力トークン 1M あたりの USD 単価 |
-| `claudeStatus.pricing.cacheReadPerMillion` | `number` | `0.30` | キャッシュ読み取りトークン 1M あたりの USD 単価 |
-| `claudeStatus.pricing.cacheCreatePerMillion` | `number` | `3.75` | キャッシュ作成トークン 1M あたりの USD 単価 |
-| `claudeStatus.pricing.useModelPricing` | `boolean` | `true` | モデルごとの組み込み単価で計算。上記4項目は未知のモデル（`false` の場合は全エントリ）に適用 |
-| `claudeStatus.pricing.modelOverrides` | `object` | `{}` | 新モデルや価格改定用のモデル別単価。例: `{ "claude-opus-6": { "inputPerMillion": 4, "outputPerMillion": 20 } }` |
+### 表示
+
+| 設定 | デフォルト | 説明 |
+|------|---------|------|
+| `claudeStatus.displayMode` | `"percent"` | ステータスバーを `"percent"`（%）か `"cost"`（$）で表示 |
+| `claudeStatus.statusBar.alignment` | `"left"` | `"left"` または `"right"` |
+| `claudeStatus.statusBar.showProjectCost` | `true` | ステータスバーに現在のプロジェクトのコストを表示 |
+| `claudeStatus.statusBar.format` | `null` | カスタムラベル（例: `"${usage5h}% \| $${costDay}"`）。プレースホルダー: `${usage5h}`, `${usage7d}`, `${bar5h}`, `${bar7d}`, `${cost5h}`, `${cost7d}`, `${costDay}`, `${costMonth}` |
+| `claudeStatus.statusBar.showSparkline` | `false` | % の横にコンパクトな 5h メーター（▰▰▰▱▱）を表示 |
+| `claudeStatus.payAsYouGo.showTimeWindows` | `true` | 従量課金のプランで `false` にすると、5h / 7d の代わりに今日のコストを表示（サブスクには影響なし） |
+| `claudeStatus.heatmap.days` | `90` | 使用履歴ヒートマップの日数（30 / 60 / 90） |
+
+### プラン・データソース・API
+
+| 設定 | デフォルト | 説明 |
+|------|---------|------|
+| `claudeStatus.claudeProvider` | `"auto"` | `"auto"`、`"claude-ai"`、`"claude-ai-usage"`（従量課金の Claude.ai プラン）、`"aws-bedrock"`、`"api-key"` |
+| `claudeStatus.claudeHome` | `".claude"` | Claude Code のデータディレクトリ（ホームからの相対パス。絶対パスと `~` も可）。ユーザー設定のみ |
+| `claudeStatus.credentials.path` | `null` | 認証情報ファイルのカスタムパス。ユーザー設定のみ |
+| `claudeStatus.rateLimitApi.enabled` | `true` | レート制限 % を取得（サブスク）。オフ: API を呼ばず、最後にキャッシュした % を `[Xm ago]` 付きで表示 |
+| `claudeStatus.cache.ttlSeconds` | `300` | レート制限キャッシュの TTL（60–3600 秒） |
+| `claudeStatus.realtime.enabled` | `false` | 未実装 — 効果はありません |
+
+### 予算・通知
+
+| 設定 | デフォルト | 説明 |
+|------|---------|------|
+| `claudeStatus.budget.dailyUsd` | `null` | 日次予算（USD、`null` = オフ） |
+| `claudeStatus.budget.weeklyUsd` | `null` | 直近7日間の予算（ダッシュボードのバー） |
+| `claudeStatus.budget.monthlyUsd` | `null` | 暦月の予算（エンタープライズの利用上限など） |
+| `claudeStatus.budget.alertThresholdPercent` | `80` | 日次 / 月次予算のこの % で警告 |
+| `claudeStatus.notifications.budgetWarning` | `true` | 予算の通知（1日 / 1か月に最大1回） |
+| `claudeStatus.notifications.rateLimitWarning` | `true` | 5h 上限に達する前に警告（サブスク） |
+| `claudeStatus.notifications.rateLimitWarningThresholdMinutes` | `30` | 何分前に警告するか（5–120） |
+
+### 料金
+
+| 設定 | デフォルト | 説明 |
+|------|---------|------|
+| `claudeStatus.pricing.useModelPricing` | `true` | 各エントリをモデルごとの組み込み単価で計算 |
+| `claudeStatus.pricing.modelOverrides` | `{}` | モデル別の正確な単価。例: `{ "claude-opus-6": { "inputPerMillion": 4, "outputPerMillion": 20 } }` |
+| `claudeStatus.pricing.inputPerMillion` | `3.00` | 手動単価（USD / 1M トークン）。未知のモデル、またはモデル別料金オフ時の全エントリに使用 |
+| `claudeStatus.pricing.outputPerMillion` | `15.00` | 〃 |
+| `claudeStatus.pricing.cacheReadPerMillion` | `0.30` | 〃 |
+| `claudeStatus.pricing.cacheCreatePerMillion` | `3.75` | 〃 |
 
 ```jsonc
-// 設定例: settings.json
+// 例: 月 $400 の利用上限がある従量課金のエンタープライズ
+{
+  "claudeStatus.payAsYouGo.showTimeWindows": false,   // 5h / 7d の代わりに 🤖 Today:$3.21
+  "claudeStatus.budget.monthlyUsd": 400,
+  "claudeStatus.budget.dailyUsd": 30
+}
+
+// 例: Claude.ai サブスクでコスト表示、外部への API 呼び出しなし
 {
   "claudeStatus.displayMode": "cost",
-  "claudeStatus.cache.ttlSeconds": 120,
-  "claudeStatus.budget.dailyUsd": 5.00,
-  "claudeStatus.budget.alertThresholdPercent": 80,
-  "claudeStatus.statusBar.showProjectCost": true,
-  // AWS Bedrockユーザー — OAuth検出をスキップし、コストのみ表示：
-  "claudeStatus.claudeProvider": "aws-bedrock",
-  // 新規レート制限APIコールを停止（キャッシュがあれば % を staleness 表示継続）：
-  // "claudeStatus.rateLimitApi.enabled": false,
-  // Anthropicが料金を変更した場合は以下を更新してください：
-  "claudeStatus.pricing.inputPerMillion": 3.00,
-  "claudeStatus.pricing.outputPerMillion": 15.00,
-  "claudeStatus.pricing.cacheReadPerMillion": 0.30,
-  "claudeStatus.pricing.cacheCreatePerMillion": 3.75
+  "claudeStatus.rateLimitApi.enabled": false
 }
 ```
 
@@ -275,26 +276,22 @@ npm run package       # → vscode-claude-status-*.vsix
 
 ## ロードマップ
 
-| 機能 | 状態 |
-|------|------|
-| データ層（JSONLリーダー、APIクライアント、キャッシュ） | ✅ v0.1.0 |
-| %/$表示のステータスバー | ✅ v0.1.0 |
-| WebViewダッシュボードスケルトン | ✅ v0.1.0 |
-| プロジェクトレベルのコスト追跡 | ✅ v0.1.0 |
-| 使用量予測 & 予算アラート | ✅ v0.2.0 |
-| セッション履歴ヒートマップ | ✅ v0.3.0 |
-| VS Code Marketplace公開 | ✅ v0.3.0 |
-| レート制限タイムラインチャート | ✅ v0.4.0 |
-| トークン内訳 & キャッシュ効率 | ✅ v0.4.0 |
-| 月次コスト推計 | ✅ v0.4.0 |
-| 週次予算プログレスバー | ✅ v0.4.0 |
-| 料金 & 設定カード（ダッシュボード内） | ✅ v0.4.0 |
+| 機能 | ステータス |
+|------|-----------|
+| ステータスバー、ダッシュボード、プロジェクトコスト、予測と予算アラート、ヒートマップ | ✅ v0.1.0 – v0.3.0 |
+| レート制限タイムライン、トークン内訳、週次予算、料金 & 設定カード | ✅ v0.4.0 |
 | i18n — 英語 / 日本語 / 中国語 | ✅ v0.4.1 |
 | macOS キーチェーン認証情報フォールバック（Claude Code v2.x+） | ✅ v0.6.0 |
-| Claude Code データディレクトリの設定（`claudeStatus.claudeHome`） | ✅ v0.7.0 |
-| 拡張ホストOOMクラッシュ修正 — 差分JSONLリード・ウォッチャー集約 | ✅ v0.7.0 |
-| モデル別料金とモデル別コスト内訳 | ✅ Unreleased |
-| サイドバーツリービュー・ステータスバーメーター・使用データエクスポート（CSV / JSON）・パンチカード | ✅ Unreleased |
+| データディレクトリの設定、OOM 修正（差分読み込み） | ✅ v0.7.0 |
+| モデル別料金（公式価格表と照合）、モデル別内訳、単価の上書き設定 | ✅ Unreleased |
+| 従量課金のエンタープライズ対応、従量課金向け表示、月次予算 | ✅ Unreleased |
+| サイドバーツリービュー、ステータスバーメーター、使用データのエクスポート（CSV / JSON）、パンチカード | ✅ Unreleased |
+
+---
+
+## ドキュメント
+
+仕様、プランごとの挙動、料金、設定の全リファレンスは [docs/](docs/README.md)（英語）にあります。
 
 ---
 

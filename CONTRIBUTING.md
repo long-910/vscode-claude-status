@@ -48,121 +48,21 @@ npm test               # full test suite
 npm run package        # production .vsix
 ```
 
-### Project Structure
+### Project Structure & How It Works
 
-```
-vscode-claude-status/
-├── src/
-│   ├── extension.ts          # activate / deactivate
-│   ├── config.ts             # typed settings wrapper
-│   ├── statusBar.ts          # status bar item + label / tooltip builders
-│   ├── data/
-│   │   ├── jsonlReader.ts    # JSONL parser + token cost aggregator
-│   │   ├── apiClient.ts      # Anthropic API rate-limit header fetcher
-│   │   ├── cache.ts          # disk-backed cache (~/.claude/…cache.json)
-│   │   ├── dataManager.ts    # central data orchestrator (singleton)
-│   │   ├── projectCost.ts    # workspace → JSONL mapping + per-project costs
-│   │   └── prediction.ts     # burn rate, time-to-exhaustion, budget prediction
-│   ├── webview/
-│   │   ├── panel.ts          # WebView dashboard panel (HTML embedded)
-│   │   └── heatmap.ts        # heatmap data aggregation (daily + hourly)
-│   └── test/suite/
-│       ├── jsonlReader.test.ts
-│       ├── projectCost.test.ts
-│       ├── prediction.test.ts
-│       ├── heatmap.test.ts
-│       ├── cache.test.ts
-│       └── statusBar.test.ts
-├── docs/                     # detailed feature & architecture specs
-├── CLAUDE.md                 # AI assistant implementation guidance
-├── CHANGELOG.md
-└── package.json
-```
+The module map, data flow and specs are in [docs/](docs/README.md) — start with
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). In one paragraph:
 
----
+> Claude Code appends to `~/.claude/projects/<project>/<session>.jsonl`. A file watcher
+> triggers `DataManager.refresh()`, which reads only the appended bytes (`usageIndex.ts`),
+> prices each entry by its model (`pricing.ts`, see [docs/PRICING.md](docs/PRICING.md)) and,
+> for Claude.ai subscriptions only, refreshes the rate-limit % at most once per 5 minutes
+> while Claude Code is active ([docs/PLANS.md](docs/PLANS.md)). The status bar, sidebar and
+> dashboard all render the same `DataManager` data.
 
-## How It Works
-
-### Data Flow
-
-```
-JSONL file updated by Claude Code
-  → FileWatcher detects change
-    → DataManager.refresh()
-      → JsonlReader aggregates token costs   (local, instant)
-      → ApiClient fetches rate-limit headers (1 API call, then cached)
-      → StatusBar & Dashboard update
-```
-
-When Claude Code is idle the extension reads only from the local cache — no API
-calls are made until Claude Code becomes active again (JSONL modified recently).
-
-### Architecture
-
-```
-┌──────────────────────────────────────────────────────┐
-│                 VS Code Extension Host               │
-│                                                      │
-│  StatusBar   DashboardPanel   FileWatcher(JSONL)     │
-│      └────────────┴──────────────────┘               │
-│                   │                                  │
-│           ┌───────▼───────┐                          │
-│           │  DataManager  │  (singleton)              │
-│           └───────┬───────┘                          │
-│                   │                                  │
-│      ┌────────────┼────────────┐                     │
-│      │            │            │                     │
-│ JsonlReader   ApiClient     Cache                    │
-│ ProjectCost  (rate headers) (disk)                   │
-└──────────────────────────────────────────────────────┘
-          │
-  ~/.claude/projects/
-    <hash>/<session>.jsonl
-```
-
-### JSONL Format (verified against Claude Code v2.1.x)
-
-```jsonc
-// ~/.claude/projects/<project-hash>/<session-uuid>.jsonl
-{
-  "type": "assistant",
-  "timestamp": "2026-02-28T10:23:45.123Z",
-  "cwd": "/home/user/my-project",
-  "message": {
-    "usage": {
-      "input_tokens": 1234,
-      "output_tokens": 567,
-      "cache_read_input_tokens": 8900,
-      "cache_creation_input_tokens": 450
-    }
-  }
-}
-```
-
-### Project Path Mapping
-
-Claude Code encodes the workspace path into a directory name by replacing every
-non-alphanumeric character with `-`:
-
-```
-/home/user/sb_git/my-app
-  → ~/.claude/projects/-home-user-sb-git-my-app/
-```
-
-The extension uses this as Strategy 1, falling back to scanning JSONL `cwd`
-fields for edge cases (Strategy 2).
-
-### Token Cost Formula
-
-Costs are calculated using **Claude Sonnet 4.x** pricing (same as
-[claude-tmux-status](https://github.com/long-910/claude-tmux-status)):
-
-| Token type | $/1 M tokens |
-|------------|-------------|
-| Input | $3.00 |
-| Output | $15.00 |
-| Cache read | $0.30 |
-| Cache creation | $3.75 |
+Tests live in `src/test/suite/` and run inside VS Code via `npm test`. Pure modules (pricing,
+budgets, export, heatmap aggregation) have no `vscode` dependency. `docs.test.ts` checks that
+every setting and command is documented and that doc links resolve.
 
 ---
 
@@ -230,15 +130,5 @@ push tag v*
 
 ## Feature Specifications & Architecture
 
-Detailed specs live under `docs/`:
+See the documentation index: [docs/README.md](docs/README.md).
 
-| File | Description |
-|------|-------------|
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Overall architecture |
-| [`docs/DATA.md`](docs/DATA.md) | JSONL parsing, API calls, caching |
-| [`docs/SETTINGS.md`](docs/SETTINGS.md) | All configuration keys |
-| [`docs/features/01-statusbar.md`](docs/features/01-statusbar.md) | Status bar display |
-| [`docs/features/02-webview.md`](docs/features/02-webview.md) | WebView dashboard |
-| [`docs/features/03-project-cost.md`](docs/features/03-project-cost.md) | Project-level cost tracking |
-| [`docs/features/04-prediction.md`](docs/features/04-prediction.md) | Usage prediction & budget alerts |
-| [`docs/features/05-heatmap.md`](docs/features/05-heatmap.md) | Session history heatmap |

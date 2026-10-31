@@ -173,12 +173,17 @@ panel.webview.postMessage({
     projectCosts: ProjectCostData[],   // array (multi-root aware)
     prediction: PredictionData | null,
     heatmap: HeatmapData | null,
-    pricing: TokenPricing,             // current claudeStatus.pricing.* values
+    pricing: TokenPricing,             // manual claudeStatus.pricing.* rates
     settings: {
       provider: string,                // detected/configured provider type
+      providerLabel: string,           // display name (statusBar.providerLabel())
       apiEnabled: boolean,             // claudeStatus.rateLimitApi.enabled
       cacheTtlSeconds: number,         // claudeStatus.cache.ttlSeconds
       weeklyBudget: number | null,     // claudeStatus.budget.weeklyUsd
+      monthlyBudget: number | null,    // claudeStatus.budget.monthlyUsd
+      statusBarFormat: string | null,  // claudeStatus.statusBar.format
+      useModelPricing: boolean,        // claudeStatus.pricing.useModelPricing
+      showTimeWindows: boolean,        // false hides 5h / 7d figures (pay-as-you-go only)
     },
   }
 })

@@ -1,239 +1,67 @@
-# Settings Specification
+# Settings
 
-All settings are under the `claudeStatus` namespace in VSCode settings.
+All settings live under the `claudeStatus` namespace (**Settings → Extensions → Claude Status**).
+`package.json` (`contributes.configuration`, descriptions in `package.nls*.json`) is the source
+of truth; the tables below are generated from it, and `docs.test.ts` fails if a setting is
+missing here or in the READMEs.
 
----
+Which settings matter depends on your plan — see [PLANS.md](PLANS.md#recommended-settings).
+Pricing settings are explained in [PRICING.md](PRICING.md).
 
-## Quick Reference — Plan × Settings Matrix
-
-What the status bar and dashboard show, depending on your Claude plan and key settings.
-
-### Step 1 — Identify your provider
-
-| You use… | `claudeProvider` (auto-detected) |
-|----------|----------------------------------|
-| Claude.ai subscription (Pro / Max, seat-based Team / Enterprise) | `claude-ai` |
-| Claude.ai usage-based plan (`oauthAccount.billingType: "usage_based"` in `~/.claude.json`, e.g. usage-based Enterprise) | `claude-ai-usage` |
-| AWS Bedrock | `aws-bedrock` |
-| Anthropic API key (`ANTHROPIC_API_KEY`) | `api-key` |
-
-### Step 2 — What you see
-
-| Provider | Plan tier | `rateLimitApi.enabled` | `displayMode` | Status bar | Rate limit bars in dashboard |
-|----------|-----------|----------------------|---------------|------------|------------------------------|
-| `claude-ai` | Max (5h + 7d windows) | `true` (default) | `percent` (default) | `🤖 5h:78% 7d:84%` | ✅ Both windows |
-| `claude-ai` | Pro/other (5h only) | `true` (default) | `percent` (default) | `🤖 5h:78%` | ✅ 5h only |
-| `claude-ai` | any | `true` (default) | `cost` | `🤖 5h:$14.21 7d:$53.17` | ✅ Shown (bars hidden in label) |
-| `claude-ai` | any | `false` + cache exists | `percent` | `🤖 5h:78% [10m ago]` | ⚠️ Stale (dimmed) |
-| `claude-ai` | any | `false` + no cache | any | `🤖 5h:$0.00 7d:$0.00` | ❌ Not shown |
-| `aws-bedrock` | — | — | — | `🤖 5h:$14.21 7d:$53.17` | ❌ Not shown (no rate limits) |
-| `api-key` | — | — | — | `🤖 5h:$14.21 7d:$53.17` | ❌ Not shown (no rate limits) |
-| `claude-ai-usage` | — | ignored (never calls the API) | — | `🤖 5h:$14.21 7d:$53.17` | ❌ Not shown (no rate limits) |
-
-For every non-`claude-ai` row, `payAsYouGo.showTimeWindows: false` changes the label to `🤖 Today:$…`.
-
-### Step 3 — Recommended settings per use case
-
-| Use case | Recommended settings |
-|----------|----------------------|
-| Claude.ai — see live % in real time | `rateLimitApi.enabled: true`, `displayMode: "percent"` (defaults) |
-| Claude.ai — prefer cost over % | `displayMode: "cost"` |
-| Claude.ai — offline / no outbound HTTPS | `rateLimitApi.enabled: false` (cached % still shown if previously fetched) |
-| AWS Bedrock / API key / usage-based Enterprise | No extra config needed — cost mode is automatic. Optionally `payAsYouGo.showTimeWindows: false` |
-| Track spending against a budget | Set `budget.dailyUsd` in dashboard or settings |
-
-> **Note on stale data:** When `rateLimitApi.enabled: false`, the extension never makes
-> new API calls but still shows the last-fetched rate limit % with a `[Xm ago]` indicator
-> so you know how old the data is. The % only disappears if there is no cache at all
-> (e.g. first run with API disabled).
+Contents: [Settings](#all-settings) · [Custom status bar format](#custom-status-bar-format) ·
+[Commands](#commands) · [Keybindings](#keybindings) · [For developers](#for-developers)
 
 ---
 
-## Full Settings Schema (`package.json` contributes.configuration)
+## All settings
 
-```json
-{
-  "claudeStatus.displayMode": {
-    "type": "string",
-    "enum": ["percent", "cost"],
-    "default": "percent",
-    "description": "Status bar display mode: utilization percentage or USD cost."
-  },
+### Display
 
-  "claudeStatus.statusBar.alignment": {
-    "type": "string",
-    "enum": ["left", "right"],
-    "default": "left",
-    "description": "Position of the status bar item."
-  },
+| Setting (`claudeStatus.…`) | Type | Default | Description |
+|---|---|---|---|
+| `displayMode` | `"percent"` \| `"cost"` | `"percent"` | Status bar display mode: utilization percentage or USD cost. |
+| `statusBar.alignment` | `"left"` \| `"right"` | `"left"` | Position of the status bar item. |
+| `statusBar.showProjectCost` | boolean | `true` | Show current project cost in the status bar. |
+| `statusBar.format` | string \| null | `null` | Custom status bar format string. Placeholders: ${usage5h} / ${usage7d} (utilization 0-100), ${bar5h} / ${bar7d} (▰▰▱▱▱ meters), ${cost5h}, ${cost7d}, ${costDay}, ${costMonth} (USD, e.g. 1.23). Set to null to use the default format. |
+| `statusBar.showSparkline` | boolean | `false` | Show a compact utilization meter (▰▰▰▱▱) next to the 5h percentage in the status bar (percent mode, Claude.ai only). Custom formats can use the ${bar5h} / ${bar7d} placeholders instead. |
+| `payAsYouGo.showTimeWindows` | boolean | `true` | Show 5-hour / 7-day window figures for pay-as-you-go usage (API key, AWS Bedrock, other non-subscription providers). These windows are Claude.ai subscription rate limits; turn this off to show today's cost instead. Has no effect on Claude.ai subscriptions. |
+| `heatmap.days` | `30` \| `60` \| `90` | `90` | Number of days shown in the usage heatmap. |
 
-  "claudeStatus.statusBar.showProjectCost": {
-    "type": "boolean",
-    "default": true,
-    "description": "Show current project cost in the status bar."
-  },
+### Plan, data source & API
 
-  "claudeStatus.statusBar.format": {
-    "type": ["string", "null"],
-    "default": null,
-    "description": "Custom status bar format string. Use placeholders: ${usage5h}, ${usage7d}, ${bar5h}, ${bar7d}, ${cost5h}, ${cost7d}, ${costDay}, ${costMonth}. null = default auto-generated label."
-  },
+| Setting (`claudeStatus.…`) | Type | Default | Description |
+|---|---|---|---|
+| `claudeProvider` | `"auto"` \| `"claude-ai"` \| `"claude-ai-usage"` \| `"aws-bedrock"` \| `"api-key"` | `"auto"` | Claude provider type. Controls whether rate limit percentages or cost is shown in the status bar. |
+| `claudeHome` | string | `".claude"` | Claude Code data directory (projects, credentials, cache). Relative paths resolve against the home directory; absolute paths and ~ are supported. Default: .claude (~/.claude). *(user settings only)* |
+| `credentials.path` | string \| null | `null` | Custom path to the Claude credentials file. Leave null to use <claudeHome>/.credentials.json (macOS falls back to the Keychain). *(user settings only)* |
+| `rateLimitApi.enabled` | boolean | `true` | Enable fetching rate-limit utilization (5h/7d %) from the Anthropic API (Claude.ai subscriptions only). When disabled, no new API calls are made: the last cached percentages are still shown with an age suffix (e.g. [10m ago]); without a cache only local token cost is shown. Default: true — API consumption is negligible because calls are made only while Claude Code is actively running. |
+| `cache.ttlSeconds` | number (60–3600) | `300` | Cache TTL in seconds. API is not called more often than this when Claude Code is idle. |
+| `realtime.enabled` | boolean | `false` | Not implemented — currently has no effect. (Reserved for polling the rate-limit API regardless of Claude Code activity.) |
 
-  "claudeStatus.statusBar.showSparkline": {
-    "type": "boolean",
-    "default": false,
-    "description": "Show a compact utilization meter (▰▰▰▱▱) next to the 5h percentage in the status bar (percent mode, Claude.ai only). Custom formats can use the ${bar5h} / ${bar7d} placeholders instead."
-  },
+### Budgets & notifications
 
-  "claudeStatus.payAsYouGo.showTimeWindows": {
-    "type": "boolean",
-    "default": true,
-    "description": "Show 5-hour / 7-day window figures for pay-as-you-go usage (API key, AWS Bedrock, other non-subscription providers). Off: status bar, sidebar and dashboard show today's cost instead. No effect on Claude.ai subscriptions or custom formats."
-  },
+| Setting (`claudeStatus.…`) | Type | Default | Description |
+|---|---|---|---|
+| `budget.dailyUsd` | number \| null | `null` | Daily budget in USD. Set to null to disable. |
+| `budget.weeklyUsd` | number \| null | `null` | Weekly budget in USD. Set to null to disable. |
+| `budget.monthlyUsd` | number \| null | `null` | Monthly spending budget in USD for the current calendar month (null = disabled) — e.g. to match a spend limit on a usage-based Enterprise plan. Shown in the dashboard, sidebar and tooltip; warns once a month at budget.alertThresholdPercent. |
+| `budget.alertThresholdPercent` | number (1–100) | `80` | Show budget warning when usage exceeds this percentage of the budget. |
+| `notifications.budgetWarning` | boolean | `true` | Show a notification when a daily or monthly budget threshold is reached (at most once per day / month). |
+| `notifications.rateLimitWarning` | boolean | `true` | Show notification when rate limit is approaching. |
+| `notifications.rateLimitWarningThresholdMinutes` | number (5–120) | `30` | Show rate limit warning this many minutes before exhaustion. |
 
-  "claudeStatus.cache.ttlSeconds": {
-    "type": "number",
-    "default": 300,
-    "minimum": 60,
-    "maximum": 3600,
-    "description": "Cache TTL in seconds. API is not called more often than this when Claude Code is idle."
-  },
+### Pricing
 
-  "claudeStatus.rateLimitApi.enabled": {
-    "type": "boolean",
-    "default": true,
-    "description": "Enable fetching rate-limit utilization (5h/7d %) from the Anthropic API. When disabled, no new API calls are made. If a prior cache exists, the cached percentages are still shown with a stale-age indicator (e.g. '[10m ago]'). If no cache exists, only local token cost is shown. API consumption is negligible by default because calls are made only when Claude Code is actively running."
-  },
+| Setting (`claudeStatus.…`) | Type | Default | Description |
+|---|---|---|---|
+| `pricing.useModelPricing` | boolean | `true` | Price each entry by its model (Opus, Sonnet, Haiku, Fable…) using built-in Anthropic rates. Unrecognized models — and every entry when disabled — use the claudeStatus.pricing.* rates above. |
+| `pricing.modelOverrides` | object | `{}` | Per-model rates (USD per 1M tokens) that take precedence over the built-in table — use this for a newly released model or a price change before the extension is updated. Keys match part of the model id (the longest match wins), e.g. `{ "claude-opus-6": { "inputPerMillion": 4, "outputPerMillion": 20 } }`. Cache read defaults to 0.1× input and cache create to 1.25× input. |
+| `pricing.inputPerMillion` | number | `3` | Manual rate: USD per 1M input tokens, used for unrecognized models and for every entry when pricing.useModelPricing is off. Default: $3.00 (Claude Sonnet 4.x). |
+| `pricing.outputPerMillion` | number | `15` | Manual rate: USD per 1M output tokens, used for unrecognized models and for every entry when pricing.useModelPricing is off. Default: $15.00 (Claude Sonnet 4.x). |
+| `pricing.cacheReadPerMillion` | number | `0.3` | Manual rate: USD per 1M cache-read tokens, used for unrecognized models and for every entry when pricing.useModelPricing is off. Default: $0.30 (Claude Sonnet 4.x). |
+| `pricing.cacheCreatePerMillion` | number | `3.75` | Manual rate: USD per 1M 5-minute cache-write tokens (1-hour writes are 2x input), used for unrecognized models and for every entry when pricing.useModelPricing is off. Default: $3.75 (Claude Sonnet 4.x). |
 
-  "claudeStatus.realtime.enabled": {
-    "type": "boolean",
-    "default": false,
-    "description": "Poll the rate-limit API every cache.ttlSeconds regardless of Claude Code activity. Requires rateLimitApi.enabled to be true. Increases API usage."
-  },
-
-  "claudeStatus.budget.dailyUsd": {
-    "type": ["number", "null"],
-    "default": null,
-    "minimum": 0,
-    "description": "Daily budget in USD. Set to null to disable."
-  },
-
-  "claudeStatus.budget.weeklyUsd": {
-    "type": ["number", "null"],
-    "default": null,
-    "minimum": 0,
-    "description": "Weekly budget in USD. Set to null to disable."
-  },
-
-  "claudeStatus.budget.monthlyUsd": {
-    "type": ["number", "null"],
-    "default": null,
-    "minimum": 0,
-    "description": "Budget in USD for the current calendar month (local time), e.g. to match a spend limit on a usage-based Enterprise plan. Set to null to disable."
-  },
-
-  "claudeStatus.budget.alertThresholdPercent": {
-    "type": "number",
-    "default": 80,
-    "minimum": 1,
-    "maximum": 100,
-    "description": "Show budget warning when usage exceeds this percentage of the budget."
-  },
-
-  "claudeStatus.notifications.rateLimitWarning": {
-    "type": "boolean",
-    "default": true,
-    "description": "Show notification when rate limit is approaching."
-  },
-
-  "claudeStatus.notifications.rateLimitWarningThresholdMinutes": {
-    "type": "number",
-    "default": 30,
-    "minimum": 5,
-    "maximum": 120,
-    "description": "Show rate limit warning this many minutes before exhaustion."
-  },
-
-  "claudeStatus.notifications.budgetWarning": {
-    "type": "boolean",
-    "default": true,
-    "description": "Show notification when budget threshold is exceeded."
-  },
-
-  "claudeStatus.heatmap.days": {
-    "type": "number",
-    "default": 90,
-    "enum": [30, 60, 90],
-    "description": "Number of days shown in the usage heatmap."
-  },
-
-  "claudeStatus.claudeHome": {
-    "type": "string",
-    "default": ".claude",
-    "scope": "machine",
-    "description": "Claude Code data directory (projects, credentials, cache). Relative paths resolve against the home directory; absolute paths and ~ are supported. Default: .claude (~/.claude)."
-  },
-
-  "claudeStatus.credentials.path": {
-    "type": ["string", "null"],
-    "default": null,
-    "scope": "machine",
-    "description": "Custom path to Claude credentials file. Leave null to use default (~/.claude/.credentials.json)."
-  },
-
-  "claudeStatus.claudeProvider": {
-    "type": "string",
-    "enum": ["auto", "claude-ai", "claude-ai-usage", "aws-bedrock", "api-key"],
-    "enumDescriptions": [
-      "Auto-detect: checks the credentials file (and whether the signed-in plan is usage-based), then AWS/API key environment variables.",
-      "Claude.ai subscription — shows rate limit utilization (5h window, 7d window if available).",
-      "Claude.ai sign-in on a usage-based plan (e.g. usage-based Enterprise, billed at API rates) — no 5h / 7d windows, shows token cost only, never calls the rate-limit API.",
-      "AWS Bedrock — no rate limits, shows token cost only.",
-      "Anthropic API key — no rate limits, shows token cost only."
-    ],
-    "default": "auto",
-    "description": "Claude provider type. Controls whether rate limit percentages or cost is shown in the status bar."
-  },
-
-  // --- Token pricing (user-adjustable when Anthropic changes rates) ---
-  "claudeStatus.pricing.inputPerMillion": {
-    "type": "number",
-    "default": 3.00,
-    "minimum": 0,
-    "description": "Cost per 1M input tokens in USD. Default: $3.00 (Claude Sonnet 4.x)."
-  },
-  "claudeStatus.pricing.outputPerMillion": {
-    "type": "number",
-    "default": 15.00,
-    "minimum": 0,
-    "description": "Cost per 1M output tokens in USD. Default: $15.00 (Claude Sonnet 4.x)."
-  },
-  "claudeStatus.pricing.cacheReadPerMillion": {
-    "type": "number",
-    "default": 0.30,
-    "minimum": 0,
-    "description": "Cost per 1M cache-read tokens in USD. Default: $0.30 (Claude Sonnet 4.x)."
-  },
-  "claudeStatus.pricing.cacheCreatePerMillion": {
-    "type": "number",
-    "default": 3.75,
-    "minimum": 0,
-    "description": "Cost per 1M cache-creation tokens in USD. Default: $3.75 (Claude Sonnet 4.x)."
-  },
-  "claudeStatus.pricing.useModelPricing": {
-    "type": "boolean",
-    "default": true,
-    "description": "Price each entry by its model using built-in Anthropic rates. Unrecognized models — and every entry when disabled — use the claudeStatus.pricing.* rates."
-  },
-  "claudeStatus.pricing.modelOverrides": {
-    "type": "object",
-    "default": {},
-    "description": "Per-model rates that take precedence over the built-in table, e.g. { \"claude-opus-6\": { \"inputPerMillion\": 4, \"outputPerMillion\": 20 } }. Keys match part of the model id (longest wins); cacheReadPerMillion defaults to 0.1x input, cacheCreatePerMillion to 1.25x input."
-  }
-}
-```
-
-### Data directory notes
+### Data directory
 
 - `claudeStatus.claudeHome` and `claudeStatus.credentials.path` are `machine`-scoped: they can be
   set in user (or remote) settings only, never in a workspace's `.vscode/settings.json`, so an
@@ -288,114 +116,46 @@ Set `claudeStatus.statusBar.format` to a template string to replace the default 
 
 ---
 
-## Commands (`package.json` contributes.commands)
+## Commands
 
-```json
-[
-  {
-    "command": "vscode-claude-status.openDashboard",
-    "title": "Claude Status: Open Dashboard"
-  },
-  {
-    "command": "vscode-claude-status.refresh",
-    "title": "Claude Status: Refresh Now"
-  },
-  {
-    "command": "vscode-claude-status.toggleDisplayMode",
-    "title": "Claude Status: Toggle % / $ Display"
-  },
-  {
-    "command": "vscode-claude-status.setBudget",
-    "title": "Claude Status: Set Budget..."
-  },
-  {
-    "command": "vscode-claude-status.exportUsage",
-    "title": "Claude Status: Export Usage Data..."
-  }
-]
-```
+| Command | Title | What it does |
+|---|---|---|
+| `vscode-claude-status.openDashboard` | Claude Status: Open Dashboard | Open the dashboard panel (also: click the status bar item) |
+| `vscode-claude-status.refresh` | Claude Status: Refresh Now | Re-read transcripts and fetch rate limits now (counts as one API call on `claude-ai`) |
+| `vscode-claude-status.toggleDisplayMode` | Claude Status: Toggle % / $ Display | Switch `displayMode` |
+| `vscode-claude-status.setBudget` | Claude Status: Set Budget... | Set or clear the **daily** budget (`budget.dailyUsd`); weekly / monthly budgets are set in Settings |
+| `vscode-claude-status.exportUsage` | Claude Status: Export Usage Data... | Export the daily history (see below) |
 
 ### Export Usage Data
 
-`vscode-claude-status.exportUsage` exports the daily usage history (the same
-aggregation that powers the heatmap, covering `claudeStatus.heatmap.days` days)
-to a file chosen via a save dialog:
+Exports the daily usage history — the same aggregation as the heatmap, covering
+`heatmap.days` days — to a file chosen in a save dialog (default name
+`claude-usage-YYYY-MM-DD.csv|json`, local date):
 
-- **CSV** — `date,cost_usd,messages,tokens`, one row per day (zero-activity days
-  included), cost with 4 decimal places.
+- **CSV** — `date,cost_usd,messages,tokens`, one row per day (zero-activity days included),
+  cost with 4 decimal places.
 - **JSON** — `{ exportedAt, days, totalCostUsd, daily: [{date, costUsd, messages, tokens}] }`.
 
-Serializers live in `src/data/exportUsage.ts` (pure functions, unit-tested).
+Serializers: `src/data/exportUsage.ts` (pure functions, unit-tested).
 
 ---
 
-## Keybindings (`package.json` contributes.keybindings)
+## Keybindings
 
-```json
-[
-  {
-    "command": "vscode-claude-status.toggleDisplayMode",
-    "key": "ctrl+shift+alt+c",
-    "mac": "cmd+shift+alt+c"
-  }
-]
-```
+| Key | Command |
+|---|---|
+| `Ctrl+Shift+Alt+C` (`⌘⇧⌥C` on macOS) | Toggle % / $ display |
 
 ---
 
-## Settings Access Pattern
+## For developers
 
-Always access settings through a typed wrapper to avoid magic strings:
-
-```typescript
-// src/config.ts
-export class ExtensionConfig {
-  private get cfg() {
-    return vscode.workspace.getConfiguration('claudeStatus')
-  }
-
-  get displayMode(): 'percent' | 'cost' {
-    return this.cfg.get('displayMode', 'percent')
-  }
-
-  get cacheTtlSeconds(): number {
-    return this.cfg.get('cache.ttlSeconds', 300)
-  }
-
-  get rateLimitApiEnabled(): boolean {
-    return this.cfg.get('rateLimitApi.enabled', true)
-  }
-
-  get dailyBudget(): number | null {
-    return this.cfg.get('budget.dailyUsd', null)
-  }
-
-  get claudeProvider(): 'auto' | ClaudeProvider {
-    return this.cfg.get('claudeProvider', 'auto')
-  }
-
-  // ... etc
-
-  async setDisplayMode(mode: 'percent' | 'cost'): Promise<void> {
-    await this.cfg.update('displayMode', mode, vscode.ConfigurationTarget.Global)
-  }
-
-  async setDailyBudget(value: number | null): Promise<void> {
-    await this.cfg.update('budget.dailyUsd', value, vscode.ConfigurationTarget.Global)
-  }
-}
-```
-
----
-
-## Settings Change Listener
-
-React to settings changes without requiring extension restart:
-
-```typescript
-vscode.workspace.onDidChangeConfiguration(e => {
-  if (e.affectsConfiguration('claudeStatus')) {
-    statusBar.update(lastData)  // re-render with new settings
-  }
-})
-```
+- Read settings only through the typed accessors in `src/config.ts` (`config.displayMode`,
+  `config.costOptions`, …) — never `getConfiguration('claudeStatus')` elsewhere.
+- `src/extension.ts` reacts to `onDidChangeConfiguration` without a reload:
+  `claudeHome` → restart the watcher and re-read; `pricing.*` → recompute costs (a normal
+  refresh); `payAsYouGo.*` → re-render from the last data (no I/O); anything else → re-render
+  the status bar.
+- Adding a setting: declare it in `package.json` with a `%…%` description in all three
+  `package.nls*.json`, add an accessor in `config.ts`, then add it to the tables here and to the
+  Configuration section of all three READMEs (`docs.test.ts` checks this).

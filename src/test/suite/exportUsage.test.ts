@@ -56,11 +56,18 @@ suite('ExportUsage', () => {
     });
   });
   suite('exportFileName', () => {
-    test('regression: uses the local date, not the UTC date', () => {
-      // 00:30 local on Jan 2 — the UTC date differs in any timezone east of UTC
-      const lateNight = new Date(2026, 0, 2, 0, 30);
-      assert.strictEqual(exportFileName('csv', lateNight), 'claude-usage-2026-01-02.csv');
-      assert.strictEqual(exportFileName('json', new Date(2026, 11, 31, 23, 59)), 'claude-usage-2026-12-31.json');
+    test('regression: uses the local date, not the UTC date', function () {
+      // CI runs in UTC, where the two dates coincide — switch to a zone east of UTC
+      const prevTz = process.env.TZ;
+      process.env.TZ = 'Asia/Tokyo';
+      try {
+        const lateNight = new Date(2026, 0, 2, 0, 30);   // 00:30 JST = Jan 1 15:30 UTC
+        if (lateNight.getUTCDate() === lateNight.getDate()) { this.skip(); }  // TZ not applied
+        assert.strictEqual(exportFileName('csv', lateNight), 'claude-usage-2026-01-02.csv');
+        assert.strictEqual(exportFileName('json', new Date(2026, 11, 31, 23, 59)), 'claude-usage-2026-12-31.json');
+      } finally {
+        if (prevTz === undefined) { delete process.env.TZ; } else { process.env.TZ = prevTz; }
+      }
     });
   });
 });

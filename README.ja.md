@@ -26,7 +26,7 @@
 
 **vscode-claude-status** は、エディタを離れることなく [Claude Code](https://claude.ai/code) の使用状況をリアルタイムで監視できる Visual Studio Code 拡張機能です。
 
-`~/.claude/projects/` からローカルでセッションデータを読み取り、レート制限の使用率ヘッダーを取得するために最大5分に1回だけ Anthropic API に問い合わせます。トークンコストはすべてクライアント側で計算され、モデル（Opus・Sonnet・Haiku・Fable など）ごとの組み込み単価を使用します。未知のモデルには設定可能なレートが適用されます。
+`~/.claude/projects/` からローカルでセッションデータを読み取り、レート制限の使用率ヘッダーを取得するために最大5分に1回だけ Anthropic API に問い合わせます。トークンコストはすべてクライアント側で計算され、モデル（Opus・Sonnet・Haiku・Fable など）ごとの組み込み単価を使用します。組み込みの単価表より新しいモデルは同じファミリーの最新単価で概算され、`claudeStatus.pricing.modelOverrides` で正確な単価を設定できます。
 
 > [!NOTE]
 > **APIコールは微量かつ Claude Code の使用中のみ発生します。**
@@ -239,6 +239,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | `claudeStatus.pricing.cacheReadPerMillion` | `number` | `0.30` | キャッシュ読み取りトークン 1M あたりの USD 単価 |
 | `claudeStatus.pricing.cacheCreatePerMillion` | `number` | `3.75` | キャッシュ作成トークン 1M あたりの USD 単価 |
 | `claudeStatus.pricing.useModelPricing` | `boolean` | `true` | モデルごとの組み込み単価で計算。上記4項目は未知のモデル（`false` の場合は全エントリ）に適用 |
+| `claudeStatus.pricing.modelOverrides` | `object` | `{}` | 新モデルや価格改定用のモデル別単価。例: `{ "claude-opus-6": { "inputPerMillion": 4, "outputPerMillion": 20 } }` |
 
 ```jsonc
 // 設定例: settings.json

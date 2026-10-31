@@ -345,7 +345,9 @@ per-type token counts and costs using the `usage` and `pricing` fields from the
 When `claudeStatus.pricing.useModelPricing` is on (default), the manual rates above
 don't apply to most entries, so the per-type rows show token counts only and a
 **By model (5h)** list shows `usage.costByModel5h` (model id shortened, e.g.
-`claude-sonnet-4-5-20250929` → `sonnet-4-5`), sorted by cost. The Pricing & Settings
+`claude-sonnet-4-5-20250929` → `sonnet-4-5`), sorted by cost. Models not priced from the
+built-in table are flagged from `usage.pricingByModel5h`: `≈` = estimated (newer than the
+table), `*` = manual rates or a `modelOverrides` entry; the label's tooltip explains which. The Pricing & Settings
 card notes that the manual rates apply only to unrecognized models.
 
 The breakdown re-renders on every `update` message if the toggle is open.

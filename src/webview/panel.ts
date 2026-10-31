@@ -919,8 +919,8 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
         html += '<div class="cost-row" style="margin-top:6px"><span class="cost-label" style="font-weight:600">' +
           i18n.byModel + '</span></div>';
         for (const m of models) {
-          // "claude-sonnet-4-5-20250929" → "sonnet-4-5"
-          const shortName = m.replace(/^claude-/, '').replace(/-\d{8}$/, '');
+          // Keys are normalized ids: "claude-sonnet-4-5" → "sonnet-4-5"
+          const shortName = m.replace(/^claude-/, '');
           // Flag models not priced from the built-in table: ≈ estimated, * manual / override
           const source = (usage.pricingByModel5h || {})[m];
           const flag = { estimated: ' ≈', manual: ' *', override: ' *' }[source] || '';

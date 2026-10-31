@@ -14,11 +14,15 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Model-aware pricing** — each usage entry is now priced by its model (`message.model`)
   with built-in Anthropic rates: Fable / Mythos 5.x, Opus 5.5, Opus 4.5 – 5, legacy Opus
   (3 / 4.0 / 4.1), Sonnet 5.x, Sonnet 3.x – 4.x, Haiku 5.5 (including its > 100K-token
-  prompt rate card), Haiku 4.5 / 3.5 / 3, with model-specific cache-read rates. Previously
+  prompt rate card), Haiku 4.5 / 3.5 / 3, with model-specific cache-read rates. Bedrock /
+  Vertex ids and snapshot dates are recognized; a model newer than the built-in table is
+  priced at its family's latest rate and marked `≈` in the dashboard. Previously
   every entry used the Sonnet 4.x-based `claudeStatus.pricing.*` rates, so Haiku and
   Sonnet 5.x usage was overstated and Opus and Fable usage understated. New setting
   `claudeStatus.pricing.useModelPricing` (default `true`); unrecognized models, and every
   entry when disabled, keep using the manual rates.
+- **`claudeStatus.pricing.modelOverrides`** — set exact per-model rates for newly released
+  models or price changes without waiting for an extension update.
 - **Per-model cost breakdown** — the dashboard's token breakdown lists the 5-hour cost per
   model.
 - **Sidebar tree view** — a new Activity Bar icon opens a native *Usage Overview* with

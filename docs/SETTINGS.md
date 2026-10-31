@@ -206,6 +206,11 @@ What the status bar and dashboard show, depending on your Claude plan and key se
     "type": "boolean",
     "default": true,
     "description": "Price each entry by its model using built-in Anthropic rates. Unrecognized models — and every entry when disabled — use the claudeStatus.pricing.* rates."
+  },
+  "claudeStatus.pricing.modelOverrides": {
+    "type": "object",
+    "default": {},
+    "description": "Per-model rates that take precedence over the built-in table, e.g. { \"claude-opus-6\": { \"inputPerMillion\": 4, \"outputPerMillion\": 20 } }. Keys match part of the model id (longest wins); cacheReadPerMillion defaults to 0.1x input, cacheCreatePerMillion to 1.25x input."
   }
 }
 ```

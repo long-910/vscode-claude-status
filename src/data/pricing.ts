@@ -56,8 +56,11 @@ interface ModelRateEntry {
 
 // Anthropic's published first-party rates, USD per 1M tokens (as of 2026-10).
 // Cache read is 0.1x input unless noted; 1-hour cache writes are 2x input.
-// To support a new model, add a row here — versions newer than the last row
-// of a family are priced at that row's rate until then (see resolve below).
+// Every released model has its own row (even when its price equals the row
+// before), so it resolves as `builtin`. To support a new model, add a row —
+// until then, versions newer than a family's last row are `estimated`.
+// Listed releases (2026-10): Fable 5, 5.1; Opus 3, 4, 4.1, 4.5, 4.6, 4.7,
+// 4.8, 5, 5.5; Sonnet 3, 3.5, 3.7, 4, 4.5, 4.6, 5, 5.5; Haiku 3, 3.5, 4.5, 5.5.
 const MODEL_RATES: Readonly<Record<Family, ReadonlyArray<ModelRateEntry>>> = {
   fable: [  // Mythos shares Fable's rates
     { version: [5, 0], pricing: modelRate(10.00, 50.00) },
@@ -67,12 +70,14 @@ const MODEL_RATES: Readonly<Record<Family, ReadonlyArray<ModelRateEntry>>> = {
     { version: [3, 0], pricing: modelRate(15.00, 75.00) },
     { version: [4, 0], pricing: modelRate(15.00, 75.00) },
     { version: [4, 1], pricing: modelRate(15.00, 75.00) },
-    { version: [4, 5], pricing: modelRate(5.00, 25.00) },   // 4.5 – 5
+    { version: [4, 5], pricing: modelRate(5.00, 25.00) },   // 4.5 – 4.8
+    { version: [5, 0], pricing: modelRate(5.00, 25.00) },
     { version: [5, 5], pricing: modelRate(4.00, 20.00, 0.20) },
   ],
   sonnet: [
     { version: [3, 0], pricing: modelRate(3.00, 15.00) },   // 3.x – 4.x
-    { version: [5, 0], pricing: modelRate(2.00, 10.00) },   // 5, 5.5
+    { version: [5, 0], pricing: modelRate(2.00, 10.00) },
+    { version: [5, 5], pricing: modelRate(2.00, 10.00, 0.20) },
   ],
   haiku: [
     { version: [3, 0], pricing: modelRate(0.25, 1.25, 0.03, 0.30) },

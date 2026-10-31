@@ -105,7 +105,8 @@ vscode-claude-status/
 │   ├── treeView.ts           # Activity Bar "Usage Overview" tree view
 │   ├── data/
 │   │   ├── dataManager.ts    # Singleton orchestrating readers, API, cache, refresh
-│   │   ├── jsonlReader.ts    # JSONL streaming, file discovery, (model-aware) pricing
+│   │   ├── jsonlReader.ts    # JSONL streaming, file discovery, usage totals
+│   │   ├── pricing.ts        # Token pricing: manual, per-model table, overrides
 │   │   ├── usageIndex.ts     # Incremental per-file usage index + dedupe
 │   │   ├── apiClient.ts      # Anthropic rate-limit header fetcher
 │   │   ├── cache.ts          # Disk-backed cache (~/.claude/vscode-claude-status-cache.json)

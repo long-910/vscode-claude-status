@@ -40,32 +40,55 @@ Each line is a JSON object. Relevant fields (verified against Claude Code v2.1.x
 #### Model-aware pricing (default)
 
 Every assistant entry carries `message.model`. With `claudeStatus.pricing.useModelPricing`
-enabled (the default), each entry is priced by its model using built-in rates
-(`resolveModelPricing()` in `jsonlReader.ts`, first match wins, USD per 1M tokens):
+enabled (the default), each entry is priced by its model (`src/data/pricing.ts`):
 
-| Match (`message.model`) | Family | Input | Output | Cache read |
+1. **Normalize the id** — provider prefixes (`us.anthropic.`, `anthropic.`), snapshot dates
+   (`-20250929`, `@20251101`), Bedrock version suffixes (`-v1:0`) and `[1m]` are removed:
+   `us.anthropic.claude-sonnet-4-5-20250929-v1:0` → `claude-sonnet-4-5`.
+2. **User override** — if a key of `claudeStatus.pricing.modelOverrides` is contained in the
+   normalized id, that rate is used (longest key wins). Source: `override`.
+3. **Family + version** — the id is parsed as `claude-<family>-<major>[-<minor>]` or the
+   Claude 3 form `claude-<major>[-<minor>]-<family>` (Mythos uses Fable's rates). The rate is
+   the newest table row whose version is ≤ the model's. Source: `builtin`.
+4. **Newer than the table** — a known family with a version above the last row (e.g. a future
+   `claude-opus-6`), or without a version, uses the family's latest row. Source: `estimated`;
+   the dashboard marks it with `≈` and suggests an override.
+5. **Unknown model** (e.g. `<synthetic>`, missing `model`) — the manual rates below. Source:
+   `manual`.
+
+Built-in table (USD per 1M tokens, Anthropic first-party pricing as of 2026-10):
+
+| Family | From version | Input | Output | Cache read |
 |---|---|---|---|---|
-| `fable-5-1`, `mythos-5-1` | Fable / Mythos 5.1 | $10.00 | $50.00 | $0.25 |
-| `fable`, `mythos` | Fable / Mythos 5 | $10.00 | $50.00 | $1.00 |
-| `opus-5-5` | Opus 5.5 | $4.00 | $20.00 | $0.20 |
-| `claude-3-opus`, `opus-4-1`, `opus-4-YYYYMMDD` | Opus 3 / 4.0 / 4.1 | $15.00 | $75.00 | $1.50 |
-| `opus` | Opus 4.5 – 5 | $5.00 | $25.00 | $0.50 |
-| `sonnet-5` | Sonnet 5 / 5.5 | $2.00 | $10.00 | $0.20 |
-| `sonnet` | Sonnet 3.x – 4.x | $3.00 | $15.00 | $0.30 |
-| `haiku-5` | Haiku 5.5 (prompt ≤ 100K tokens) | $0.10 | $0.50 | $0.01 |
-| `haiku-5` | Haiku 5.5 (prompt > 100K tokens) | $0.50 | $2.50 | $0.05 |
-| `claude-3-5-haiku` | Haiku 3.5 | $0.80 | $4.00 | $0.08 |
-| `claude-3-haiku` | Haiku 3 | $0.25 | $1.25 | $0.03 |
-| `haiku` | Haiku 4.5 | $1.00 | $5.00 | $0.10 |
+| Fable / Mythos | 5.0 | $10.00 | $50.00 | $1.00 |
+| Fable / Mythos | 5.1 | $10.00 | $50.00 | $0.25 |
+| Opus | 3.0 (3, 4.0, 4.1) | $15.00 | $75.00 | $1.50 |
+| Opus | 4.5 (4.5 – 4.8) | $5.00 | $25.00 | $0.50 |
+| Opus | 5.0 | $5.00 | $25.00 | $0.50 |
+| Opus | 5.5 | $4.00 | $20.00 | $0.20 |
+| Sonnet | 3.0 (3.x – 4.x) | $3.00 | $15.00 | $0.30 |
+| Sonnet | 5.0 | $2.00 | $10.00 | $0.20 |
+| Sonnet | 5.5 | $2.00 | $10.00 | $0.20 |
+| Haiku | 3.0 | $0.25 | $1.25 | $0.03 |
+| Haiku | 3.5 | $0.80 | $4.00 | $0.08 |
+| Haiku | 4.5 | $1.00 | $5.00 | $0.10 |
+| Haiku | 5.5 (prompt ≤ 100K tokens) | $0.10 | $0.50 | $0.01 |
+| Haiku | 5.5 (prompt > 100K tokens) | $0.50 | $2.50 | $0.05 |
 
 5-minute cache writes are 1.25x and 1-hour cache writes 2x the model's input rate. "Prompt"
 for the Haiku 5.5 rate card is `input + cache read + cache creation` tokens of the entry.
 
-Entries whose model is not recognized (e.g. `<synthetic>`, missing `model`) — and every
-entry when `useModelPricing` is `false` — use the manual rates below. All cost consumers
-(status bar totals, project cost, prediction, heatmap) take the same `CostOptions`
-(`config.costOptions`), so they always agree. The dashboard's token breakdown lists the
-5-hour cost per model (`costByModel5h`).
+**When Anthropic releases a model or changes a price:** add or edit a row in
+`MODEL_RATES` (`src/data/pricing.ts`) — every released model gets its own row, even at an
+unchanged price, so it is reported as `builtin` rather than `estimated` — and add the id to
+the "every released model resolves as builtin" test in `pricing.test.ts`. Until a release
+ships, users can set `claudeStatus.pricing.modelOverrides`.
+
+All cost consumers (status bar totals, project cost, prediction, heatmap) take the same
+`CostOptions` (`config.costOptions`), so they always agree. With `useModelPricing: false`
+every entry uses the manual rates — identical to the calculation before model pricing.
+The dashboard's token breakdown lists the 5-hour cost per model (`costByModel5h`) and how
+each was priced (`pricingByModel5h`).
 
 #### Manual rates
 

@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as readline from 'readline';
 import { getClaudeHome } from './claudeHome';
 import { readUsageRecords, usageDedupeKey } from './usageIndex';
-import { usageCost, pricingSource, CostOptions, DEFAULT_COST_OPTIONS, PricingSource } from './pricing';
+import { usageCost, pricingSource, normalizeModelId, CostOptions, DEFAULT_COST_OPTIONS, PricingSource } from './pricing';
 
 // Pricing lives in ./pricing; re-exported here for existing importers
 export {
@@ -50,8 +50,10 @@ export interface AggregatedUsage {
   tokensOut5h: number
   tokensCacheRead5h: number
   tokensCacheCreate5h: number
-  costByModel5h: Record<string, number>  // model id → cost in the 5h window
-  pricingByModel5h: Record<string, PricingSource>  // model id → how it was priced
+  // Keyed by normalized model id ("claude-opus-5-5"), so provider-prefixed and
+  // dated ids of the same model share one row
+  costByModel5h: Record<string, number>            // model → cost in the 5h window
+  pricingByModel5h: Record<string, PricingSource>  // model → how it was priced
 }
 
 export function getClaudeProjectsDir(): string {
@@ -206,9 +208,10 @@ export async function readAllUsage(options: CostOptions = DEFAULT_COST_OPTIONS):
       result.tokensCacheRead5h += usage.cache_read_input_tokens || 0;
       result.tokensCacheCreate5h += usage.cache_creation_input_tokens || 0;
       if (model) {
-        result.costByModel5h[model] = (result.costByModel5h[model] || 0) + cost;
-        if (!(model in result.pricingByModel5h)) {
-          result.pricingByModel5h[model] = pricingSource(model, options);
+        const key = normalizeModelId(model);
+        result.costByModel5h[key] = (result.costByModel5h[key] || 0) + cost;
+        if (!(key in result.pricingByModel5h)) {
+          result.pricingByModel5h[key] = pricingSource(model, options);
         }
       }
     }

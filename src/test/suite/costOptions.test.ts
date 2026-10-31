@@ -2,6 +2,7 @@ import * as assert from 'assert';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
+import * as vscode from 'vscode';
 import { readAllUsage } from '../../data/jsonlReader';
 import { calculateCost, CostOptions, DEFAULT_COST_OPTIONS, DEFAULT_PRICING } from '../../data/pricing';
 import { clearUsageIndex } from '../../data/usageIndex';
@@ -62,6 +63,13 @@ suite('Cost options (regression)', () => {
     assert.strictEqual(u.pricingByModel5h['claude-opus-5-5'], 'builtin');
   });
 
+  test('readAllUsage: per-model totals merge provider-prefixed and dated ids', async () => {
+    await fs.appendFile(file, line('r9', 'us.anthropic.claude-opus-5-5-v1:0', 60e3) + '\n');
+    const u = await readAllUsage(DEFAULT_COST_OPTIONS);
+    assert.deepStrictEqual(Object.keys(u.costByModel5h), ['claude-opus-5-5']);
+    assert.ok(near(u.costByModel5h['claude-opus-5-5'], 3 * opusCost));
+  });
+
   test('readAllUsage: useModelPricing=false prices exactly like before model pricing', async () => {
     const u = await readAllUsage(MANUAL_ONLY);
     assert.ok(near(u.cost5h, 2 * manualCost), `cost5h ${u.cost5h}`);
@@ -107,5 +115,29 @@ suite('Cost options (regression)', () => {
     assert.strictEqual(total(await dm.getHeatmapData()), 2, 'served from the 5-minute cache');
     dm.invalidateHeatmap();
     assert.strictEqual(total(await dm.getHeatmapData()), 3, 'recomputed after invalidation');
+  });
+
+  test('DataManager passes the pricing settings to usage totals and the heatmap', async () => {
+    const cfg = () => vscode.workspace.getConfiguration('claudeStatus');
+    const prevModel = cfg().inspect<boolean>('pricing.useModelPricing')?.globalValue;
+    const prevProvider = cfg().inspect<string>('claudeProvider')?.globalValue;
+    const dm = DataManager.getInstance();
+    dm.restartWatching();
+    try {
+      // Local-only provider: no credentials lookup, no API call
+      await cfg().update('claudeProvider', 'api-key', vscode.ConfigurationTarget.Global);
+      await cfg().update('pricing.useModelPricing', false, vscode.ConfigurationTarget.Global);
+      dm.invalidateHeatmap();
+      const sonnetRateCall = calculateCost(USAGE, DEFAULT_PRICING);   // the default manual rates
+      const usage = await dm.getUsageData();
+      assert.ok(near(usage.cost5h, 2 * sonnetRateCall), `usage cost5h ${usage.cost5h}`);
+      const heatmap = await dm.getHeatmapData();
+      const total = (heatmap?.daily ?? []).reduce((s, d) => s + d.cost, 0);
+      assert.ok(near(total, 2 * sonnetRateCall), `heatmap total ${total}`);
+    } finally {
+      await cfg().update('pricing.useModelPricing', prevModel, vscode.ConfigurationTarget.Global);
+      await cfg().update('claudeProvider', prevProvider, vscode.ConfigurationTarget.Global);
+      dm.invalidateHeatmap();
+    }
   });
 });

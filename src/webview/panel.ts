@@ -4,6 +4,7 @@ import { DataManager, ClaudeUsageData, ProjectCostData, PredictionData, HeatmapD
 import { config } from '../config';
 import type { TokenPricing } from '../data/jsonlReader';
 import { providerLabel, showTimeWindows } from '../statusBar';
+import { projectMonthCost } from '../data/budget';
 
 interface DashboardSettings {
   provider: string;
@@ -22,6 +23,7 @@ interface DashboardMessage {
   projectCosts: ProjectCostData[];
   prediction: PredictionData | null;
   heatmap: HeatmapData | null;
+  monthEstimate: number | null;
   pricing: TokenPricing;
   settings: DashboardSettings;
 }
@@ -48,7 +50,7 @@ function buildI18n(): Record<string, string> {
     project:               t('Project'),
     prediction:            t('Prediction'),
     pricingSettings:       t('Pricing & Settings'),
-    usageHistory:          t('Usage History'),
+    usageHistory:          t('Usage History ({0} days)', '<span id="heatmap-days">90</span>'),
     loadingProject:        t('Loading project data…'),
     noProjectData:         t('No project data'),
     loadingPrediction:     t('Loading prediction…'),
@@ -530,7 +532,7 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
   <!-- Usage History (Feature 05) -->
   <div class="card">
     <div class="card-title">
-      ${i18n.usageHistory} (<span id="heatmap-days">90</span> ${i18n.days7})
+      ${i18n.usageHistory}
     </div>
     <div id="heatmap-content">
       <div class="placeholder">${i18n.loadingHistory}</div>
@@ -698,13 +700,12 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
       document.getElementById('cost-7d').textContent  = '$' + usage.cost7d.toFixed(2);
       document.getElementById('cost-month-actual').textContent = '$' + (usage.costMonth || 0).toFixed(2);
 
-      // Monthly projection
+      // Monthly projection (computed by the extension from this month's cost so far)
       const monthRow = document.getElementById('cost-month-row');
+      const monthEstimate = lastData ? lastData.monthEstimate : null;
       if (monthRow) {
-        const dailyAvg = usage.costDay > 0 ? usage.costDay
-          : usage.cost7d > 0 ? usage.cost7d / 7 : 0;
-        if (dailyAvg > 0) {
-          document.getElementById('cost-month').textContent = '$' + (dailyAvg * 30).toFixed(2);
+        if (monthEstimate !== null) {
+          document.getElementById('cost-month').textContent = '$' + monthEstimate.toFixed(2);
           monthRow.style.display = '';
         } else {
           monthRow.style.display = 'none';
@@ -1495,6 +1496,7 @@ export class DashboardPanel {
         projectCosts: this.dataManager.getLastProjectCosts(),
         prediction,
         heatmap,
+        monthEstimate: projectMonthCost(usage.costMonth),
         pricing: config.tokenPricing,
         settings: {
           provider: usage.providerType,

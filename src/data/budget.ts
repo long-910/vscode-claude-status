@@ -9,6 +9,17 @@ export function budgetPeriodKey(kind: 'day' | 'month', now: Date = new Date()): 
   return kind === 'month' ? day.slice(0, 7) : day;
 }
 
+/**
+ * Projected cost for the whole calendar month: this month's cost so far spread
+ * over the days elapsed (today counts as a full day), times the days in the
+ * month. Null while nothing has been spent this month.
+ */
+export function projectMonthCost(costMonth: number, now: Date = new Date()): number | null {
+  if (!(costMonth > 0)) { return null; }
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  return costMonth / now.getDate() * daysInMonth;
+}
+
 /** True once `spent` reaches `thresholdPercent` of a positive `budget`. */
 export function budgetThresholdReached(spent: number, budget: number | null, thresholdPercent: number): boolean {
   if (budget === null || !(budget > 0)) { return false; }

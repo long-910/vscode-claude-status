@@ -98,6 +98,11 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Tooltip and sidebar countdowns showed `60m` / `24h` (e.g. `2d 24h` is now `3d`).
 - The heatmap unit test failed when run between 00:00 and 03:00 local time.
 - The status bar format field's example placeholder was untranslated in Japanese / Chinese.
+- The dashboard's **Month (est.)** was today's cost × 30, so one busy day could project far more
+  than the month's actual cost (e.g. $2,255 on the 31st with $177 spent). It now spreads this
+  month's cost so far over the days elapsed.
+- The usage history heading read `Usage History (90 7 days)`; it now reads
+  `Usage History (90 days)`.
 
 ---
 

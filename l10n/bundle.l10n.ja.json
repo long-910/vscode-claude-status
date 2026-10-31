@@ -42,7 +42,7 @@
   "Project": "プロジェクト",
   "Prediction": "予測",
   "Pricing & Settings": "料金と設定",
-  "Usage History": "使用履歴",
+  "Usage History ({0} days)": "使用履歴（{0}日間）",
   "Loading project data…": "プロジェクトデータ読み込み中…",
   "No project data": "プロジェクトデータなし",
   "Loading prediction…": "予測データ読み込み中…",

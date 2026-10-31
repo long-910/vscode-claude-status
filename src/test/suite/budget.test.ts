@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { BudgetAlertTracker, budgetPeriodKey, budgetThresholdReached } from '../../data/budget';
+import { BudgetAlertTracker, budgetPeriodKey, budgetThresholdReached, projectMonthCost } from '../../data/budget';
 import { localDateKey, startOfMonth } from '../../data/localTime';
 
 suite('Budget', () => {
@@ -24,6 +24,16 @@ suite('Budget', () => {
     assert.strictEqual(budgetThresholdReached(80, 100, 80), true);
     assert.strictEqual(budgetThresholdReached(500, null, 80), false, 'no budget');
     assert.strictEqual(budgetThresholdReached(500, 0, 80), false, 'zero budget is disabled');
+  });
+
+  test('projectMonthCost spreads the month so far over the days elapsed', () => {
+    // Regression: the estimate was today's cost x 30, so one heavy day on the 31st
+    // projected $2,255 while the month so far was $177.
+    assert.strictEqual(projectMonthCost(177, new Date(2026, 9, 31, 23, 0)), 177, 'last day: estimate = month so far');
+    assert.strictEqual(projectMonthCost(100, new Date(2026, 9, 10, 12, 0)), 310, 'day 10 of 31');
+    assert.strictEqual(projectMonthCost(28, new Date(2026, 1, 14)), 56, 'February has 28 days');
+    assert.strictEqual(projectMonthCost(5, new Date(2026, 10, 1, 0, 5)), 150, 'first day counts as a full day');
+    assert.strictEqual(projectMonthCost(0, new Date(2026, 9, 10)), null, 'nothing spent yet');
   });
 
   suite('BudgetAlertTracker', () => {

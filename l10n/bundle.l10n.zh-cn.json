@@ -42,7 +42,7 @@
   "Project": "项目",
   "Prediction": "预测",
   "Pricing & Settings": "定价与设置",
-  "Usage History": "使用历史",
+  "Usage History ({0} days)": "使用历史（{0} 天）",
   "Loading project data…": "正在加载项目数据…",
   "No project data": "无项目数据",
   "Loading prediction…": "正在加载预测数据…",

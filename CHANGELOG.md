@@ -62,6 +62,11 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Minimum VS Code version raised from 1.73 to 1.82.** The rate-limit % is fetched with the
+  global `fetch` API, which the extension host only provides from VS Code 1.82 (Electron 25 /
+  Node.js 18). On 1.73 – 1.81 (Node.js 16) it was never available: subscribers saw
+  `Not logged in` or an old cached % instead of their usage. Users of VS Code 1.81 or older
+  can stay on 0.7.0.
 - **Displayed costs change** for anyone using models other than Sonnet 4.x — they become more
   accurate. Set `claudeStatus.pricing.useModelPricing: false` to get the previous flat rates.
 - Burn-rate prediction and the heatmap now honour the pricing settings (they always used the

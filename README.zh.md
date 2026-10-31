@@ -10,7 +10,7 @@
 [![Open VSX](https://img.shields.io/open-vsx/v/long-kudo/vscode-claude-status?style=flat-square&label=Open%20VSX)](https://open-vsx.org/extension/long-kudo/vscode-claude-status)
 [![Downloads](https://img.shields.io/visual-studio-marketplace/d/long-kudo.vscode-claude-status?style=flat-square&logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=long-kudo.vscode-claude-status)
 [![Rating](https://img.shields.io/visual-studio-marketplace/r/long-kudo.vscode-claude-status?style=flat-square&logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=long-kudo.vscode-claude-status)
-[![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.73.0-007ACC?style=flat-square)](https://code.visualstudio.com/)
+[![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.82.0-007ACC?style=flat-square)](https://code.visualstudio.com/)
 
 [![License: MIT](https://img.shields.io/github/license/long-910/vscode-claude-status?style=flat-square)](LICENSE)
 [![CI](https://github.com/long-910/vscode-claude-status/actions/workflows/ci.yml/badge.svg)](https://github.com/long-910/vscode-claude-status/actions/workflows/ci.yml)
@@ -132,7 +132,14 @@ Claude Status: Set Budget...
 
 ## 系统要求
 
-- **VS Code** 1.73 或更高版本
+- **VS Code** 1.82 或更高版本
+
+> [!IMPORTANT]
+> **最低 VS Code 版本已从 1.73 提高到 1.82。** 速率限制 %（Claude.ai 订阅）通过全局 `fetch` API
+> 获取，而扩展宿主从 VS Code 1.82（Electron 25 / Node.js 18）起才提供该 API。在 VS Code 1.73 – 1.81
+> （Node.js 16）上它从未可用，订阅用户看到的是 `🤖 Not logged in`（或旧的缓存 %）而不是用量 —
+> 现在的最低版本反映了真实要求。
+> 如果使用 VS Code 1.81 或更早版本，请继续使用扩展 0.7.0，或更新 VS Code。
 - **Claude Code** 至少有一个会话 — 令牌费用从
   `~/.claude/projects/**/*.jsonl`（或 `claudeStatus.claudeHome`）读取
 

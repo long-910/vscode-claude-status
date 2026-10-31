@@ -177,6 +177,11 @@ The shapes are defined in the source; the fields that matter across modules:
 
 ## Platform Support
 
+**VS Code ≥ 1.82** (`engines.vscode: ^1.82.0`): the rate-limit probe uses the global `fetch`,
+which the extension host has from VS Code 1.82 (Electron 25 / Node.js 18.15). VS Code 1.73 –
+1.81 run Node.js 16, where it is missing. Keep `@types/vscode` at the same floor so newer APIs
+fail to compile.
+
 | Platform | Status |
 |----------|--------|
 | Linux | ✅ Primary |

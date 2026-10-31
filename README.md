@@ -10,7 +10,7 @@
 [![Open VSX](https://img.shields.io/open-vsx/v/long-kudo/vscode-claude-status?style=flat-square&label=Open%20VSX)](https://open-vsx.org/extension/long-kudo/vscode-claude-status)
 [![Downloads](https://img.shields.io/visual-studio-marketplace/d/long-kudo.vscode-claude-status?style=flat-square&logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=long-kudo.vscode-claude-status)
 [![Rating](https://img.shields.io/visual-studio-marketplace/r/long-kudo.vscode-claude-status?style=flat-square&logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=long-kudo.vscode-claude-status)
-[![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.73.0-007ACC?style=flat-square)](https://code.visualstudio.com/)
+[![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.82.0-007ACC?style=flat-square)](https://code.visualstudio.com/)
 
 [![License: MIT](https://img.shields.io/github/license/long-910/vscode-claude-status?style=flat-square)](LICENSE)
 [![CI](https://github.com/long-910/vscode-claude-status/actions/workflows/ci.yml/badge.svg)](https://github.com/long-910/vscode-claude-status/actions/workflows/ci.yml)
@@ -155,7 +155,15 @@ Number of days is configurable via `claudeStatus.heatmap.days` (30 / 60 / 90).
 
 ## Requirements
 
-- **VS Code** 1.73 or newer
+- **VS Code** 1.82 or newer
+
+> [!IMPORTANT]
+> **Minimum VS Code version raised from 1.73 to 1.82.** The rate-limit % (Claude.ai
+> subscriptions) is fetched with the global `fetch` API, which the extension host only
+> provides from VS Code 1.82 (Electron 25 / Node.js 18). On VS Code 1.73 – 1.81 (Node.js 16)
+> it was never available, so subscribers saw `🤖 Not logged in` (or an old cached %) instead of
+> their usage — the floor now states the real requirement. On VS Code 1.81 or older, keep extension version 0.7.0, or update
+> VS Code.
 - **Claude Code** with at least one session — the extension reads
   `~/.claude/projects/**/*.jsonl` (or `claudeStatus.claudeHome`) for token cost
 

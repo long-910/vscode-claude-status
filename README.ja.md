@@ -10,7 +10,7 @@
 [![Open VSX](https://img.shields.io/open-vsx/v/long-kudo/vscode-claude-status?style=flat-square&label=Open%20VSX)](https://open-vsx.org/extension/long-kudo/vscode-claude-status)
 [![Downloads](https://img.shields.io/visual-studio-marketplace/d/long-kudo.vscode-claude-status?style=flat-square&logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=long-kudo.vscode-claude-status)
 [![Rating](https://img.shields.io/visual-studio-marketplace/r/long-kudo.vscode-claude-status?style=flat-square&logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=long-kudo.vscode-claude-status)
-[![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.73.0-007ACC?style=flat-square)](https://code.visualstudio.com/)
+[![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.82.0-007ACC?style=flat-square)](https://code.visualstudio.com/)
 
 [![License: MIT](https://img.shields.io/github/license/long-910/vscode-claude-status?style=flat-square)](LICENSE)
 [![CI](https://github.com/long-910/vscode-claude-status/actions/workflows/ci.yml/badge.svg)](https://github.com/long-910/vscode-claude-status/actions/workflows/ci.yml)
@@ -136,7 +136,16 @@ Claude Status: Set Budget...
 
 ## 必要条件
 
-- **VS Code** 1.73 以降
+- **VS Code** 1.82 以降
+
+> [!IMPORTANT]
+> **対応する VS Code の最低バージョンを 1.73 から 1.82 に引き上げました。** レート制限の %
+> （Claude.ai サブスクリプション）は global の `fetch` API で取得していますが、拡張機能ホストで
+> これが使えるのは VS Code 1.82（Electron 25 / Node.js 18）からです。VS Code 1.73 〜 1.81
+> （Node.js 16）では一度も使えず、サブスクリプションの方には使用率の代わりに `🤖 Not logged in`
+> （または古いキャッシュの %）が表示されていました。
+> 実際の動作要件に合わせて最低バージョンを修正しています。VS Code 1.81 以前をお使いの場合は、
+> 拡張機能を 0.7.0 のまま使うか、VS Code を更新してください。
 - **Claude Code** のセッションが1つ以上あること — トークンコストは
   `~/.claude/projects/**/*.jsonl`（または `claudeStatus.claudeHome`）から読み取ります
 

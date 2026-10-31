@@ -227,6 +227,11 @@ export async function readUsageRecords(filePaths: string[], sinceMs: number): Pr
   return result;
 }
 
+/** Number of transcripts currently held in the index (tests). */
+export function indexedFileCount(): number {
+  return files.size;
+}
+
 /** Drop all cached state (tests). */
 export function clearUsageIndex(): void {
   files.clear();

@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
-import { clearAccountInfoCache, getGlobalConfigPath, isUsageBased, readOAuthAccountInfo } from '../../data/accountInfo';
+import { clearAccountInfoCache, getGlobalConfigPath, isUsageBased, readOAuthAccountInfo, RECHECK_MS } from '../../data/accountInfo';
 import { detectProvider, fetchRateLimitData } from '../../data/apiClient';
 import { DEFAULT_CLAUDE_HOME, setClaudeHome } from '../../data/claudeHome';
 
@@ -33,13 +33,37 @@ suite('Account info / usage-based plans', () => {
   });
 
   test('reads oauthAccount.billingType and re-reads when the file changes', async () => {
-    assert.strictEqual(await readOAuthAccountInfo(), null, 'no file');
+    let t = 1_000_000;
+    const later = () => (t += RECHECK_MS);   // each read past the recheck interval
+    assert.strictEqual(await readOAuthAccountInfo(later()), null, 'no file');
     await writeConfig({ billingType: 'usage_based' });
-    assert.deepStrictEqual(await readOAuthAccountInfo(), { billingType: 'usage_based' });
+    assert.deepStrictEqual(await readOAuthAccountInfo(later()), { billingType: 'usage_based' });
     await writeConfig({ billingType: 'stripe_subscription', emailAddress: 'a@example.com' });
-    assert.deepStrictEqual(await readOAuthAccountInfo(), { billingType: 'stripe_subscription' });
+    assert.deepStrictEqual(await readOAuthAccountInfo(later()), { billingType: 'stripe_subscription' });
     await fs.writeFile(path.join(home, '.claude.json'), '{ not json');
-    assert.strictEqual(await readOAuthAccountInfo(), null, 'unparseable');
+    assert.strictEqual(await readOAuthAccountInfo(later()), null, 'unparseable');
+  });
+
+  test('regression (#48): looks at the large global config at most once per recheck interval', async () => {
+    const t0 = 5_000_000;
+    await writeConfig({ billingType: 'usage_based' });
+    assert.deepStrictEqual(await readOAuthAccountInfo(t0), { billingType: 'usage_based' });
+    // Claude Code rewrites the file while streaming — not re-read within the interval
+    await writeConfig({ billingType: 'stripe_subscription', note: 'rewritten' });
+    assert.deepStrictEqual(await readOAuthAccountInfo(t0 + RECHECK_MS - 1), { billingType: 'usage_based' });
+    assert.deepStrictEqual(await readOAuthAccountInfo(t0 + RECHECK_MS), { billingType: 'stripe_subscription' });
+  });
+
+  test('a new data directory is read at once, without waiting for the interval', async () => {
+    await writeConfig({ billingType: 'usage_based' });
+    assert.ok(isUsageBased(await readOAuthAccountInfo(1)));
+    const other = await fs.mkdtemp(path.join(os.tmpdir(), 'account-info-b-'));
+    try {
+      setClaudeHome(other);
+      assert.strictEqual(await readOAuthAccountInfo(2), null);
+    } finally {
+      await fs.rm(other, { recursive: true, force: true });
+    }
   });
 
   test('isUsageBased', () => {
@@ -50,8 +74,10 @@ suite('Account info / usage-based plans', () => {
 
   test('detectProvider: usage-based sign-in → claude-ai-usage, otherwise claude-ai', async () => {
     assert.strictEqual(await detectProvider(credPath), 'claude-ai', 'no global config');
+    clearAccountInfoCache();
     await writeConfig({ billingType: 'stripe_subscription' });
     assert.strictEqual(await detectProvider(credPath), 'claude-ai');
+    clearAccountInfoCache();
     await writeConfig({ billingType: 'usage_based', organizationName: 'Acme' });
     assert.strictEqual(await detectProvider(credPath), 'claude-ai-usage');
   });

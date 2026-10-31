@@ -86,6 +86,7 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Code session (it waited for a 5-hour window reset); it now re-arms every calendar day.
 - Tooltip and sidebar countdowns showed `60m` / `24h` (e.g. `2d 24h` is now `3d`).
 - The heatmap unit test failed when run between 00:00 and 03:00 local time.
+- The status bar format field's example placeholder was untranslated in Japanese / Chinese.
 
 ---
 

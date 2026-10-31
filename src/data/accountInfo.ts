@@ -22,13 +22,20 @@ export function getGlobalConfigPath(): string {
     : path.join(home, '.claude.json');
 }
 
-// The file also holds per-project history and can be large: parse it again
-// only when its mtime or size changes
-let cached: { path: string; mtimeMs: number; size: number; info: OAuthAccountInfo | null } | undefined;
+// The file also holds per-project history — several MB — and Claude Code rewrites
+// it often. The billing type rarely changes, so look at the file at most once per
+// RECHECK_MS (a new data directory is read at once), and parse it again only when
+// its mtime or size changed. Keeps refreshes during streaming cheap (#48).
+export const RECHECK_MS = 5 * 60 * 1000;
+
+let cached: { path: string; mtimeMs: number; size: number; checkedAt: number; info: OAuthAccountInfo | null } | undefined;
 
 /** The signed-in account's billing info, or null when unknown (no file, not signed in). */
-export async function readOAuthAccountInfo(): Promise<OAuthAccountInfo | null> {
+export async function readOAuthAccountInfo(now: number = Date.now()): Promise<OAuthAccountInfo | null> {
   const configPath = getGlobalConfigPath();
+  if (cached && cached.path === configPath && now - cached.checkedAt < RECHECK_MS) {
+    return cached.info;
+  }
   let stat;
   try {
     stat = await fs.stat(configPath);
@@ -37,6 +44,7 @@ export async function readOAuthAccountInfo(): Promise<OAuthAccountInfo | null> {
     return null;
   }
   if (cached && cached.path === configPath && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+    cached.checkedAt = now;
     return cached.info;
   }
 
@@ -50,7 +58,7 @@ export async function readOAuthAccountInfo(): Promise<OAuthAccountInfo | null> {
   } catch {
     // unreadable or mid-write — treat as unknown, retry on the next change
   }
-  cached = { path: configPath, mtimeMs: stat.mtimeMs, size: stat.size, info };
+  cached = { path: configPath, mtimeMs: stat.mtimeMs, size: stat.size, checkedAt: now, info };
   return info;
 }
 

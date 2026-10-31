@@ -131,5 +131,6 @@
   "Monthly budget": "月次予算",
   "⚠️ Monthly budget exhausted": "⚠️ 月次予算を使い切りました",
   "⚠️ Monthly budget nearly exhausted": "⚠️ 月次予算の残りがわずかです",
-  "Claude Code: Monthly budget {0}% used (${1} / ${2})": "Claude Code: 月次予算 {0}% 使用済み (${1} / ${2})"
+  "Claude Code: Monthly budget {0}% used (${1} / ${2})": "Claude Code: 月次予算 {0}% 使用済み (${1} / ${2})",
+  "e.g. ${usage5h}% | $${costDay}": "例: ${usage5h}% | $${costDay}"
 }

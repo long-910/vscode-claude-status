@@ -2,7 +2,9 @@ import * as assert from 'assert';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
-import { readUsageRecords, clearUsageIndex, firstSeen, parseUsageLine, INDEX_RETENTION_MS } from '../../data/usageIndex';
+import { readUsageRecords, clearUsageIndex, firstSeen, indexedFileCount, parseUsageLine, INDEX_RETENTION_MS } from '../../data/usageIndex';
+import { findAllJsonlFiles } from '../../data/jsonlReader';
+import { DEFAULT_CLAUDE_HOME, setClaudeHome } from '../../data/claudeHome';
 
 suite('UsageIndex', () => {
   let tmpFile: string;
@@ -148,5 +150,43 @@ suite('UsageIndex', () => {
       await fs.writeFile(tmpFile, line + line + line);
       assert.strictEqual((await readUsageRecords([tmpFile], since())).length, 1);
     });
+  });
+
+  test('regression (#48): consumed bytes are never read again — only appended ones', async () => {
+    await fs.writeFile(tmpFile, entry('r1', 11));
+    assert.deepStrictEqual((await readUsageRecords([tmpFile], since())).map(r => r.usage.input_tokens), [11]);
+    // Rewrite the same bytes with a different value but the same size: a re-read would see 99
+    await fs.writeFile(tmpFile, entry('r1', 99));
+    assert.deepStrictEqual((await readUsageRecords([tmpFile], since())).map(r => r.usage.input_tokens), [11]);
+    await fs.appendFile(tmpFile, entry('r2', 22));
+    assert.deepStrictEqual((await readUsageRecords([tmpFile], since())).map(r => r.usage.input_tokens), [11, 22]);
+  });
+
+  test('regression (#48): findAllJsonlFiles skips transcripts not modified since the cutoff', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'find-files-'));
+    const dir = path.join(home, 'projects', '-p');
+    await fs.mkdir(dir, { recursive: true });
+    const fresh = path.join(dir, 'fresh.jsonl');
+    const old = path.join(dir, 'old.jsonl');
+    await fs.writeFile(fresh, entry('a'));
+    await fs.writeFile(old, entry('b'));
+    const tenDaysAgo = (Date.now() - 10 * 24 * 3600e3) / 1000;
+    await fs.utimes(old, tenDaysAgo, tenDaysAgo);
+    setClaudeHome(home);
+    try {
+      assert.deepStrictEqual((await findAllJsonlFiles()).map(f => path.basename(f)).sort(), ['fresh.jsonl', 'old.jsonl']);
+      assert.deepStrictEqual((await findAllJsonlFiles(Date.now() - 7 * 24 * 3600e3)).map(f => path.basename(f)), ['fresh.jsonl']);
+    } finally {
+      setClaudeHome(DEFAULT_CLAUDE_HOME);
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  test('indexedFileCount reflects the files held in memory', async () => {
+    await fs.writeFile(tmpFile, entry('r1'));
+    await readUsageRecords([tmpFile], since());
+    assert.strictEqual(indexedFileCount(), 1);
+    clearUsageIndex();
+    assert.strictEqual(indexedFileCount(), 0);
   });
 });

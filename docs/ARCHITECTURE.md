@@ -42,8 +42,8 @@ The extension is split into two webpack chunks to minimise startup parse time:
 
 | File | Size | When loaded |
 |------|------|-------------|
-| `dist/extension.js` | ~73 KiB | Always — at extension activation |
-| `dist/panel.js` | ~50 KiB | On demand — first time dashboard is opened |
+| `dist/extension.js` | ~100 KiB | Always — at extension activation |
+| `dist/panel.js` | ~55 KiB | On demand — first time dashboard is opened |
 
 `src/webview/panel.ts` is loaded via dynamic `import()` inside the `openDashboard`
 command handler and is never parsed during the critical activation path.
@@ -90,6 +90,22 @@ class DataManager {
 
 ---
 
+### Sidebar Tree View (`src/treeView.ts`)
+
+`ClaudeStatusTreeProvider` renders the Activity Bar "Usage Overview" view from
+`getLastData()` / `getLastProjectCosts()` only — it performs no file reads or API
+calls of its own. It refreshes on `onDidUpdate` and on the 60-second status bar
+timer (to keep "resets in" countdowns current). See
+[`features/06-treeview.md`](features/06-treeview.md).
+
+### Usage Export (`src/data/exportUsage.ts`)
+
+The `exportUsage` command serializes `getHeatmapData().daily` (the same aggregation
+as the heatmap, `heatmap.days` days) to CSV or JSON. The serializers are pure
+functions with no `vscode` import. See [`SETTINGS.md`](SETTINGS.md#export-usage-data).
+
+---
+
 ### Data Flow
 
 #### When Claude Code is active (JSONL updated recently):
@@ -103,6 +119,7 @@ FileWatcher detects JSONL change
     → Cache.write()
     → onDidUpdate.fire()
       → StatusBar.update()
+      → TreeView.refresh()           [sidebar; reads DataManager's last data, no I/O]
       → WebViewPanel.postMessage()
     → getHeatmapData() [background, only while the dashboard is open; fires second onDidUpdate when done]
 ```

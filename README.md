@@ -83,8 +83,8 @@ Click the status bar item to open a rich dashboard panel with:
 
 - **Current Usage** — colour-coded progress bars for 5 h and 7 d windows
 - **Token Cost** — 5 h / today / 7 d / month (est.) costs; expandable **token breakdown**
-  shows per-type counts (input / output / cache read / cache create) with individual costs
-  and cache hit ratio
+  shows per-type counts (input / output / cache read / cache create), a per-model cost list
+  for the 5 h window, and cache hit ratio
 - **Project Cost** — per-workspace breakdown (today / 7 days / 30 days)
 - **Prediction** — burn rate ($/hr), time-to-exhaustion, daily & weekly budget tracking;
   **Rate Limit Timeline chart** visualises the projected 5 h utilization from now to reset
@@ -141,6 +141,8 @@ Understand your long-term usage patterns at a glance.
   green intensity reflects daily spend; hover any cell for exact date and cost
 - **Hourly bar chart** — average cost per hour of day (last 30 days); shows when
   you typically use Claude Code most heavily
+- **Punch card** — weekday × hour cost matrix (last 30 days); shows weekly patterns
+  such as "Monday mornings"
 
 Number of days is configurable via `claudeStatus.heatmap.days` (30 / 60 / 90).
 
@@ -302,6 +304,8 @@ All settings are under the `claudeStatus` namespace in VS Code Settings.
 | macOS Keychain credential fallback (Claude Code v2.x+) | ✅ v0.6.0 |
 | Configurable Claude Code data directory (`claudeStatus.claudeHome`) | ✅ v0.7.0 |
 | Extension host OOM fix — incremental JSONL reads, coalesced watcher | ✅ v0.7.0 |
+| Model-aware pricing with per-model breakdown | ✅ Unreleased |
+| Sidebar tree view, status bar meter, usage export (CSV / JSON), punch card | ✅ Unreleased |
 
 ---
 

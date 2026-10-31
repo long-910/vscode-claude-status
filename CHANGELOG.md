@@ -11,10 +11,47 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- **Export Usage Data command** (`Claude Status: Export Usage Data...`) — export the
-  daily usage history (date, cost, message count, tokens; same aggregation as the
-  heatmap, covering `claudeStatus.heatmap.days` days) to a **CSV** or **JSON** file
-  via a save dialog. Useful for expense reports and external analysis.
+- **Model-aware pricing** — each usage entry is now priced by its model (`message.model`)
+  with built-in Anthropic rates: Fable / Mythos 5.x, Opus 5.5, Opus 4.5 – 5, legacy Opus
+  (3 / 4.0 / 4.1), Sonnet 5.x, Sonnet 3.x – 4.x, Haiku 5.5 (including its > 100K-token
+  prompt rate card), Haiku 4.5 / 3.5 / 3, with model-specific cache-read rates. Previously
+  every entry used the Sonnet 4.x-based `claudeStatus.pricing.*` rates, so Haiku and
+  Sonnet 5.x usage was overstated and Opus and Fable usage understated. New setting
+  `claudeStatus.pricing.useModelPricing` (default `true`); unrecognized models, and every
+  entry when disabled, keep using the manual rates.
+- **Per-model cost breakdown** — the dashboard's token breakdown lists the 5-hour cost per
+  model.
+- **Sidebar tree view** — a new Activity Bar icon opens a native *Usage Overview* with
+  rate-limit windows, token costs (5h / today / 7d), per-project costs and quick actions.
+  It reads the data the status bar already has, so it adds no file reads or API calls.
+- **Status bar meter** (`claudeStatus.statusBar.showSparkline`, default `false`) — shows a
+  compact utilization meter (`▰▰▰▱▱`) next to the 5h percentage. Custom status bar formats
+  gain matching `${bar5h}` / `${bar7d}` placeholders.
+- **Export Usage Data command** (`Claude Status: Export Usage Data...`, also in the
+  sidebar) — exports the daily usage history (date, cost, message count, tokens; same
+  aggregation as the heatmap, covering `claudeStatus.heatmap.days` days) to a **CSV** or
+  **JSON** file.
+- **Punch card** — the dashboard's Usage History card gains a weekday × hour cost matrix
+  for the last 30 days.
+
+### Changed
+
+- Displayed costs change for users of non-Sonnet-4.x models (they become more accurate).
+  Set `claudeStatus.pricing.useModelPricing` to `false` to restore the previous flat rates.
+- Burn-rate prediction and the heatmap now honour the `claudeStatus.pricing.*` settings;
+  they previously always used the built-in Sonnet defaults.
+- Changing any `claudeStatus.pricing.*` setting recomputes costs immediately (no API call).
+- Development dependencies updated (minor / patch); release workflow uses
+  `softprops/action-gh-release@v3`.
+
+### Fixed
+
+- **Heatmap over-counted streaming responses** — it was the last reader without
+  `requestId` / `message.id` deduplication, so daily and hourly costs were inflated 2–4×
+  in agentic sessions. All readers now share one dedupe helper.
+- Status bar tooltip (and sidebar) reset countdowns no longer show `60m` / `24h`
+  (e.g. `2d 24h` is now `3d`), matching the dashboard's rollover rule.
+- Heatmap unit test no longer fails when run between 00:00 and 03:00 local time.
 
 ---
 

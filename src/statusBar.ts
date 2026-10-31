@@ -3,17 +3,23 @@ import { ClaudeUsageData, ProjectCostData } from './data/dataManager';
 import { config } from './config';
 
 export function formatDuration(seconds: number): string {
-  if (seconds < 3600) {
-    return vscode.l10n.t('{0}m', Math.round(seconds / 60));
+  // Same rollover rule as webview/formatDuration.ts: rounding never yields "60m" or "24h"
+  let mins = Math.round(seconds / 60);
+  if (mins < 60) {
+    return vscode.l10n.t('{0}m', mins);
   }
   if (seconds < 86400) {
-    const hours = Math.floor(seconds / 3600);
-    const mins = Math.round((seconds % 3600) / 60);
-    if (mins === 0) { return vscode.l10n.t('{0}h', hours); }
-    return vscode.l10n.t('{0}h {1}m', hours, mins);
+    let hours = Math.floor(seconds / 3600);
+    mins = Math.round((seconds % 3600) / 60);
+    if (mins === 60) { mins = 0; hours++; }
+    if (hours < 24) {
+      if (mins === 0) { return vscode.l10n.t('{0}h', hours); }
+      return vscode.l10n.t('{0}h {1}m', hours, mins);
+    }
   }
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.round((seconds % 86400) / 3600);
+  let days = Math.floor(seconds / 86400);
+  let hours = Math.round((seconds % 86400) / 3600);
+  if (hours === 24) { hours = 0; days++; }
   if (hours === 0) { return vscode.l10n.t('{0}d', days); }
   return vscode.l10n.t('{0}d {1}h', days, hours);
 }

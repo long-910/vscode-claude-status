@@ -53,6 +53,13 @@ suite('formatDuration', () => {
     assert.strictEqual(formatDuration(90000), '1d 1h');
     assert.strictEqual(formatDuration(172800), '2d');
   });
+
+  test('rolls rounded units over instead of showing 60m / 24h', () => {
+    assert.strictEqual(formatDuration(3590), '1h');      // 59m 50s
+    assert.strictEqual(formatDuration(7170), '2h');      // 1h 59m 30s
+    assert.strictEqual(formatDuration(86370), '1d');     // 23h 59m 30s
+    assert.strictEqual(formatDuration(259000), '3d');    // 2d 23h 56m 40s
+  });
 });
 
 suite('buildUtilizationBar', () => {

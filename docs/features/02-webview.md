@@ -342,6 +342,12 @@ per-type token counts and costs using the `usage` and `pricing` fields from the
 | Cache create | `tokensCacheCreate5h / 1M × pricing.cacheCreatePerMillion` |
 | Cache hit ratio | `tokensCacheRead5h / (tokensIn5h + tokensCacheRead5h) × 100` |
 
+When `claudeStatus.pricing.useModelPricing` is on (default), the manual rates above
+don't apply to most entries, so the per-type rows show token counts only and a
+**By model (5h)** list shows `usage.costByModel5h` (model id shortened, e.g.
+`claude-sonnet-4-5-20250929` → `sonnet-4-5`), sorted by cost. The Pricing & Settings
+card notes that the manual rates apply only to unrecognized models.
+
 The breakdown re-renders on every `update` message if the toggle is open.
 
 ---

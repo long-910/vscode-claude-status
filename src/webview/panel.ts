@@ -986,7 +986,7 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
         '<span class="pg-unit">/ 1M tokens</span>' +
         '</div>' +
         (settings.useModelPricing
-          ? '<div class="pg-unit" style="margin-top:4px">' + esc(i18n.modelPricingOn) + '</div>'
+          ? '<div style="margin-top:4px;font-size:0.85em;color:var(--vscode-descriptionForeground)">' + esc(i18n.modelPricingOn) + '</div>'
           : '') +
         '<div class="settings-row">' +
         '<span class="settings-badge">' + esc(providerLabel) + '</span>' +

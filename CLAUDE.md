@@ -99,26 +99,26 @@ Implement in this order to keep the extension usable at every step:
 ```
 vscode-claude-status/
 ├── src/
-│   ├── extension.ts          # Entry point — activate/deactivate
+│   ├── extension.ts          # Entry point — activate/deactivate, commands
+│   ├── config.ts             # Typed accessors for claudeStatus.* settings
 │   ├── statusBar.ts          # Status bar item management
+│   ├── treeView.ts           # Activity Bar "Usage Overview" tree view
 │   ├── data/
-│   │   ├── jsonlReader.ts    # ~/.claude/projects/**/*.jsonl parser
+│   │   ├── dataManager.ts    # Singleton orchestrating readers, API, cache, refresh
+│   │   ├── jsonlReader.ts    # JSONL streaming, file discovery, (model-aware) pricing
+│   │   ├── usageIndex.ts     # Incremental per-file usage index + dedupe
 │   │   ├── apiClient.ts      # Anthropic rate-limit header fetcher
 │   │   ├── cache.ts          # Disk-backed cache (~/.claude/vscode-claude-status-cache.json)
+│   │   ├── claudeHome.ts     # claudeStatus.claudeHome resolution
 │   │   ├── projectCost.ts    # Workspace path → project JSONL mapping
-│   │   └── prediction.ts     # Rate-of-use prediction engine
+│   │   ├── prediction.ts     # Rate-of-use prediction engine
+│   │   └── exportUsage.ts    # CSV / JSON serializers for Export Usage Data
 │   ├── webview/
-│   │   ├── panel.ts          # WebView panel lifecycle
-│   │   ├── heatmap.ts        # Heatmap data aggregation
-│   │   └── html/
-│   │       └── dashboard.html # WebView HTML template
+│   │   ├── panel.ts          # WebView panel lifecycle + dashboard HTML
+│   │   ├── heatmap.ts        # Heatmap / hourly / punch card aggregation
+│   │   └── formatDuration.ts # Duration formatting shared with the WebView
 │   └── test/
-│       ├── runTest.ts
-│       └── suite/
-│           ├── jsonlReader.test.ts
-│           ├── projectCost.test.ts
-│           ├── prediction.test.ts
-│           └── cache.test.ts
+│       └── suite/            # Mocha suites (*.test.ts), run by @vscode/test-cli
 ├── docs/                     # Detailed specs (read before implementing)
 ├── CLAUDE.md                 # This file
 ├── CHANGELOG.md

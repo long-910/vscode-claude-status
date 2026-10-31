@@ -145,6 +145,19 @@ suite('Heatmap', () => {
       assert.ok(Math.abs(today.cost - 6.00) < 1e-9, `expected $6.00, got ${today.cost}`);
     });
 
+    test('regression: reads a transcript appended today in a project dir untouched for 100 days', async () => {
+      const dir = path.join(tmpHome, 'projects', '-proj');
+      await fs.writeFile(path.join(dir, 's.jsonl'), JSON.stringify({
+        type: 'assistant', timestamp: new Date().toISOString(), requestId: 'r',
+        message: { model: 'claude-sonnet-4-5', usage: { input_tokens: 1_000_000, output_tokens: 0 } },
+      }) + '\n');
+      // Appending to a file does not change its directory's mtime
+      const old = (Date.now() - 100 * 24 * 3600e3) / 1000;
+      await fs.utimes(dir, old, old);
+      const total = (await getHeatmapData(90)).daily.reduce((s, d) => s + d.cost, 0);
+      assert.ok(Math.abs(total - 3) < 1e-9, `expected $3, got ${total}`);
+    });
+
     test('applies pricing modifiers recorded on usage (fast mode = 2x)', async () => {
       const entry = (requestId: string, speed?: string) => JSON.stringify({
         type: 'assistant', timestamp: new Date().toISOString(), requestId,

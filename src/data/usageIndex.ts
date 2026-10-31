@@ -49,49 +49,75 @@ function newState(ino: number, mtimeMs: number): FileState {
   return { ino, mtimeMs, offset: 0, records: [], seenKeys: new Set() };
 }
 
-// Same filtering and dedupe rules as readJsonlFile(): Claude Code writes one
-// entry per content block of a streaming response, all sharing the same
-// requestId and usage, so each API call is counted once.
-function ingestLine(state: FileState, line: string, retainSince: number): void {
+export interface ParsedUsageLine {
+  dedupeKey: string | null
+  record: UsageRecord | null   // null: no usage or an invalid timestamp
+}
+
+/**
+ * Parse one transcript line. The single place that decides which lines carry
+ * usage and how usage is normalized — shared by the index and the heatmap.
+ * Returns null for anything that is not an assistant message (or not JSON).
+ * Callers dedupe on `dedupeKey` before looking at `record`: Claude Code writes
+ * one entry per content block of a streaming response, all sharing the same
+ * requestId and usage, so each API call is counted once.
+ */
+export function parseUsageLine(line: string): ParsedUsageLine | null {
   const trimmed = line.trim();
-  if (!trimmed) { return; }
+  if (!trimmed) { return null; }
   let obj: Record<string, unknown>;
   try {
     obj = JSON.parse(trimmed) as Record<string, unknown>;
   } catch {
-    return; // skip malformed lines
+    return null; // skip malformed lines
   }
-  if (obj.type !== 'assistant' || typeof obj.timestamp !== 'string') { return; }
+  if (obj.type !== 'assistant' || typeof obj.timestamp !== 'string') { return null; }
   const message = obj.message as { model?: unknown; usage?: Partial<TokenUsage> } | undefined;
-  if (!message) { return; }
+  if (!message) { return null; }
 
   const dedupeKey = usageDedupeKey(obj);
-  if (dedupeKey) {
-    if (state.seenKeys.has(dedupeKey)) { return; }
-    state.seenKeys.add(dedupeKey);
-  }
-
   const u = message.usage;
-  if (!u) { return; }
   const timestamp = new Date(obj.timestamp).getTime();
-  if (isNaN(timestamp) || timestamp < retainSince) { return; }
+  if (!u || isNaN(timestamp)) { return { dedupeKey, record: null }; }
 
-  state.records.push({
-    timestamp,
-    usage: {
-      input_tokens: u.input_tokens || 0,
-      output_tokens: u.output_tokens || 0,
-      cache_read_input_tokens: u.cache_read_input_tokens || 0,
-      cache_creation_input_tokens: u.cache_creation_input_tokens || 0,
-      cache_creation: u.cache_creation
-        ? { ephemeral_1h_input_tokens: u.cache_creation.ephemeral_1h_input_tokens }
-        : undefined,
-      // Pricing modifiers; kept only when set so records stay slim
-      ...(typeof u.speed === 'string' ? { speed: u.speed } : {}),
-      ...(typeof u.inference_geo === 'string' ? { inference_geo: u.inference_geo } : {}),
+  return {
+    dedupeKey,
+    record: {
+      timestamp,
+      usage: {
+        input_tokens: u.input_tokens || 0,
+        output_tokens: u.output_tokens || 0,
+        cache_read_input_tokens: u.cache_read_input_tokens || 0,
+        cache_creation_input_tokens: u.cache_creation_input_tokens || 0,
+        cache_creation: u.cache_creation
+          ? { ephemeral_1h_input_tokens: u.cache_creation.ephemeral_1h_input_tokens }
+          : undefined,
+        // Pricing modifiers; kept only when set so records stay slim
+        ...(typeof u.speed === 'string' ? { speed: u.speed } : {}),
+        ...(typeof u.inference_geo === 'string' ? { inference_geo: u.inference_geo } : {}),
+      },
+      model: typeof message.model === 'string' ? message.model : undefined,
     },
-    model: typeof message.model === 'string' ? message.model : undefined,
-  });
+  };
+}
+
+/**
+ * Per-reader dedupe: true the first time a key is seen (and for lines with no
+ * key, which cannot be deduplicated).
+ */
+export function firstSeen(seen: Set<string>, key: string | null): boolean {
+  if (!key) { return true; }
+  if (seen.has(key)) { return false; }
+  seen.add(key);
+  return true;
+}
+
+function ingestLine(state: FileState, line: string, retainSince: number): void {
+  const parsed = parseUsageLine(line);
+  if (!parsed || !firstSeen(state.seenKeys, parsed.dedupeKey)) { return; }
+  if (parsed.record && parsed.record.timestamp >= retainSince) {
+    state.records.push(parsed.record);
+  }
 }
 
 function isCompleteJson(line: string): boolean {

@@ -1,7 +1,6 @@
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { usageCost, forEachJsonlLine, TokenUsage, getClaudeProjectsDir, CostOptions, DEFAULT_COST_OPTIONS } from '../data/jsonlReader';
-import { usageDedupeKey } from '../data/usageIndex';
+import { usageCost, forEachJsonlLine, findAllJsonlFiles, CostOptions, DEFAULT_COST_OPTIONS } from '../data/jsonlReader';
+import { firstSeen, parseUsageLine } from '../data/usageIndex';
+import { localDateKey } from '../data/localTime';
 
 export interface DailyUsage {
   date: string        // "YYYY-MM-DD" local time
@@ -32,13 +31,6 @@ export interface EntryForHeatmap {
 
 // ---- helpers ----------------------------------------------------------------
 
-function toLocalDateKey(ts: number): string {
-  const d = new Date(ts);
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-}
 
 async function readJsonlForHeatmap(
   filePath: string,
@@ -46,40 +38,20 @@ async function readJsonlForHeatmap(
   options: CostOptions,
 ): Promise<EntryForHeatmap[]> {
   const result: EntryForHeatmap[] = [];
-  // Streaming responses repeat the same usage on every content-block line —
-  // count each API call once, like the other readers
+  // Same parsing and streaming dedupe as the usage index
   const seenKeys = new Set<string>();
   try {
-    await forEachJsonlLine(filePath, trimmed => {
-      try {
-        const obj = JSON.parse(trimmed) as Record<string, unknown>;
-        if (obj.type !== 'assistant' || typeof obj.timestamp !== 'string') { return; }
-        const ts = new Date(obj.timestamp).getTime();
-        if (isNaN(ts) || ts < cutoff) { return; }
-        const msg = obj.message as { model?: unknown; usage?: Partial<TokenUsage> } | undefined;
-        if (!msg?.usage) { return; }
-        const dedupeKey = usageDedupeKey(obj);
-        if (dedupeKey) {
-          if (seenKeys.has(dedupeKey)) { return; }
-          seenKeys.add(dedupeKey);
-        }
-        const u = msg.usage;
-        const cost = usageCost({
-          input_tokens: u.input_tokens ?? 0,
-          output_tokens: u.output_tokens ?? 0,
-          cache_read_input_tokens: u.cache_read_input_tokens ?? 0,
-          cache_creation_input_tokens: u.cache_creation_input_tokens ?? 0,
-          cache_creation: u.cache_creation,
-          speed: u.speed,
-          inference_geo: u.inference_geo,
-        }, typeof msg.model === 'string' ? msg.model : undefined, options);
-        result.push({
-          timestamp: ts,
-          cost,
-          tokens: (u.input_tokens ?? 0) + (u.output_tokens ?? 0),
-          hour: new Date(ts).getHours(),
-        });
-      } catch { /* skip malformed lines */ }
+    await forEachJsonlLine(filePath, line => {
+      const parsed = parseUsageLine(line);
+      if (!parsed || !firstSeen(seenKeys, parsed.dedupeKey) || !parsed.record) { return; }
+      const { timestamp, usage, model } = parsed.record;
+      if (timestamp < cutoff) { return; }
+      result.push({
+        timestamp,
+        cost: usageCost(usage, model, options),
+        tokens: usage.input_tokens + usage.output_tokens,
+        hour: new Date(timestamp).getHours(),
+      });
     });
   } catch { /* skip unreadable files */ }
   return result;
@@ -94,7 +66,7 @@ const READ_CONCURRENCY = 4;
 export function aggregateByDay(entries: EntryForHeatmap[], days: number): DailyUsage[] {
   const byDate = new Map<string, DailyUsage>();
   for (const e of entries) {
-    const key = toLocalDateKey(e.timestamp);
+    const key = localDateKey(e.timestamp);
     const d = byDate.get(key) ?? { date: key, cost: 0, sessionCount: 0, tokensTotal: 0 };
     d.cost += e.cost;
     d.tokensTotal += e.tokens;
@@ -106,7 +78,7 @@ export function aggregateByDay(entries: EntryForHeatmap[], days: number): DailyU
   const result: DailyUsage[] = [];
   const now = Date.now();
   for (let i = days - 1; i >= 0; i--) {
-    const key = toLocalDateKey(now - i * 24 * 3600 * 1000);
+    const key = localDateKey(now - i * 24 * 3600 * 1000);
     result.push(byDate.get(key) ?? { date: key, cost: 0, sessionCount: 0, tokensTotal: 0 });
   }
   return result;
@@ -142,43 +114,23 @@ export function aggregateByDowHour(entries: EntryForHeatmap[], days: number): nu
 // ---- main entry point -------------------------------------------------------
 
 export async function getHeatmapData(days = 90, options: CostOptions = DEFAULT_COST_OPTIONS): Promise<HeatmapData> {
-  const claudeProjectsDir = getClaudeProjectsDir();
   const cutoff = Date.now() - days * 24 * 3600 * 1000;
   const allEntries: EntryForHeatmap[] = [];
 
-  try {
-    const projectDirs = await fs.readdir(claudeProjectsDir);
+  // Same discovery as the other readers: per-file mtime filter (a directory's
+  // own mtime is not used — appending to an old transcript doesn't change it).
+  // Returns [] when ~/.claude/projects doesn't exist.
+  const filePaths = await findAllJsonlFiles(cutoff);
 
-    // Collect qualifying JSONL files (mtime filter for performance)
-    const filePaths: string[] = [];
-    for (const dir of projectDirs) {
-      const dirPath = path.join(claudeProjectsDir, dir);
-      try {
-        const dstat = await fs.stat(dirPath);
-        if (!dstat.isDirectory() || dstat.mtimeMs < cutoff) { continue; }
-        const files = await fs.readdir(dirPath);
-        for (const file of files) {
-          if (!file.endsWith('.jsonl')) { continue; }
-          const fp = path.join(dirPath, file);
-          try {
-            const fstat = await fs.stat(fp);
-            if (fstat.mtimeMs >= cutoff) { filePaths.push(fp); }
-          } catch { /* skip */ }
-        }
-      } catch { /* skip unreadable project dirs */ }
+  // Read qualifying files with bounded concurrency
+  let next = 0;
+  const workers = Array.from({ length: Math.min(READ_CONCURRENCY, filePaths.length) }, async () => {
+    while (next < filePaths.length) {
+      const chunk = await readJsonlForHeatmap(filePaths[next++], cutoff, options);
+      for (const entry of chunk) { allEntries.push(entry); }
     }
-
-    // Read qualifying files with bounded concurrency
-    let next = 0;
-    const workers = Array.from({ length: Math.min(READ_CONCURRENCY, filePaths.length) }, async () => {
-      while (next < filePaths.length) {
-        const chunk = await readJsonlForHeatmap(filePaths[next++], cutoff, options);
-        for (const entry of chunk) { allEntries.push(entry); }
-      }
-    });
-    await Promise.all(workers);
-
-  } catch { /* ~/.claude/projects doesn't exist — return empty data */ }
+  });
+  await Promise.all(workers);
 
   return {
     daily: aggregateByDay(allEntries, days),

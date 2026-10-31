@@ -1,27 +1,38 @@
 import * as vscode from 'vscode';
 import { ClaudeUsageData, ProjectCostData } from './data/dataManager';
+import type { ClaudeProvider } from './data/apiClient';
 import { config } from './config';
+import { formatDuration as formatDurationWith } from './webview/formatDuration';
 
+/** "1h 30m" etc., localized. One algorithm (with its 60m / 24h rollover) for every surface. */
 export function formatDuration(seconds: number): string {
-  // Same rollover rule as webview/formatDuration.ts: rounding never yields "60m" or "24h"
-  let mins = Math.round(seconds / 60);
-  if (mins < 60) {
-    return vscode.l10n.t('{0}m', mins);
+  const t = vscode.l10n.t;
+  return formatDurationWith(seconds, {
+    unitM: t('{0}m', '__N__'),
+    unitH: t('{0}h', '__N__'),
+    unitHM: t('{0}h {1}m', '__N__', '__N2__'),
+    unitD: t('{0}d', '__N__'),
+    unitDH: t('{0}d {1}h', '__N__', '__N2__'),
+  });
+}
+
+/** Display name of a provider, for the tooltip and the dashboard. */
+export function providerLabel(provider: ClaudeProvider): string {
+  switch (provider) {
+    case 'claude-ai': return 'Claude.ai';
+    case 'claude-ai-usage': return vscode.l10n.t('Claude.ai usage-based');
+    case 'aws-bedrock': return vscode.l10n.t('AWS Bedrock');
+    case 'api-key': return vscode.l10n.t('API Key');
+    default: return vscode.l10n.t('Claude Code');
   }
-  if (seconds < 86400) {
-    let hours = Math.floor(seconds / 3600);
-    mins = Math.round((seconds % 3600) / 60);
-    if (mins === 60) { mins = 0; hours++; }
-    if (hours < 24) {
-      if (mins === 0) { return vscode.l10n.t('{0}h', hours); }
-      return vscode.l10n.t('{0}h {1}m', hours, mins);
-    }
-  }
-  let days = Math.floor(seconds / 86400);
-  let hours = Math.round((seconds % 86400) / 3600);
-  if (hours === 24) { hours = 0; days++; }
-  if (hours === 0) { return vscode.l10n.t('{0}d', days); }
-  return vscode.l10n.t('{0}d {1}h', days, hours);
+}
+
+/** "$45.00", or "$45.00 / $60.00 (75%)" when claudeStatus.budget.monthlyUsd is set. */
+export function formatMonthCost(data: Pick<ClaudeUsageData, 'costMonth'>): string {
+  const budget = config.monthlyBudget;
+  const spent = `$${data.costMonth.toFixed(2)}`;
+  if (!budget || budget <= 0) { return spent; }
+  return `${spent} / $${budget.toFixed(2)} (${Math.round((data.costMonth / budget) * 100)}%)`;
 }
 
 function formatTokens(n: number): string {
@@ -140,14 +151,6 @@ export function buildLabel(data: ClaudeUsageData, projectCosts: ProjectCostData[
   return isStale ? `${main}${staleSuffix}` : main;
 }
 
-function monthLine(data: ClaudeUsageData): string {
-  const budget = config.monthlyBudget;
-  const suffix = budget && budget > 0
-    ? ` / $${budget.toFixed(2)} (${Math.round((data.costMonth / budget) * 100)}%)`
-    : '';
-  return `${vscode.l10n.t('This month')}: $${data.costMonth.toFixed(2)}${suffix}`;
-}
-
 export function buildTooltip(data: ClaudeUsageData, projectCosts: ProjectCostData[] = []): string {
   const {
     utilization5h, utilization7d, resetIn5h, resetIn7d,
@@ -181,11 +184,7 @@ export function buildTooltip(data: ClaudeUsageData, projectCosts: ProjectCostDat
     }
     lines.push('');
   } else {
-    const providerLabel = providerType === 'aws-bedrock' ? vscode.l10n.t('AWS Bedrock')
-      : providerType === 'api-key' ? vscode.l10n.t('API Key')
-      : providerType === 'claude-ai-usage' ? vscode.l10n.t('Claude.ai usage-based')
-      : vscode.l10n.t('Claude Code');
-    lines.push(`Claude Code (${providerLabel})`, '─────────────────────────────', '');
+    lines.push(`Claude Code (${providerLabel(providerType)})`, '─────────────────────────────', '');
   }
 
   lines.push(vscode.l10n.t('Token Cost (local)'), '─────────────────────────────');
@@ -198,7 +197,7 @@ export function buildTooltip(data: ClaudeUsageData, projectCosts: ProjectCostDat
   } else {
     lines.push(`${vscode.l10n.t('Today')}: $${costDay.toFixed(2)}`);
   }
-  lines.push(monthLine(data));
+  lines.push(`${vscode.l10n.t('This month')}: ${formatMonthCost(data)}`);
 
   if (projectCosts.length > 0) {
     lines.push('');

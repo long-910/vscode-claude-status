@@ -1,11 +1,17 @@
 import * as assert from 'assert';
-import { BudgetAlertTracker, budgetPeriodKey, budgetThresholdReached, startOfMonth } from '../../data/budget';
+import { BudgetAlertTracker, budgetPeriodKey, budgetThresholdReached } from '../../data/budget';
+import { localDateKey, startOfMonth } from '../../data/localTime';
 
 suite('Budget', () => {
   test('startOfMonth is local midnight on the 1st', () => {
     const start = new Date(startOfMonth(new Date(2026, 9, 31, 23, 59)));
     assert.deepStrictEqual([start.getFullYear(), start.getMonth(), start.getDate(), start.getHours(), start.getMinutes()], [2026, 9, 1, 0, 0]);
     assert.strictEqual(startOfMonth(new Date(2026, 0, 1, 0, 0)), new Date(2026, 0, 1).getTime());
+  });
+
+  test('localDateKey is the local calendar date', () => {
+    assert.strictEqual(localDateKey(new Date(2026, 0, 2, 0, 30)), '2026-01-02');
+    assert.strictEqual(localDateKey(new Date(2026, 11, 31, 23, 59).getTime()), '2026-12-31');
   });
 
   test('budgetPeriodKey uses the local calendar', () => {

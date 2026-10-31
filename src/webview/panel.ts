@@ -3,9 +3,11 @@ import * as crypto from 'crypto';
 import { DataManager, ClaudeUsageData, ProjectCostData, PredictionData, HeatmapData } from '../data/dataManager';
 import { config } from '../config';
 import type { TokenPricing } from '../data/jsonlReader';
+import { providerLabel, showTimeWindows } from '../statusBar';
 
 interface DashboardSettings {
   provider: string;
+  providerLabel: string;
   apiEnabled: boolean;
   cacheTtlSeconds: number;
   weeklyBudget: number | null;
@@ -78,7 +80,6 @@ function buildI18n(): Record<string, string> {
     cacheRead:             t('Cache read'),
     cacheCreate:           t('Cache create'),
     byModel:               t('By model (5h)'),
-    claudeAiUsage:         t('Claude.ai usage-based'),
     pricingEstimated:      t('Newer than the built-in price table — priced at the latest known rate of its family. Set exact rates in claudeStatus.pricing.modelOverrides.'),
     pricingManual:         t('Unrecognized model — priced at the claudeStatus.pricing.* rates.'),
     pricingOverride:       t('Priced by claudeStatus.pricing.modelOverrides.'),
@@ -1007,12 +1008,7 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
       const el = document.getElementById('pricing-content');
       if (!el || !pricing) { return; }
 
-      const providerLabel = {
-        'claude-ai': 'Claude.ai',
-        'claude-ai-usage': i18n.claudeAiUsage,
-        'aws-bedrock': 'AWS Bedrock',
-        'api-key': 'API Key',
-      }[settings.provider] || settings.provider;
+      const providerLabel = settings.providerLabel || settings.provider;
 
       const apiStatus = settings.apiEnabled
         ? '<span class="settings-badge ok">' + i18n.apiEnabled + '</span>'
@@ -1502,13 +1498,14 @@ export class DashboardPanel {
         pricing: config.tokenPricing,
         settings: {
           provider: usage.providerType,
+          providerLabel: providerLabel(usage.providerType),
           apiEnabled: config.rateLimitApiEnabled,
           cacheTtlSeconds: config.cacheTtlSeconds,
           weeklyBudget: config.weeklyBudget,
           monthlyBudget: config.monthlyBudget,
           statusBarFormat: config.statusBarFormat,
           useModelPricing: config.useModelPricing,
-          showTimeWindows: usage.providerType === 'claude-ai' || config.payAsYouGoShowTimeWindows,
+          showTimeWindows: showTimeWindows(usage),
         },
       },
     };

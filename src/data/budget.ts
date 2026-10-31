@@ -1,17 +1,12 @@
 // Budget periods and alert rules. Pure functions — no vscode import — so they
 // are unit-testable outside the extension host.
 
-/** Local midnight on the 1st of `now`'s month, in ms. */
-export function startOfMonth(now: Date = new Date()): number {
-  return new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-}
+import { localDateKey } from './localTime';
 
 /** Local calendar period a budget alert belongs to: "2026-10-31" or "2026-10". */
 export function budgetPeriodKey(kind: 'day' | 'month', now: Date = new Date()): string {
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  if (kind === 'month') { return `${yyyy}-${mm}`; }
-  return `${yyyy}-${mm}-${String(now.getDate()).padStart(2, '0')}`;
+  const day = localDateKey(now);
+  return kind === 'month' ? day.slice(0, 7) : day;
 }
 
 /** True once `spent` reaches `thresholdPercent` of a positive `budget`. */

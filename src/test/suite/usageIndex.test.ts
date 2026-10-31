@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
-import { readUsageRecords, clearUsageIndex, INDEX_RETENTION_MS } from '../../data/usageIndex';
+import { readUsageRecords, clearUsageIndex, firstSeen, parseUsageLine, INDEX_RETENTION_MS } from '../../data/usageIndex';
 
 suite('UsageIndex', () => {
   let tmpFile: string;
@@ -114,5 +114,39 @@ suite('UsageIndex', () => {
     assert.strictEqual(a.usage.speed, 'fast');
     assert.strictEqual(a.usage.inference_geo, 'us');
     assert.ok(!('speed' in b.usage) && !('inference_geo' in b.usage));
+  });
+
+  suite('parseUsageLine / firstSeen (shared with the heatmap)', () => {
+    const usage = { input_tokens: 5, output_tokens: 2 };
+    const ts = new Date().toISOString();
+
+    test('dedupe key: requestId, falling back to message.id, else none', () => {
+      assert.strictEqual(parseUsageLine(JSON.stringify({ type: 'assistant', timestamp: ts, requestId: 'r', message: { id: 'm', usage } }))?.dedupeKey, 'r');
+      assert.strictEqual(parseUsageLine(JSON.stringify({ type: 'assistant', timestamp: ts, message: { id: 'm', usage } }))?.dedupeKey, 'm');
+      assert.strictEqual(parseUsageLine(JSON.stringify({ type: 'assistant', timestamp: ts, message: { usage } }))?.dedupeKey, null);
+    });
+
+    test('skips non-assistant, malformed and usage-less lines', () => {
+      assert.strictEqual(parseUsageLine('{"type":"user","timestamp":"x"}'), null);
+      assert.strictEqual(parseUsageLine('not json'), null);
+      assert.strictEqual(parseUsageLine(JSON.stringify({ type: 'assistant', timestamp: ts, message: { id: 'm' } }))?.record, null);
+      assert.strictEqual(parseUsageLine(JSON.stringify({ type: 'assistant', timestamp: 'bad', message: { usage } }))?.record, null);
+    });
+
+    test('normalizes missing token fields to 0 and keeps model', () => {
+      const r = parseUsageLine(JSON.stringify({ type: 'assistant', timestamp: ts, message: { model: 'claude-opus-5-5', usage: { output_tokens: 3 } } }))?.record;
+      assert.deepStrictEqual([r?.usage.input_tokens, r?.usage.output_tokens, r?.usage.cache_read_input_tokens, r?.model], [0, 3, 0, 'claude-opus-5-5']);
+    });
+
+    test('firstSeen dedupes keyed lines and always counts keyless ones', () => {
+      const seen = new Set<string>();
+      assert.deepStrictEqual([firstSeen(seen, 'a'), firstSeen(seen, 'a'), firstSeen(seen, null), firstSeen(seen, null)], [true, false, true, true]);
+    });
+
+    test('streaming duplicates sharing message.id (no requestId) count once', async () => {
+      const line = JSON.stringify({ type: 'assistant', timestamp: ts, message: { id: 'msg_x', usage } }) + '\n';
+      await fs.writeFile(tmpFile, line + line + line);
+      assert.strictEqual((await readUsageRecords([tmpFile], since())).length, 1);
+    });
   });
 });

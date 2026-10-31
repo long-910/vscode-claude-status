@@ -2,9 +2,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as readline from 'readline';
 import { getClaudeHome } from './claudeHome';
-import { readUsageRecords, usageDedupeKey } from './usageIndex';
+import { readUsageRecords } from './usageIndex';
 import { usageCost, pricingSource, normalizeModelId, CostOptions, DEFAULT_COST_OPTIONS, PricingSource } from './pricing';
-import { startOfMonth } from './budget';
+import { startOfMonth } from './localTime';
 
 // Pricing lives in ./pricing; re-exported here for existing importers
 export {
@@ -28,22 +28,11 @@ export interface TokenUsage {
   inference_geo?: string   // "us" when US-only inference was requested
 }
 
-// Actual Claude Code JSONL structure (verified against real data):
-// - type: 'assistant' entries contain usage data
-// - usage is at entry.message.usage (NOT entry.usage)
-// - costUSD field does not exist; always calculate from tokens
+// Claude Code JSONL facts (verified against real data) — parsing lives in
+// parseUsageLine() (usageIndex.ts):
+// - only type: 'assistant' entries carry usage, at entry.message.usage
+// - there is no costUSD field; cost is always calculated from tokens
 // - cwd is at the top level of every entry
-interface JsonlEntry {
-  type: string
-  timestamp: string
-  cwd?: string
-  requestId?: string
-  message?: {
-    id?: string
-    model?: string
-    usage?: TokenUsage
-  }
-}
 
 export interface AggregatedUsage {
   cost5h: number
@@ -131,46 +120,6 @@ export async function findAllJsonlFiles(modifiedSinceMs?: number): Promise<strin
   }
 
   return files;
-}
-
-export async function readJsonlFile(filePath: string): Promise<JsonlEntry[]> {
-  const entries: JsonlEntry[] = [];
-  // Claude Code writes one JSONL entry per content block in a streaming response,
-  // all sharing the same requestId and usage counts. Deduplicate to count each
-  // API call exactly once.
-  const seenRequestIds = new Set<string>();
-  try {
-    await forEachJsonlLine(filePath, trimmed => {
-      try {
-        const obj = JSON.parse(trimmed) as Record<string, unknown>;
-        // Only 'assistant' entries have usage data in message.usage
-        if (
-          obj.type === 'assistant' &&
-          typeof obj.timestamp === 'string' &&
-          obj.message !== undefined
-        ) {
-          const dedupeKey = usageDedupeKey(obj);
-          if (dedupeKey) {
-            if (seenRequestIds.has(dedupeKey)) { return; }
-            seenRequestIds.add(dedupeKey);
-          }
-          // Keep only the fields callers use — message content can be large
-          const message = obj.message as JsonlEntry['message'];
-          entries.push({
-            type: obj.type,
-            timestamp: obj.timestamp,
-            requestId: typeof obj.requestId === 'string' ? obj.requestId : undefined,
-            message: { id: message?.id, model: message?.model, usage: message?.usage },
-          });
-        }
-      } catch {
-        // skip malformed lines
-      }
-    });
-  } catch {
-    // skip unreadable files
-  }
-  return entries;
 }
 
 export async function readAllUsage(options: CostOptions = DEFAULT_COST_OPTIONS): Promise<AggregatedUsage> {

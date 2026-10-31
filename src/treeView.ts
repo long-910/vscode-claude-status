@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { DataManager, ClaudeUsageData, ProjectCostData } from './data/dataManager';
-import { formatDuration, showTimeWindows } from './statusBar';
+import { formatDuration, formatMonthCost, showTimeWindows } from './statusBar';
 import { config } from './config';
 
 // Tree node: a plain TreeItem plus optional pre-built children
@@ -70,8 +70,7 @@ function buildCostSection(data: ClaudeUsageData): TreeNode {
   const today = leaf(vscode.l10n.t('Today'), { description: `$${data.costDay.toFixed(2)}`, icon: 'calendar' });
   const budget = config.monthlyBudget;
   const month = leaf(vscode.l10n.t('This month'), {
-    description: `$${data.costMonth.toFixed(2)}` + (budget && budget > 0
-      ? ` / $${budget.toFixed(2)} (${Math.round((data.costMonth / budget) * 100)}%)` : ''),
+    description: formatMonthCost(data),
     icon: 'graph-line',
     iconColor: budget && budget > 0 ? utilizationColor(data.costMonth / budget) : undefined,
   });

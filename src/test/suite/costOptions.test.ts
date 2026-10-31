@@ -140,4 +140,23 @@ suite('Cost options (regression)', () => {
       dm.invalidateHeatmap();
     }
   });
+
+  test('a usage-based Claude.ai provider never calls the rate-limit API', async () => {
+    const cfg = () => vscode.workspace.getConfiguration('claudeStatus');
+    const prevProvider = cfg().inspect<string>('claudeProvider')?.globalValue;
+    const realFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = (async () => { calls++; return new Response('{}'); }) as typeof fetch;
+    try {
+      await cfg().update('claudeProvider', 'claude-ai-usage', vscode.ConfigurationTarget.Global);
+      const usage = await DataManager.getInstance().getUsageData(true);   // even when forced
+      assert.strictEqual(calls, 0);
+      assert.strictEqual(usage.providerType, 'claude-ai-usage');
+      assert.strictEqual(usage.dataSource, 'local-only');
+      assert.ok(usage.cost5h > 0);
+    } finally {
+      globalThis.fetch = realFetch;
+      await cfg().update('claudeProvider', prevProvider, vscode.ConfigurationTarget.Global);
+    }
+  });
 });

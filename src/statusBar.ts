@@ -174,6 +174,7 @@ export function buildTooltip(data: ClaudeUsageData, projectCosts: ProjectCostDat
   } else {
     const providerLabel = providerType === 'aws-bedrock' ? vscode.l10n.t('AWS Bedrock')
       : providerType === 'api-key' ? vscode.l10n.t('API Key')
+      : providerType === 'claude-ai-usage' ? vscode.l10n.t('Claude.ai usage-based')
       : vscode.l10n.t('Claude Code');
     lines.push(`Claude Code (${providerLabel})`, '─────────────────────────────', '');
   }

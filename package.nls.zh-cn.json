@@ -25,7 +25,7 @@
   "config.claudeHome.desc": "Claude Code 数据目录（projects、凭证、缓存）。相对路径基于用户主目录解析；支持绝对路径和 ~。默认值：.claude（~/.claude）。",
   "config.credentials.path.desc": "Claude 凭证文件的自定义路径。设为 null 使用默认路径（~/.claude/.credentials.json）。",
   "config.claudeProvider.desc": "Claude 提供商类型。控制状态栏显示速率限制百分比还是费用。",
-  "config.claudeProvider.auto": "自动检测：检查凭证文件，然后检查 AWS/API 密钥环境变量。",
+  "config.claudeProvider.auto": "自动检测：检查凭证文件（以及登录的方案是否为按量付费），然后检查 AWS/API 密钥环境变量。",
   "config.claudeProvider.claudeAi": "Claude.ai 订阅 — 显示速率限制利用率（5h 窗口，如可用则显示 7d 窗口）。",
   "config.claudeProvider.awsBedrock": "AWS Bedrock — 无速率限制，仅显示令牌费用。",
   "config.claudeProvider.apiKey": "Anthropic API 密钥 — 无速率限制，仅显示令牌费用。",
@@ -37,5 +37,6 @@
   "view.container.title": "Claude Status",
   "view.overview.title": "使用情况概览",
   "config.pricing.modelOverrides.desc": "按模型设置的费率（USD / 百万令牌），优先于内置费率表——可在扩展更新前用于新发布的模型或价格调整。键与模型 ID 的一部分匹配（最长匹配优先），例如 `{ \"claude-opus-6\": { \"inputPerMillion\": 4, \"outputPerMillion\": 20 } }`。缓存读取默认为输入的 0.1 倍，缓存创建默认为 1.25 倍。",
-  "config.payAsYouGo.showTimeWindows.desc": "在按量付费（API 密钥、AWS Bedrock 等非订阅方式）时显示 5 小时 / 7 天窗口的用量。这些窗口是 Claude.ai 订阅的速率限制概念；关闭后改为显示今日费用。对 Claude.ai 订阅无影响。"
+  "config.payAsYouGo.showTimeWindows.desc": "在按量付费（API 密钥、AWS Bedrock 等非订阅方式）时显示 5 小时 / 7 天窗口的用量。这些窗口是 Claude.ai 订阅的速率限制概念；关闭后改为显示今日费用。对 Claude.ai 订阅无影响。",
+  "config.claudeProvider.claudeAiUsage": "按量付费方案的 Claude.ai 登录（如按 API 费率计费的按量付费 Enterprise）— 无 5h / 7d 窗口，仅显示令牌费用，不调用速率限制 API。根据 Claude Code 的账户信息自动检测。"
 }

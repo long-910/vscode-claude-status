@@ -73,6 +73,7 @@ function buildI18n(): Record<string, string> {
     cacheRead:             t('Cache read'),
     cacheCreate:           t('Cache create'),
     byModel:               t('By model (5h)'),
+    claudeAiUsage:         t('Claude.ai usage-based'),
     pricingEstimated:      t('Newer than the built-in price table — priced at the latest known rate of its family. Set exact rates in claudeStatus.pricing.modelOverrides.'),
     pricingManual:         t('Unrecognized model — priced at the claudeStatus.pricing.* rates.'),
     pricingOverride:       t('Priced by claudeStatus.pricing.modelOverrides.'),
@@ -977,6 +978,7 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
 
       const providerLabel = {
         'claude-ai': 'Claude.ai',
+        'claude-ai-usage': i18n.claudeAiUsage,
         'aws-bedrock': 'AWS Bedrock',
         'api-key': 'API Key',
       }[settings.provider] || settings.provider;

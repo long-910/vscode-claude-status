@@ -1,6 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { getClaudeHome } from './claudeHome';
+import { isUsageBased, readOAuthAccountInfo } from './accountInfo';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -15,7 +16,10 @@ interface ClaudeCredentials {
   }
 }
 
-export type ClaudeProvider = 'claude-ai' | 'aws-bedrock' | 'api-key' | 'unknown';
+// 'claude-ai'       — Claude.ai subscription with 5h / 7d rate-limit windows
+// 'claude-ai-usage' — Claude.ai sign-in on a usage-based (API-rate) plan,
+//                     e.g. usage-based Enterprise: no windows, cost only
+export type ClaudeProvider = 'claude-ai' | 'claude-ai-usage' | 'aws-bedrock' | 'api-key' | 'unknown';
 
 export interface RateLimitData {
   utilization5h: number
@@ -30,7 +34,8 @@ export async function detectProvider(customCredPath?: string | null): Promise<Cl
   // 1. Check for OAuth credentials (Claude.ai subscription)
   try {
     await readCredentials(customCredPath);
-    return 'claude-ai';
+    // Same signal Claude Code uses to switch its usage-limit handling off
+    return isUsageBased(await readOAuthAccountInfo()) ? 'claude-ai-usage' : 'claude-ai';
   } catch {
     // No valid OAuth token — check other providers
   }
@@ -104,6 +109,13 @@ export async function fetchRateLimitData(customCredPath?: string | null): Promis
       messages: [{ role: 'user', content: '.' }],
     }),
   });
+
+  // An error without rate-limit headers (expired token, outage) carries no
+  // utilization — fail so the caller falls back to the cache instead of
+  // reporting 0% as live data. 429 responses do carry the headers.
+  if (!response.ok && response.headers.get('anthropic-ratelimit-unified-5h-status') === null) {
+    throw new Error(`Rate limit request failed: HTTP ${response.status}`);
+  }
 
   const util5h = parseFloat(response.headers.get('anthropic-ratelimit-unified-5h-utilization') ?? '0');
   const util7d = parseFloat(response.headers.get('anthropic-ratelimit-unified-7d-utilization') ?? '0');

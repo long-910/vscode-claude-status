@@ -29,6 +29,12 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   other non-subscription usage, turn off the 5-hour / 7-day window figures (a Claude.ai
   subscription concept) and show today's cost instead in the status bar, sidebar and
   dashboard. Subscriptions are unaffected.
+- **Usage-based Claude.ai plans** (e.g. usage-based Enterprise — seat fee plus all usage at
+  API rates, no per-seat 5-hour / weekly limits) are detected from Claude Code's account info
+  (`oauthAccount.billingType: "usage_based"` in `~/.claude.json`) as the new provider
+  `claude-ai-usage`. They show cost only and never call the rate-limit API; previously they
+  showed a meaningless `5h:0%`. Can also be set explicitly with
+  `claudeStatus.claudeProvider: "claude-ai-usage"`.
 - **Per-model cost breakdown** — the dashboard's token breakdown lists the 5-hour cost per
   model.
 - **Sidebar tree view** — a new Activity Bar icon opens a native *Usage Overview* with
@@ -56,6 +62,8 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- A failed rate-limit request without rate-limit headers (e.g. an expired token) was shown
+  as live `0%`; it now falls back to the cached value.
 - **Heatmap over-counted streaming responses** — it was the last reader without
   `requestId` / `message.id` deduplication, so daily and hourly costs were inflated 2–4×
   in agentic sessions. All readers now share one dedupe helper.

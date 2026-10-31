@@ -160,6 +160,7 @@ Number of days is configurable via `claudeStatus.heatmap.days` (30 / 60 / 90).
 | Provider | Authentication | Display |
 |----------|---------------|---------|
 | Claude.ai subscription | `claude login` — credentials stored in macOS Keychain (v2.x+) or `~/.claude/.credentials.json`; detected automatically | Rate-limit % + cost |
+| Claude.ai usage-based plan (e.g. usage-based Enterprise) | `claude login`; detected from Claude Code's account info (`billingType: "usage_based"`) | Cost only (API rates) |
 | AWS Bedrock | AWS credentials (env vars or `~/.aws/`) | Cost only |
 | Anthropic API key | `ANTHROPIC_API_KEY` env var | Cost only |
 
@@ -182,8 +183,16 @@ Number of days is configurable via `claudeStatus.heatmap.days` (30 / 60 / 90).
 |------|--------------------|-----------|
 | Claude.ai Pro / Max (5h + 7d) | `5h:45% 7d:32%` | ✅ |
 | Claude.ai Pro / any 5h-only tier | `5h:45%` | auto-hidden |
+| Claude.ai usage-based (e.g. usage-based Enterprise) | cost only (`5h:$0.15 7d:$0.42`, or `Today:$0.15` with `payAsYouGo.showTimeWindows: false`) | N/A |
 | AWS Bedrock | cost only (`5h:$0.15 7d:$0.42`) | N/A |
 | Anthropic API key | cost only | N/A |
+
+Usage-based Claude.ai plans (seat fee + all usage at standard API rates, no per-seat
+5-hour / weekly limits) are detected the same way Claude Code does it — from
+`oauthAccount.billingType` in `~/.claude.json`. For them the extension shows cost only and
+**never calls the rate-limit API**. Seat-based Team / Enterprise seats with usage limits
+keep the normal rate-limit display. Costs are estimates at list API rates; negotiated
+discounts and the seat fee are not included.
 
 If auto-detection does not work for your setup, set `claudeStatus.claudeProvider`
 explicitly in VS Code Settings.
@@ -257,7 +266,7 @@ All settings are under the `claudeStatus` namespace in VS Code Settings.
 | `claudeStatus.heatmap.days` | `30 \| 60 \| 90` | `90` | Days shown in usage heatmap |
 | `claudeStatus.claudeHome` | `string` | `".claude"` | Claude Code data directory. Relative to home dir; absolute paths and `~` supported. User settings only. On macOS the Keychain fallback always reads the default profile |
 | `claudeStatus.credentials.path` | `string \| null` | `null` | Custom credentials file path |
-| `claudeStatus.claudeProvider` | `"auto"` \| `"claude-ai"` \| `"aws-bedrock"` \| `"api-key"` | `"auto"` | Provider type (auto-detect or explicit) |
+| `claudeStatus.claudeProvider` | `"auto"` \| `"claude-ai"` \| `"claude-ai-usage"` \| `"aws-bedrock"` \| `"api-key"` | `"auto"` | Provider type (auto-detect or explicit; `claude-ai-usage` = usage-based Claude.ai plan) |
 | `claudeStatus.pricing.inputPerMillion` | `number` | `3.00` | USD per 1M input tokens |
 | `claudeStatus.pricing.outputPerMillion` | `number` | `15.00` | USD per 1M output tokens |
 | `claudeStatus.pricing.cacheReadPerMillion` | `number` | `0.30` | USD per 1M cache-read tokens |

@@ -110,6 +110,9 @@ export class DataManager {
       // API disabled by user but cache exists — show stale rate limit data with age indicator
       rateLimitData = this.cacheToRateLimitData(cache.usageData);
       dataSource = 'stale';
+    } else if (providerType === 'claude-ai-usage') {
+      // Signed in, but billed at API rates: no windows to fetch, never call the API
+      dataSource = 'local-only';
     } else {
       // Non-claude-ai provider, or no cache — cost only from local JSONL
       const hasCostData = localUsage.cost7d > 0 || localUsage.cost5h > 0;

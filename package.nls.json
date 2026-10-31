@@ -25,7 +25,7 @@
   "config.claudeHome.desc": "Claude Code data directory (projects, credentials, cache). Relative paths resolve against the home directory; absolute paths and ~ are supported. Default: .claude (~/.claude).",
   "config.credentials.path.desc": "Custom path to Claude credentials file. Leave null to use default (~/.claude/.credentials.json).",
   "config.claudeProvider.desc": "Claude provider type. Controls whether rate limit percentages or cost is shown in the status bar.",
-  "config.claudeProvider.auto": "Auto-detect: checks credentials file, then AWS/API key environment variables.",
+  "config.claudeProvider.auto": "Auto-detect: checks the credentials file (and whether the signed-in plan is usage-based), then AWS/API key environment variables.",
   "config.claudeProvider.claudeAi": "Claude.ai subscription — shows rate limit utilization (5h window, 7d window if available).",
   "config.claudeProvider.awsBedrock": "AWS Bedrock — no rate limits, shows token cost only.",
   "config.claudeProvider.apiKey": "Anthropic API key — no rate limits, shows token cost only.",
@@ -37,5 +37,6 @@
   "view.container.title": "Claude Status",
   "view.overview.title": "Usage Overview",
   "config.pricing.modelOverrides.desc": "Per-model rates (USD per 1M tokens) that take precedence over the built-in table — use this for a newly released model or a price change before the extension is updated. Keys match part of the model id (the longest match wins), e.g. `{ \"claude-opus-6\": { \"inputPerMillion\": 4, \"outputPerMillion\": 20 } }`. Cache read defaults to 0.1× input and cache create to 1.25× input.",
-  "config.payAsYouGo.showTimeWindows.desc": "Show 5-hour / 7-day window figures for pay-as-you-go usage (API key, AWS Bedrock, other non-subscription providers). These windows are Claude.ai subscription rate limits; turn this off to show today's cost instead. Has no effect on Claude.ai subscriptions."
+  "config.payAsYouGo.showTimeWindows.desc": "Show 5-hour / 7-day window figures for pay-as-you-go usage (API key, AWS Bedrock, other non-subscription providers). These windows are Claude.ai subscription rate limits; turn this off to show today's cost instead. Has no effect on Claude.ai subscriptions.",
+  "config.claudeProvider.claudeAiUsage": "Claude.ai sign-in on a usage-based plan (e.g. usage-based Enterprise, billed at API rates) — no 5h / 7d windows, shows token cost only, never calls the rate-limit API. Auto-detected from Claude Code's account info."
 }

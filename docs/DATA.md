@@ -365,10 +365,10 @@ and show a status bar message guiding the user to log in with Claude Code.
 ### Provider Detection
 
 ```typescript
-export type ClaudeProvider = 'claude-ai' | 'aws-bedrock' | 'api-key' | 'unknown'
+export type ClaudeProvider = 'claude-ai' | 'claude-ai-usage' | 'aws-bedrock' | 'api-key' | 'unknown'
 
 async function detectProvider(customCredPath?: string | null): Promise<ClaudeProvider> {
-  // 1. OAuth credentials → claude-ai
+  // 1. OAuth credentials → claude-ai, or claude-ai-usage when the account is usage-based
   // 2. AWS env vars → aws-bedrock
   // 3. ANTHROPIC_API_KEY → api-key
   // 4. fallback → unknown
@@ -376,6 +376,20 @@ async function detectProvider(customCredPath?: string | null): Promise<ClaudePro
 ```
 
 Non-`claude-ai` providers always use cost mode (no rate limit percentages).
+
+**Usage-based plans** (`src/data/accountInfo.ts`): Claude Code stores the signed-in account in
+its global config — `~/.claude.json`, or `<claudeHome>/.claude.json` when `claudeStatus.claudeHome`
+points elsewhere (the `CLAUDE_CONFIG_DIR` layout) — as `oauthAccount.billingType`, copied from the
+organization's `billing_type`. `"usage_based"` (e.g. usage-based Enterprise: seat fee plus all usage at
+standard API rates, no per-seat 5-hour / weekly limits) maps to `claude-ai-usage`; Claude Code itself
+switches its usage-limit handling off for that value. The file can be large (it holds per-project
+history), so it is parsed only when its mtime or size changes. `claude-ai-usage` never calls the
+rate-limit API — there are no windows to read, and the probe request would be billed against the
+organization's spend limits.
+
+`fetchRateLimitData()` rejects an error response that carries no unified rate-limit headers (expired
+token, outage), so the caller falls back to the cache instead of reporting 0 % as live data; 429
+responses carry the headers and are reported as `denied`.
 
 ---
 

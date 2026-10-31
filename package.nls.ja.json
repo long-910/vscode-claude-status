@@ -25,7 +25,7 @@
   "config.claudeHome.desc": "Claude Code のデータディレクトリ（projects・認証情報・キャッシュ）。相対パスはホームディレクトリ基準で解決されます。絶対パスと ~ も使用できます。デフォルト: .claude（~/.claude）。",
   "config.credentials.path.desc": "Claude 認証情報ファイルのカスタムパス。null でデフォルト（~/.claude/.credentials.json）を使用します。",
   "config.claudeProvider.desc": "Claude プロバイダーの種類。ステータスバーにレート制限の割合またはコストを表示するかどうかを制御します。",
-  "config.claudeProvider.auto": "自動検出: 認証情報ファイルを確認し、次に AWS/API キーの環境変数を確認します。",
+  "config.claudeProvider.auto": "自動検出: 認証情報ファイル（およびログイン中のプランが従量課金かどうか）を確認し、次に AWS/API キーの環境変数を確認します。",
   "config.claudeProvider.claudeAi": "Claude.ai サブスクリプション — レート制限の利用率を表示します（5h ウィンドウ、利用可能な場合は 7d ウィンドウ）。",
   "config.claudeProvider.awsBedrock": "AWS Bedrock — レート制限なし、トークンコストのみ表示。",
   "config.claudeProvider.apiKey": "Anthropic API キー — レート制限なし、トークンコストのみ表示。",
@@ -37,5 +37,6 @@
   "view.container.title": "Claude Status",
   "view.overview.title": "使用状況の概要",
   "config.pricing.modelOverrides.desc": "モデルごとの単価（USD / 1M トークン）。組み込みの単価表より優先されます。新しくリリースされたモデルや価格改定に、拡張機能の更新を待たずに対応できます。キーはモデル ID の一部と照合されます（最長一致）。例: `{ \"claude-opus-6\": { \"inputPerMillion\": 4, \"outputPerMillion\": 20 } }`。キャッシュ読み取りは入力の 0.1 倍、キャッシュ作成は 1.25 倍が既定値です。",
-  "config.payAsYouGo.showTimeWindows.desc": "従量課金（APIキー・AWS Bedrock などサブスクリプション以外）で、5時間 / 7日ウィンドウの使用量を表示します。これらのウィンドウは Claude.ai サブスクリプションのレート制限の概念のため、オフにすると代わりに今日のコストを表示します。Claude.ai サブスクリプションには影響しません。"
+  "config.payAsYouGo.showTimeWindows.desc": "従量課金（APIキー・AWS Bedrock などサブスクリプション以外）で、5時間 / 7日ウィンドウの使用量を表示します。これらのウィンドウは Claude.ai サブスクリプションのレート制限の概念のため、オフにすると代わりに今日のコストを表示します。Claude.ai サブスクリプションには影響しません。",
+  "config.claudeProvider.claudeAiUsage": "従量課金プランの Claude.ai ログイン（API レートで課金される従量課金のエンタープライズなど）— 5h / 7d ウィンドウなし、トークンコストのみ表示し、レート制限 API は呼び出しません。Claude Code のアカウント情報から自動検出されます。"
 }

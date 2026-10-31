@@ -12,7 +12,8 @@ What the status bar and dashboard show, depending on your Claude plan and key se
 
 | You use… | `claudeProvider` (auto-detected) |
 |----------|----------------------------------|
-| Claude.ai subscription (Pro / Max) | `claude-ai` |
+| Claude.ai subscription (Pro / Max, seat-based Team / Enterprise) | `claude-ai` |
+| Claude.ai usage-based plan (`oauthAccount.billingType: "usage_based"` in `~/.claude.json`, e.g. usage-based Enterprise) | `claude-ai-usage` |
 | AWS Bedrock | `aws-bedrock` |
 | Anthropic API key (`ANTHROPIC_API_KEY`) | `api-key` |
 
@@ -27,6 +28,9 @@ What the status bar and dashboard show, depending on your Claude plan and key se
 | `claude-ai` | any | `false` + no cache | any | `🤖 5h:$0.00 7d:$0.00` | ❌ Not shown |
 | `aws-bedrock` | — | — | — | `🤖 5h:$14.21 7d:$53.17` | ❌ Not shown (no rate limits) |
 | `api-key` | — | — | — | `🤖 5h:$14.21 7d:$53.17` | ❌ Not shown (no rate limits) |
+| `claude-ai-usage` | — | ignored (never calls the API) | — | `🤖 5h:$14.21 7d:$53.17` | ❌ Not shown (no rate limits) |
+
+For every non-`claude-ai` row, `payAsYouGo.showTimeWindows: false` changes the label to `🤖 Today:$…`.
 
 ### Step 3 — Recommended settings per use case
 
@@ -35,7 +39,7 @@ What the status bar and dashboard show, depending on your Claude plan and key se
 | Claude.ai — see live % in real time | `rateLimitApi.enabled: true`, `displayMode: "percent"` (defaults) |
 | Claude.ai — prefer cost over % | `displayMode: "cost"` |
 | Claude.ai — offline / no outbound HTTPS | `rateLimitApi.enabled: false` (cached % still shown if previously fetched) |
-| AWS Bedrock / API key | No extra config needed — cost mode is automatic |
+| AWS Bedrock / API key / usage-based Enterprise | No extra config needed — cost mode is automatic. Optionally `payAsYouGo.showTimeWindows: false` |
 | Track spending against a budget | Set `budget.dailyUsd` in dashboard or settings |
 
 > **Note on stale data:** When `rateLimitApi.enabled: false`, the extension never makes
@@ -172,10 +176,11 @@ What the status bar and dashboard show, depending on your Claude plan and key se
 
   "claudeStatus.claudeProvider": {
     "type": "string",
-    "enum": ["auto", "claude-ai", "aws-bedrock", "api-key"],
+    "enum": ["auto", "claude-ai", "claude-ai-usage", "aws-bedrock", "api-key"],
     "enumDescriptions": [
-      "Auto-detect: checks credentials file, then AWS/API key environment variables.",
+      "Auto-detect: checks the credentials file (and whether the signed-in plan is usage-based), then AWS/API key environment variables.",
       "Claude.ai subscription — shows rate limit utilization (5h window, 7d window if available).",
+      "Claude.ai sign-in on a usage-based plan (e.g. usage-based Enterprise, billed at API rates) — no 5h / 7d windows, shows token cost only, never calls the rate-limit API.",
       "AWS Bedrock — no rate limits, shows token cost only.",
       "Anthropic API key — no rate limits, shows token cost only."
     ],

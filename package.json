@@ -221,12 +221,14 @@
           "enum": [
             "auto",
             "claude-ai",
+            "claude-ai-usage",
             "aws-bedrock",
             "api-key"
           ],
           "enumDescriptions": [
             "%config.claudeProvider.auto%",
             "%config.claudeProvider.claudeAi%",
+            "%config.claudeProvider.claudeAiUsage%",
             "%config.claudeProvider.awsBedrock%",
             "%config.claudeProvider.apiKey%"
           ],

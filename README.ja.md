@@ -143,6 +143,7 @@ Claude Status: Set Budget...
 | プロバイダー | 認証方法 | 表示内容 |
 |-------------|---------|---------|
 | Claude.ai サブスクリプション | `claude login` — v2.x+ (Mac) はmacOSキーチェーンに保存、旧バージョンは `~/.claude/.credentials.json`。いずれも自動検出 | レート制限 % + コスト |
+| Claude.ai 従量課金プラン（従量課金のエンタープライズなど） | `claude login`。Claude Code のアカウント情報（`billingType: "usage_based"`）から自動検出 | コストのみ（API レート） |
 | AWS Bedrock | AWS認証情報（環境変数または `~/.aws/`） | コストのみ |
 | Anthropic APIキー | `ANTHROPIC_API_KEY` 環境変数 | コストのみ |
 
@@ -160,8 +161,14 @@ Claude Status: Set Budget...
 |--------|-------------|------------|
 | Claude.ai Pro / Max（5h + 7d） | `5h:45% 7d:32%` | ✅ |
 | Claude.ai Pro / 5hのみのプラン | `5h:45%` | 自動非表示 |
+| Claude.ai 従量課金（従量課金のエンタープライズなど） | コストのみ（`5h:$0.15 7d:$0.42`、`payAsYouGo.showTimeWindows: false` なら `Today:$0.15`） | N/A |
 | AWS Bedrock | コストのみ（`5h:$0.15 7d:$0.42`） | N/A |
 | Anthropic APIキー | コストのみ | N/A |
+
+従量課金の Claude.ai プラン（シート料金＋全使用量を標準 API レートで課金、シートごとの5時間/週間上限なし）は、
+Claude Code 本体と同じく `~/.claude.json` の `oauthAccount.billingType` で判定します。この場合はコストのみを表示し、
+**レート制限 API は一切呼び出しません**。使用上限のあるシート型の Team / Enterprise は通常どおりレート制限を表示します。
+コストは API 定価での概算で、個別契約の割引やシート料金は含みません。
 
 自動検出がうまく機能しない場合は、VS Code設定で `claudeStatus.claudeProvider` を明示的に設定してください。
 
@@ -234,7 +241,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | `claudeStatus.heatmap.days` | `30 \| 60 \| 90` | `90` | 使用ヒートマップに表示する日数 |
 | `claudeStatus.claudeHome` | `string` | `".claude"` | Claude Code データディレクトリ（相対パスはホーム基準、絶対パス・`~` 可）。ユーザー設定のみ。macOS の Keychain フォールバックは常に既定プロファイルを参照 |
 | `claudeStatus.credentials.path` | `string \| null` | `null` | カスタム認証情報ファイルパス |
-| `claudeStatus.claudeProvider` | `"auto"` \| `"claude-ai"` \| `"aws-bedrock"` \| `"api-key"` | `"auto"` | プロバイダータイプ（自動検出または明示的指定） |
+| `claudeStatus.claudeProvider` | `"auto"` \| `"claude-ai"` \| `"claude-ai-usage"` \| `"aws-bedrock"` \| `"api-key"` | `"auto"` | プロバイダータイプ（自動検出または明示的指定。`claude-ai-usage` = 従量課金の Claude.ai プラン） |
 | `claudeStatus.pricing.inputPerMillion` | `number` | `3.00` | 入力トークン 1M あたりの USD 単価 |
 | `claudeStatus.pricing.outputPerMillion` | `number` | `15.00` | 出力トークン 1M あたりの USD 単価 |
 | `claudeStatus.pricing.cacheReadPerMillion` | `number` | `0.30` | キャッシュ読み取りトークン 1M あたりの USD 単価 |

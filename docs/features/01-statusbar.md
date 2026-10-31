@@ -171,7 +171,7 @@ Click to open dashboard →
 
 5h / 7d windows are Claude.ai subscription rate limits. With
 `claudeStatus.payAsYouGo.showTimeWindows: false`, non-claude-ai providers (API key, AWS
-Bedrock, unknown) show today's cost instead — label `🤖 Today:$14.21 | my-app:$3.21`,
+Bedrock, usage-based Claude.ai plans such as usage-based Enterprise, unknown) show today's cost instead — label `🤖 Today:$14.21 | my-app:$3.21`,
 tooltip:
 ```
 Claude Code (API Key)

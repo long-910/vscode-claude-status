@@ -137,6 +137,7 @@ Claude Status: Set Budget...
 | 提供商 | 认证方式 | 显示内容 |
 |--------|---------|---------|
 | Claude.ai 订阅 | `claude login` — v2.x+（Mac）凭证存储于 macOS 钥匙串，旧版本使用 `~/.claude/.credentials.json`，均自动检测 | 速率限制 % + 费用 |
+| Claude.ai 按量付费方案（如按量付费 Enterprise） | `claude login`；根据 Claude Code 账户信息（`billingType: "usage_based"`）自动检测 | 仅费用（API 费率） |
 | AWS Bedrock | AWS 凭证（环境变量或 `~/.aws/`） | 仅费用 |
 | Anthropic API 密钥 | `ANTHROPIC_API_KEY` 环境变量 | 仅费用 |
 
@@ -154,8 +155,13 @@ Claude Status: Set Budget...
 |------|------------|--------|
 | Claude.ai Pro / Max（5h + 7d） | `5h:45% 7d:32%` | ✅ |
 | Claude.ai Pro / 仅 5h 套餐 | `5h:45%` | 自动隐藏 |
+| Claude.ai 按量付费（如按量付费 Enterprise） | 仅费用（`5h:$0.15 7d:$0.42`，`payAsYouGo.showTimeWindows: false` 时为 `Today:$0.15`） | N/A |
 | AWS Bedrock | 仅费用（`5h:$0.15 7d:$0.42`） | N/A |
 | Anthropic API 密钥 | 仅费用 | N/A |
+
+按量付费的 Claude.ai 方案（席位费 + 全部用量按标准 API 费率计费，无按席位的 5 小时 / 每周限额）与 Claude Code
+本身的判断方式相同，根据 `~/.claude.json` 中的 `oauthAccount.billingType` 检测。此时仅显示费用，且**完全不调用速率限制 API**。
+有用量限额的席位制 Team / Enterprise 仍正常显示速率限制。费用为按 API 标价的估算，不含协议折扣和席位费。
 
 如果自动检测无法正常工作，请在 VS Code 设置中显式设置 `claudeStatus.claudeProvider`。
 
@@ -228,7 +234,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | `claudeStatus.heatmap.days` | `30 \| 60 \| 90` | `90` | 使用热力图显示的天数 |
 | `claudeStatus.claudeHome` | `string` | `".claude"` | Claude Code 数据目录（相对路径基于主目录，支持绝对路径和 `~`）。仅限用户设置。macOS 的钥匙串回退始终读取默认配置 |
 | `claudeStatus.credentials.path` | `string \| null` | `null` | 自定义凭证文件路径 |
-| `claudeStatus.claudeProvider` | `"auto"` \| `"claude-ai"` \| `"aws-bedrock"` \| `"api-key"` | `"auto"` | 提供商类型（自动检测或显式指定） |
+| `claudeStatus.claudeProvider` | `"auto"` \| `"claude-ai"` \| `"claude-ai-usage"` \| `"aws-bedrock"` \| `"api-key"` | `"auto"` | 提供商类型（自动检测或显式指定；`claude-ai-usage` = 按量付费的 Claude.ai 方案） |
 | `claudeStatus.pricing.inputPerMillion` | `number` | `3.00` | 每百万输入令牌的 USD 单价 |
 | `claudeStatus.pricing.outputPerMillion` | `number` | `15.00` | 每百万输出令牌的 USD 单价 |
 | `claudeStatus.pricing.cacheReadPerMillion` | `number` | `0.30` | 每百万缓存读取令牌的 USD 单价 |

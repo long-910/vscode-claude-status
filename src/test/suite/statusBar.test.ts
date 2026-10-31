@@ -188,6 +188,16 @@ suite('StatusBar', () => {
       assert.ok(!tooltip.includes('5h:') && !tooltip.includes('7d:'), tooltip);
     });
 
+    test('usage-based Claude.ai sign-in is treated as pay-as-you-go', async () => {
+      const usageBased = () => makeData({ providerType: 'claude-ai-usage', dataSource: 'local-only', cost5h: 1.23, costDay: 2.50, cost7d: 10.00 });
+      await set(undefined);
+      assert.strictEqual(buildLabel(usageBased()), '🤖 5h:$1.23 7d:$10.00');
+      assert.ok(buildTooltip(usageBased()).includes('Claude Code (Claude.ai usage-based)'));
+      assert.ok(!buildTooltip(usageBased()).includes('5h window'), 'no rate-limit section');
+      await set(false);
+      assert.strictEqual(buildLabel(usageBased()), '🤖 Today:$2.50');
+    });
+
     test('off: Claude.ai subscriptions are unaffected', async () => {
       await set(false);
       assert.ok(buildLabel(makeData({ dataSource: 'cache' })).startsWith('🤖 5h:50%'));

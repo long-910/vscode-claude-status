@@ -23,6 +23,12 @@ export class ExtensionConfig {
     return this.cfg.get('statusBar.format', null);
   }
 
+  // Pay-as-you-go providers (API key, Bedrock, …) have no 5h / 7d rate-limit
+  // windows; this hides the window-based figures for them
+  get payAsYouGoShowTimeWindows(): boolean {
+    return this.cfg.get('payAsYouGo.showTimeWindows', true);
+  }
+
   get showSparkline(): boolean {
     return this.cfg.get('statusBar.showSparkline', false);
   }

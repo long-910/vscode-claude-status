@@ -83,4 +83,24 @@ suite('TreeView', () => {
     assert.ok(commands.includes('vscode-claude-status.exportUsage'));
     provider.dispose();
   });
+
+  test('Token Cost shows Today only when pay-as-you-go time windows are off', async () => {
+    const cfg = vscode.workspace.getConfiguration('claudeStatus');
+    const prev = cfg.inspect<boolean>('payAsYouGo.showTimeWindows')?.globalValue;
+    await cfg.update('payAsYouGo.showTimeWindows', false, vscode.ConfigurationTarget.Global);
+    try {
+      const costRows = (data: ClaudeUsageData) => {
+        const provider = new ClaudeStatusTreeProvider(fakeManager(data));
+        const section = provider.getChildren().find(n => n.item.label === 'Token Cost');
+        assert.ok(section);
+        const rows = provider.getChildren(section).map(n => String(n.item.label));
+        provider.dispose();
+        return rows;
+      };
+      assert.deepStrictEqual(costRows(makeData({ providerType: 'api-key', dataSource: 'local-only' })), ['Today']);
+      assert.deepStrictEqual(costRows(makeData()), ['5h', 'Today', '7 days'], 'subscriptions unaffected');
+    } finally {
+      await cfg.update('payAsYouGo.showTimeWindows', prev, vscode.ConfigurationTarget.Global);
+    }
+  });
 });

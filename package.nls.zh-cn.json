@@ -36,5 +36,6 @@
   "config.pricing.useModelPricing.desc": "按每条记录的模型（Opus、Sonnet、Haiku、Fable 等）使用内置的 Anthropic 费率计价。无法识别的模型（以及禁用时的所有记录）使用上方的 claudeStatus.pricing.* 费率。",
   "view.container.title": "Claude Status",
   "view.overview.title": "使用情况概览",
-  "config.pricing.modelOverrides.desc": "按模型设置的费率（USD / 百万令牌），优先于内置费率表——可在扩展更新前用于新发布的模型或价格调整。键与模型 ID 的一部分匹配（最长匹配优先），例如 `{ \"claude-opus-6\": { \"inputPerMillion\": 4, \"outputPerMillion\": 20 } }`。缓存读取默认为输入的 0.1 倍，缓存创建默认为 1.25 倍。"
+  "config.pricing.modelOverrides.desc": "按模型设置的费率（USD / 百万令牌），优先于内置费率表——可在扩展更新前用于新发布的模型或价格调整。键与模型 ID 的一部分匹配（最长匹配优先），例如 `{ \"claude-opus-6\": { \"inputPerMillion\": 4, \"outputPerMillion\": 20 } }`。缓存读取默认为输入的 0.1 倍，缓存创建默认为 1.25 倍。",
+  "config.payAsYouGo.showTimeWindows.desc": "在按量付费（API 密钥、AWS Bedrock 等非订阅方式）时显示 5 小时 / 7 天窗口的用量。这些窗口是 Claude.ai 订阅的速率限制概念；关闭后改为显示今日费用。对 Claude.ai 订阅无影响。"
 }

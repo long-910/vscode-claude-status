@@ -167,6 +167,27 @@ Last updated: just now
 Click to open dashboard →
 ```
 
+### Pay-as-you-go without time windows
+
+5h / 7d windows are Claude.ai subscription rate limits. With
+`claudeStatus.payAsYouGo.showTimeWindows: false`, non-claude-ai providers (API key, AWS
+Bedrock, unknown) show today's cost instead — label `🤖 Today:$14.21 | my-app:$3.21`,
+tooltip:
+```
+Claude Code (API Key)
+─────────────────────────────
+
+Token Cost (local)
+─────────────────────────────
+Today: $14.21
+
+Last updated: just now
+Click to open dashboard →
+```
+Claude.ai subscriptions and custom `statusBar.format` strings are not affected. The sidebar
+Token Cost section and the dashboard follow the same setting (the dashboard hides the
+Current Usage card, the 5h / 7d rows and the 5h token breakdown).
+
 Build with `\n`-separated string. VSCode renders tooltip as plain text.
 
 ---

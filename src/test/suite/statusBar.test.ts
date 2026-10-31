@@ -1,4 +1,5 @@
 import * as assert from 'assert';
+import * as vscode from 'vscode';
 import { buildLabel, buildTooltip, buildUtilizationBar, formatDuration } from '../../statusBar';
 import { ClaudeUsageData } from '../../data/dataManager';
 
@@ -160,5 +161,47 @@ suite('StatusBar', () => {
   test('buildTooltip shows no-credentials message', () => {
     const tooltip = buildTooltip(makeData({ dataSource: 'no-credentials' }));
     assert.ok(tooltip.includes('not logged in') || tooltip.includes('Not logged'), tooltip);
+  });
+
+  suite('claudeStatus.payAsYouGo.showTimeWindows', () => {
+    const KEY = 'payAsYouGo.showTimeWindows';
+    const cfg = () => vscode.workspace.getConfiguration('claudeStatus');
+    const set = (v: boolean | undefined) => cfg().update(KEY, v, vscode.ConfigurationTarget.Global);
+    let prev: boolean | undefined;
+    const apiKey = () => makeData({ providerType: 'api-key', dataSource: 'local-only', cost5h: 1.23, costDay: 2.50, cost7d: 10.00 });
+
+    suiteSetup(() => { prev = cfg().inspect<boolean>(KEY)?.globalValue; });
+    teardown(() => set(prev));
+
+    test('regression: default (on) keeps the 5h / 7d cost label for pay-as-you-go', async () => {
+      await set(undefined);
+      assert.strictEqual(buildLabel(apiKey()), '🤖 5h:$1.23 7d:$10.00');
+      assert.ok(buildTooltip(apiKey()).includes('5h:'));
+    });
+
+    test('off: pay-as-you-go shows today\'s cost only', async () => {
+      await set(false);
+      assert.strictEqual(buildLabel(apiKey()), '🤖 Today:$2.50');
+      assert.strictEqual(buildLabel(apiKey(), [mockProject]), '🤖 Today:$2.50 | my-app:$3.21');
+      const tooltip = buildTooltip(apiKey());
+      assert.ok(tooltip.includes('Today: $2.50'), tooltip);
+      assert.ok(!tooltip.includes('5h:') && !tooltip.includes('7d:'), tooltip);
+    });
+
+    test('off: Claude.ai subscriptions are unaffected', async () => {
+      await set(false);
+      assert.ok(buildLabel(makeData({ dataSource: 'cache' })).startsWith('🤖 5h:50%'));
+      assert.ok(buildTooltip(makeData()).includes('5h window'));
+    });
+
+    test('off: a custom status bar format is left as written', async () => {
+      await set(false);
+      await cfg().update('statusBar.format', '${cost5h}', vscode.ConfigurationTarget.Global);
+      try {
+        assert.strictEqual(buildLabel(apiKey()), '1.23');
+      } finally {
+        await cfg().update('statusBar.format', undefined, vscode.ConfigurationTarget.Global);
+      }
+    });
   });
 });

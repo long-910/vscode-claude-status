@@ -227,6 +227,11 @@ export class DataManager {
     }
   }
 
+  /** Re-send the last data to every listener (display settings changed; no I/O). */
+  republish(): void {
+    if (this.lastData) { this._onDidUpdate.fire(this.lastData); }
+  }
+
   /** Force the next heatmap access to recompute (e.g. after pricing changes). */
   invalidateHeatmap(): void {
     this.heatmapComputedAt = 0;

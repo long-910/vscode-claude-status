@@ -185,9 +185,13 @@ export function activate(context: vscode.ExtensionContext) {
         dataManager.refresh().catch(() => {});
       }
       if (e.affectsConfiguration('claudeStatus.pricing')) {
-        // Costs are computed at read time — recompute with the new rates (no API call)
+        // Costs are computed at read time — recompute with the new rates. A normal
+        // refresh: the API is only called under the usual cache / activity rules
         dataManager.invalidateHeatmap();
         dataManager.refresh().catch(() => {});
+      } else if (e.affectsConfiguration('claudeStatus.payAsYouGo')) {
+        // Display-only: re-render status bar, sidebar and dashboard, no I/O
+        dataManager.republish();
       }
       if (e.affectsConfiguration('claudeStatus')) {
         updateStatusBar();

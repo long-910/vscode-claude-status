@@ -81,6 +81,12 @@ What the status bar and dashboard show, depending on your Claude plan and key se
     "description": "Show a compact utilization meter (▰▰▰▱▱) next to the 5h percentage in the status bar (percent mode, Claude.ai only). Custom formats can use the ${bar5h} / ${bar7d} placeholders instead."
   },
 
+  "claudeStatus.payAsYouGo.showTimeWindows": {
+    "type": "boolean",
+    "default": true,
+    "description": "Show 5-hour / 7-day window figures for pay-as-you-go usage (API key, AWS Bedrock, other non-subscription providers). Off: status bar, sidebar and dashboard show today's cost instead. No effect on Claude.ai subscriptions or custom formats."
+  },
+
   "claudeStatus.cache.ttlSeconds": {
     "type": "number",
     "default": 300,

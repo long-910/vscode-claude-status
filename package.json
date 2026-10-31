@@ -127,6 +127,11 @@
           "default": false,
           "description": "%config.statusBar.showSparkline.desc%"
         },
+        "claudeStatus.payAsYouGo.showTimeWindows": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.payAsYouGo.showTimeWindows.desc%"
+        },
         "claudeStatus.cache.ttlSeconds": {
           "type": "number",
           "default": 300,

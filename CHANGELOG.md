@@ -23,6 +23,12 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   entry when disabled, keep using the manual rates.
 - **`claudeStatus.pricing.modelOverrides`** — set exact per-model rates for newly released
   models or price changes without waiting for an extension update.
+- Fast mode (`usage.speed: "fast"`, 2x) and US-only inference (`usage.inference_geo: "us"`,
+  1.1x on Claude 4.6+) are priced when the transcript records them.
+- **`claudeStatus.payAsYouGo.showTimeWindows`** (default `true`) — for API-key, Bedrock and
+  other non-subscription usage, turn off the 5-hour / 7-day window figures (a Claude.ai
+  subscription concept) and show today's cost instead in the status bar, sidebar and
+  dashboard. Subscriptions are unaffected.
 - **Per-model cost breakdown** — the dashboard's token breakdown lists the 5-hour cost per
   model.
 - **Sidebar tree view** — a new Activity Bar icon opens a native *Usage Overview* with

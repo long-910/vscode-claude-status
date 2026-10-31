@@ -11,6 +11,7 @@ interface DashboardSettings {
   weeklyBudget: number | null;
   statusBarFormat: string | null;
   useModelPricing: boolean;
+  showTimeWindows: boolean;   // false hides the 5h / 7d figures (pay-as-you-go only)
 }
 
 interface DashboardMessage {
@@ -440,7 +441,7 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
   </div>
 
   <!-- Current Usage -->
-  <div class="card">
+  <div class="card" id="current-usage-card">
     <div class="card-title">${i18n.currentUsage}</div>
     <div class="progress-row">
       <div class="progress-labels">
@@ -466,7 +467,7 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
     <!-- Token Cost -->
     <div class="card">
       <div class="card-title">${i18n.tokenCost}</div>
-      <div class="cost-row">
+      <div class="cost-row" id="cost-5h-row">
         <span class="cost-label">5h</span>
         <span id="cost-5h">—</span>
       </div>
@@ -474,7 +475,7 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
         <span class="cost-label">${i18n.today}</span>
         <span id="cost-day">—</span>
       </div>
-      <div class="cost-row">
+      <div class="cost-row" id="cost-7d-row">
         <span class="cost-label">${i18n.days7}</span>
         <span id="cost-7d">—</span>
       </div>
@@ -482,7 +483,7 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
         <span class="cost-label">${i18n.monthEst}</span>
         <span id="cost-month">—</span>
       </div>
-      <div style="margin-top:6px">
+      <div style="margin-top:6px" id="breakdown-wrap">
         <button class="detail-toggle" id="breakdown-toggle">▶ ${i18n.tokenBreakdown}</button>
         <div id="token-breakdown" class="token-breakdown" style="display:none"></div>
       </div>
@@ -626,6 +627,14 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
     }
 
     function updateUsage(usage, mode) {
+      // Pay-as-you-go with claudeStatus.payAsYouGo.showTimeWindows off: hide
+      // every 5h / 7d figure (the token breakdown is 5h-based too)
+      const timeWindows = !(lastData && lastData.settings && lastData.settings.showTimeWindows === false);
+      for (const id of ['current-usage-card', 'cost-5h-row', 'cost-7d-row', 'breakdown-wrap']) {
+        const el = document.getElementById(id);
+        if (el) { el.style.display = timeWindows ? '' : 'none'; }
+      }
+
       const denied = usage.limitStatus === 'denied';
       const isClaudeAi = usage.providerType === 'claude-ai';
       const useCostMode = !isClaudeAi || usage.dataSource === 'local-only' || mode === 'cost';
@@ -1465,6 +1474,7 @@ export class DashboardPanel {
           weeklyBudget: config.weeklyBudget,
           statusBarFormat: config.statusBarFormat,
           useModelPricing: config.useModelPricing,
+          showTimeWindows: usage.providerType === 'claude-ai' || config.payAsYouGoShowTimeWindows,
         },
       },
     };

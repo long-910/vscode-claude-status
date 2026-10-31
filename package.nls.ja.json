@@ -36,5 +36,6 @@
   "config.pricing.useModelPricing.desc": "各エントリをモデル（Opus・Sonnet・Haiku・Fable など）ごとの組み込み単価で計算します。未知のモデル、および無効時はすべてのエントリに上記の claudeStatus.pricing.* の単価を使用します。",
   "view.container.title": "Claude Status",
   "view.overview.title": "使用状況の概要",
-  "config.pricing.modelOverrides.desc": "モデルごとの単価（USD / 1M トークン）。組み込みの単価表より優先されます。新しくリリースされたモデルや価格改定に、拡張機能の更新を待たずに対応できます。キーはモデル ID の一部と照合されます（最長一致）。例: `{ \"claude-opus-6\": { \"inputPerMillion\": 4, \"outputPerMillion\": 20 } }`。キャッシュ読み取りは入力の 0.1 倍、キャッシュ作成は 1.25 倍が既定値です。"
+  "config.pricing.modelOverrides.desc": "モデルごとの単価（USD / 1M トークン）。組み込みの単価表より優先されます。新しくリリースされたモデルや価格改定に、拡張機能の更新を待たずに対応できます。キーはモデル ID の一部と照合されます（最長一致）。例: `{ \"claude-opus-6\": { \"inputPerMillion\": 4, \"outputPerMillion\": 20 } }`。キャッシュ読み取りは入力の 0.1 倍、キャッシュ作成は 1.25 倍が既定値です。",
+  "config.payAsYouGo.showTimeWindows.desc": "従量課金（APIキー・AWS Bedrock などサブスクリプション以外）で、5時間 / 7日ウィンドウの使用量を表示します。これらのウィンドウは Claude.ai サブスクリプションのレート制限の概念のため、オフにすると代わりに今日のコストを表示します。Claude.ai サブスクリプションには影響しません。"
 }

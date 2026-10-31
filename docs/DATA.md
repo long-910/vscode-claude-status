@@ -56,7 +56,9 @@ enabled (the default), each entry is priced by its model (`src/data/pricing.ts`)
 5. **Unknown model** (e.g. `<synthetic>`, missing `model`) — the manual rates below. Source:
    `manual`.
 
-Built-in table (USD per 1M tokens, Anthropic first-party pricing as of 2026-10):
+Built-in table (USD per 1M tokens, Anthropic first-party pricing, checked against
+[platform.claude.com/docs/en/about-claude/pricing](https://platform.claude.com/docs/en/about-claude/pricing)
+on 2026-10-31; `pricing.test.ts` mirrors the published table):
 
 | Family | From version | Input | Output | Cache read |
 |---|---|---|---|---|
@@ -68,7 +70,7 @@ Built-in table (USD per 1M tokens, Anthropic first-party pricing as of 2026-10):
 | Opus | 5.5 | $4.00 | $20.00 | $0.20 |
 | Sonnet | 3.0 (3.x – 4.x) | $3.00 | $15.00 | $0.30 |
 | Sonnet | 5.0 | $2.00 | $10.00 | $0.20 |
-| Sonnet | 5.5 | $2.00 | $10.00 | $0.20 |
+| Sonnet | 5.5 | $2.00 | $10.00 | $0.10 |
 | Haiku | 3.0 | $0.25 | $1.25 | $0.03 |
 | Haiku | 3.5 | $0.80 | $4.00 | $0.08 |
 | Haiku | 4.5 | $1.00 | $5.00 | $0.10 |
@@ -77,6 +79,17 @@ Built-in table (USD per 1M tokens, Anthropic first-party pricing as of 2026-10):
 
 5-minute cache writes are 1.25x and 1-hour cache writes 2x the model's input rate. "Prompt"
 for the Haiku 5.5 rate card is `input + cache read + cache creation` tokens of the entry.
+
+**Pricing modifiers** recorded on `message.usage` (applied to built-in / estimated rates only,
+never to manual rates or overrides):
+
+| Field | Value | Multiplier |
+|---|---|---|
+| `usage.speed` | `"fast"` (fast mode: Opus 5.5 / 5 / 4.8) | 2x every category |
+| `usage.inference_geo` | `"us"` (US-only inference, Claude 4.6+) | 1.1x every category |
+
+Batch API discounts and partner platforms' own price lists (Bedrock, Google-managed Vertex)
+are not modelled — Claude Code uses the Messages API, and partner prices differ by region.
 
 **When Anthropic releases a model or changes a price:** add or edit a row in
 `MODEL_RATES` (`src/data/pricing.ts`) — every released model gets its own row, even at an

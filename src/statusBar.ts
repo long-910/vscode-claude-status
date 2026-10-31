@@ -62,8 +62,17 @@ function applyFormat(format: string, data: ClaudeUsageData): string {
     .replace(/\$\{costDay\}/g, costDay.toFixed(2));
 }
 
+/**
+ * Whether to show the 5h / 7d window figures. Always for Claude.ai
+ * subscriptions; for pay-as-you-go providers (API key, Bedrock, unknown) only
+ * while claudeStatus.payAsYouGo.showTimeWindows is on (default).
+ */
+export function showTimeWindows(data: Pick<ClaudeUsageData, 'providerType'>): boolean {
+  return data.providerType === 'claude-ai' || config.payAsYouGoShowTimeWindows;
+}
+
 export function buildLabel(data: ClaudeUsageData, projectCosts: ProjectCostData[] = []): string {
-  const { dataSource, utilization5h, utilization7d, limitStatus, cost5h, cost7d, cacheAge, has7dLimit, providerType } = data;
+  const { dataSource, utilization5h, utilization7d, limitStatus, cost5h, costDay, cost7d, cacheAge, has7dLimit, providerType } = data;
   const displayMode = config.displayMode;
 
   if (dataSource === 'no-credentials') {
@@ -87,7 +96,11 @@ export function buildLabel(data: ClaudeUsageData, projectCosts: ProjectCostData[
   let part5h: string;
   let part7d: string;
 
-  if (useCostMode) {
+  if (useCostMode && !showTimeWindows(data)) {
+    // Pay-as-you-go without time windows: today's spend only
+    part5h = `${vscode.l10n.t('Today')}:$${costDay.toFixed(2)}`;
+    part7d = '';
+  } else if (useCostMode) {
     part5h = `5h:$${cost5h.toFixed(2)}`;
     part7d = ` 7d:$${cost7d.toFixed(2)}`;
   } else {
@@ -165,13 +178,16 @@ export function buildTooltip(data: ClaudeUsageData, projectCosts: ProjectCostDat
     lines.push(`Claude Code (${providerLabel})`, '─────────────────────────────', '');
   }
 
-  lines.push(
-    vscode.l10n.t('Token Cost (local)'),
-    '─────────────────────────────',
-    `5h:   in:${formatTokens(tokensIn5h)} out:${formatTokens(tokensOut5h)}  $${cost5h.toFixed(2)}`,
-    `day:  $${costDay.toFixed(2)}`,
-    `7d:   $${cost7d.toFixed(2)}`,
-  );
+  lines.push(vscode.l10n.t('Token Cost (local)'), '─────────────────────────────');
+  if (showTimeWindows(data)) {
+    lines.push(
+      `5h:   in:${formatTokens(tokensIn5h)} out:${formatTokens(tokensOut5h)}  $${cost5h.toFixed(2)}`,
+      `day:  $${costDay.toFixed(2)}`,
+      `7d:   $${cost7d.toFixed(2)}`,
+    );
+  } else {
+    lines.push(`${vscode.l10n.t('Today')}: $${costDay.toFixed(2)}`);
+  }
 
   if (projectCosts.length > 0) {
     lines.push('');

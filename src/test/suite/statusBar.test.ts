@@ -18,6 +18,7 @@ function makeData(overrides: Partial<ClaudeUsageData> = {}): ClaudeUsageData {
     tokensOut5h: 10_000,
     tokensCacheRead5h: 5_000,
     tokensCacheCreate5h: 1_000,
+    costByModel5h: {},
     lastUpdated: new Date(),
     cacheAge: 30,
     dataSource: 'cache',

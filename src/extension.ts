@@ -129,6 +129,11 @@ export function activate(context: vscode.ExtensionContext) {
         dataManager.restartWatching();
         dataManager.refresh().catch(() => {});
       }
+      if (e.affectsConfiguration('claudeStatus.pricing')) {
+        // Costs are computed at read time — recompute with the new rates (no API call)
+        dataManager.invalidateHeatmap();
+        dataManager.refresh().catch(() => {});
+      }
       if (e.affectsConfiguration('claudeStatus')) {
         updateStatusBar();
       }

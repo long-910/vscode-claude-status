@@ -29,8 +29,9 @@
 
 It reads session data from `~/.claude/projects/` locally (no extra network calls)
 and queries the Anthropic API at most once per 5 minutes to fetch rate-limit
-utilization headers. All token costs are calculated client-side using configurable
-per-token rates (defaults: Claude Sonnet 4.x pricing).
+utilization headers. All token costs are calculated client-side, priced per model
+(Opus, Sonnet, Haiku, Fable…) with built-in rates, falling back to configurable
+per-token rates for unrecognized models.
 
 > [!NOTE]
 > **API calls are minimal and only happen while Claude Code is active.**
@@ -249,6 +250,7 @@ All settings are under the `claudeStatus` namespace in VS Code Settings.
 | `claudeStatus.pricing.outputPerMillion` | `number` | `15.00` | USD per 1M output tokens |
 | `claudeStatus.pricing.cacheReadPerMillion` | `number` | `0.30` | USD per 1M cache-read tokens |
 | `claudeStatus.pricing.cacheCreatePerMillion` | `number` | `3.75` | USD per 1M cache-creation tokens |
+| `claudeStatus.pricing.useModelPricing` | `boolean` | `true` | Price each entry by its model with built-in rates; the four rates above apply to unrecognized models (or to everything when `false`) |
 
 ```jsonc
 // Example: settings.json

@@ -95,4 +95,12 @@ suite('UsageIndex', () => {
     const records = await readUsageRecords([path.join(os.tmpdir(), 'does-not-exist-usage-index.jsonl')], since());
     assert.deepStrictEqual(records, []);
   });
+  test('keeps message.model on each record', async () => {
+    await fs.writeFile(tmpFile, JSON.stringify({
+      type: 'assistant', timestamp: new Date().toISOString(), requestId: 'r1',
+      message: { model: 'claude-opus-5-5', usage: { input_tokens: 1, output_tokens: 1 } },
+    }) + '\n');
+    const [record] = await readUsageRecords([tmpFile], since());
+    assert.strictEqual(record.model, 'claude-opus-5-5');
+  });
 });

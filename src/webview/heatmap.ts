@@ -1,6 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { calculateCost, forEachJsonlLine, TokenUsage, getClaudeProjectsDir } from '../data/jsonlReader';
+import { usageCost, forEachJsonlLine, TokenUsage, getClaudeProjectsDir, CostOptions, DEFAULT_COST_OPTIONS } from '../data/jsonlReader';
+import { usageDedupeKey } from '../data/usageIndex';
 
 export interface DailyUsage {
   date: string        // "YYYY-MM-DD" local time
@@ -41,8 +42,12 @@ function toLocalDateKey(ts: number): string {
 async function readJsonlForHeatmap(
   filePath: string,
   cutoff: number,
+  options: CostOptions,
 ): Promise<EntryForHeatmap[]> {
   const result: EntryForHeatmap[] = [];
+  // Streaming responses repeat the same usage on every content-block line —
+  // count each API call once, like the other readers
+  const seenKeys = new Set<string>();
   try {
     await forEachJsonlLine(filePath, trimmed => {
       try {
@@ -50,16 +55,21 @@ async function readJsonlForHeatmap(
         if (obj.type !== 'assistant' || typeof obj.timestamp !== 'string') { return; }
         const ts = new Date(obj.timestamp).getTime();
         if (isNaN(ts) || ts < cutoff) { return; }
-        const msg = obj.message as { usage?: Partial<TokenUsage> } | undefined;
+        const msg = obj.message as { model?: unknown; usage?: Partial<TokenUsage> } | undefined;
         if (!msg?.usage) { return; }
+        const dedupeKey = usageDedupeKey(obj);
+        if (dedupeKey) {
+          if (seenKeys.has(dedupeKey)) { return; }
+          seenKeys.add(dedupeKey);
+        }
         const u = msg.usage;
-        const cost = calculateCost({
+        const cost = usageCost({
           input_tokens: u.input_tokens ?? 0,
           output_tokens: u.output_tokens ?? 0,
           cache_read_input_tokens: u.cache_read_input_tokens ?? 0,
           cache_creation_input_tokens: u.cache_creation_input_tokens ?? 0,
           cache_creation: u.cache_creation,
-        });
+        }, typeof msg.model === 'string' ? msg.model : undefined, options);
         result.push({
           timestamp: ts,
           cost,
@@ -118,7 +128,7 @@ export function aggregateByHour(entries: EntryForHeatmap[], days: number): Hourl
 
 // ---- main entry point -------------------------------------------------------
 
-export async function getHeatmapData(days = 90): Promise<HeatmapData> {
+export async function getHeatmapData(days = 90, options: CostOptions = DEFAULT_COST_OPTIONS): Promise<HeatmapData> {
   const claudeProjectsDir = getClaudeProjectsDir();
   const cutoff = Date.now() - days * 24 * 3600 * 1000;
   const allEntries: EntryForHeatmap[] = [];
@@ -149,7 +159,7 @@ export async function getHeatmapData(days = 90): Promise<HeatmapData> {
     let next = 0;
     const workers = Array.from({ length: Math.min(READ_CONCURRENCY, filePaths.length) }, async () => {
       while (next < filePaths.length) {
-        const chunk = await readJsonlForHeatmap(filePaths[next++], cutoff);
+        const chunk = await readJsonlForHeatmap(filePaths[next++], cutoff, options);
         for (const entry of chunk) { allEntries.push(entry); }
       }
     });

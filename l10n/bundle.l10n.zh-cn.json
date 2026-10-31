@@ -103,5 +103,7 @@
   "⚙ Set format": "⚙ 设置格式",
   "Format string:": "格式字符串：",
   "Reset to default": "恢复默认",
-  "(default)": "（默认）"
+  "(default)": "（默认）",
+  "By model (5h)": "按模型 (5小时)",
+  "Model-aware pricing is on — these rates apply only to unrecognized models.": "已启用按模型计价 — 这些费率仅适用于无法识别的模型。"
 }

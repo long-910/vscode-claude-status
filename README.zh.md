@@ -26,7 +26,7 @@
 
 **vscode-claude-status** 是一款 Visual Studio Code 扩展，让您无需离开编辑器即可实时监控 [Claude Code](https://claude.ai/code) 的使用情况。
 
-扩展从 `~/.claude/projects/` 本地读取会话数据，最多每 5 分钟调用一次 Anthropic API 获取速率限制头信息。所有令牌费用均使用可配置的单价在客户端计算（默认：Claude Sonnet 4.x 定价）。
+扩展从 `~/.claude/projects/` 本地读取会话数据，最多每 5 分钟调用一次 Anthropic API 获取速率限制头信息。所有令牌费用均在客户端计算，按模型（Opus、Sonnet、Haiku、Fable 等）使用内置费率；无法识别的模型使用可配置的单价。
 
 > [!NOTE]
 > **API 调用极少，且仅在 Claude Code 活跃期间发生。**
@@ -224,6 +224,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | `claudeStatus.pricing.outputPerMillion` | `number` | `15.00` | 每百万输出令牌的 USD 单价 |
 | `claudeStatus.pricing.cacheReadPerMillion` | `number` | `0.30` | 每百万缓存读取令牌的 USD 单价 |
 | `claudeStatus.pricing.cacheCreatePerMillion` | `number` | `3.75` | 每百万缓存创建令牌的 USD 单价 |
+| `claudeStatus.pricing.useModelPricing` | `boolean` | `true` | 按模型使用内置费率计价；上述四项适用于无法识别的模型（为 `false` 时适用于全部记录） |
 
 ```jsonc
 // 示例: settings.json

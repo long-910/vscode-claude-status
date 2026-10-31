@@ -103,5 +103,7 @@
   "⚙ Set format": "⚙ 書式を設定",
   "Format string:": "書式文字列:",
   "Reset to default": "デフォルトに戻す",
-  "(default)": "（デフォルト）"
+  "(default)": "（デフォルト）",
+  "By model (5h)": "モデル別 (5時間)",
+  "Model-aware pricing is on — these rates apply only to unrecognized models.": "モデル別料金が有効です — この単価は未知のモデルにのみ適用されます。"
 }

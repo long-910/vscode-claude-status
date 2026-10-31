@@ -10,6 +10,7 @@ interface DashboardSettings {
   cacheTtlSeconds: number;
   weeklyBudget: number | null;
   statusBarFormat: string | null;
+  useModelPricing: boolean;
 }
 
 interface DashboardMessage {
@@ -70,6 +71,8 @@ function buildI18n(): Record<string, string> {
     output:                t('Output'),
     cacheRead:             t('Cache read'),
     cacheCreate:           t('Cache create'),
+    byModel:               t('By model (5h)'),
+    modelPricingOn:        t('Model-aware pricing is on — these rates apply only to unrecognized models.'),
     cacheGood:             t('Good! Cache is saving cost.'),
     cacheLow:              t('Low cache reuse.'),
     noCacheReads:          t('No cache reads in this window.'),
@@ -852,16 +855,20 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
       if (el) { el.style.display = breakdownOpen ? 'block' : 'none'; }
       if (btn) { btn.textContent = (breakdownOpen ? '▼' : '▶') + ' ' + i18n.tokenBreakdown; }
       if (breakdownOpen && lastData) {
-        renderTokenBreakdown(lastData.usage, lastData.pricing);
+        renderTokenBreakdown(lastData.usage, lastData.pricing, lastData.settings);
       }
     }
 
-    function renderTokenBreakdown(usage, pricing) {
+    function renderTokenBreakdown(usage, pricing, settings) {
       const el = document.getElementById('token-breakdown');
       if (!el || !pricing) { return; }
 
       function fmtK(n) { return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n); }
       function tokenCost(tokens, ratePerM) { return (tokens / 1_000_000) * ratePerM; }
+      // With model-aware pricing the manual rates don't apply to most entries,
+      // so per-type rows show tokens only and the per-model list carries cost
+      const byModelPricing = !!(settings && settings.useModelPricing);
+      function costSuffix(c) { return byModelPricing ? '' : ' = $' + c.toFixed(4); }
 
       const inCost   = tokenCost(usage.tokensIn5h,         pricing.inputPerMillion);
       const outCost  = tokenCost(usage.tokensOut5h,        pricing.outputPerMillion);
@@ -874,16 +881,30 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
 
       let html =
         '<div class="cost-row"><span class="cost-label">' + i18n.input + '</span>' +
-        '<span>' + fmtK(usage.tokensIn5h) + ' tok = $' + inCost.toFixed(4) + '</span></div>' +
+        '<span>' + fmtK(usage.tokensIn5h) + ' tok' + costSuffix(inCost) + '</span></div>' +
         '<div class="cost-row"><span class="cost-label">' + i18n.output + '</span>' +
-        '<span>' + fmtK(usage.tokensOut5h) + ' tok = $' + outCost.toFixed(4) + '</span></div>';
+        '<span>' + fmtK(usage.tokensOut5h) + ' tok' + costSuffix(outCost) + '</span></div>';
 
       if (usage.tokensCacheRead5h > 0 || usage.tokensCacheCreate5h > 0) {
         html +=
           '<div class="cost-row"><span class="cost-label">' + i18n.cacheRead + '</span>' +
-          '<span>' + fmtK(usage.tokensCacheRead5h) + ' tok = $' + rdCost.toFixed(4) + '</span></div>' +
+          '<span>' + fmtK(usage.tokensCacheRead5h) + ' tok' + costSuffix(rdCost) + '</span></div>' +
           '<div class="cost-row"><span class="cost-label">' + i18n.cacheCreate + '</span>' +
-          '<span>' + fmtK(usage.tokensCacheCreate5h) + ' tok = $' + crCost.toFixed(4) + '</span></div>';
+          '<span>' + fmtK(usage.tokensCacheCreate5h) + ' tok' + costSuffix(crCost) + '</span></div>';
+      }
+
+      // Per-model cost breakdown (5h window)
+      const byModel = usage.costByModel5h || {};
+      const models = Object.keys(byModel).sort((a, b) => byModel[b] - byModel[a]);
+      if (models.length > 0) {
+        html += '<div class="cost-row" style="margin-top:6px"><span class="cost-label" style="font-weight:600">' +
+          i18n.byModel + '</span></div>';
+        for (const m of models) {
+          // "claude-sonnet-4-5-20250929" → "sonnet-4-5"
+          const shortName = m.replace(/^claude-/, '').replace(/-\d{8}$/, '');
+          html += '<div class="cost-row"><span class="cost-label">' + esc(shortName) + '</span>' +
+            '<span>$' + byModel[m].toFixed(4) + '</span></div>';
+        }
       }
 
       html += '<div class="cache-efficiency">';
@@ -948,6 +969,9 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
         '<span class="pg-rate">$' + pricing.cacheCreatePerMillion.toFixed(2) + '</span>' +
         '<span class="pg-unit">/ 1M tokens</span>' +
         '</div>' +
+        (settings.useModelPricing
+          ? '<div class="pg-unit" style="margin-top:4px">' + esc(i18n.modelPricingOn) + '</div>'
+          : '') +
         '<div class="settings-row">' +
         '<span class="settings-badge">' + esc(providerLabel) + '</span>' +
         apiStatus +
@@ -1262,7 +1286,7 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
         updatePredictionChart(msg.data.usage, msg.data.prediction);
         if (msg.data.heatmap) { updateHeatmap(msg.data.heatmap); }
         // Refresh open panels on data update
-        if (breakdownOpen) { renderTokenBreakdown(msg.data.usage, msg.data.pricing); }
+        if (breakdownOpen) { renderTokenBreakdown(msg.data.usage, msg.data.pricing, msg.data.settings); }
         renderPricingContent(msg.data.pricing, msg.data.settings);
       } else if (msg.type === 'setDisplayMode') {
         currentMode = msg.mode;
@@ -1389,6 +1413,7 @@ export class DashboardPanel {
           cacheTtlSeconds: config.cacheTtlSeconds,
           weeklyBudget: config.weeklyBudget,
           statusBarFormat: config.statusBarFormat,
+          useModelPricing: config.useModelPricing,
         },
       },
     };

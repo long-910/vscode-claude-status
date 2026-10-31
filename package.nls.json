@@ -30,5 +30,6 @@
   "config.pricing.inputPerMillion.desc": "Cost per 1M input tokens in USD. Default: $3.00 (Claude Sonnet 4.x). Update this if Anthropic changes pricing.",
   "config.pricing.outputPerMillion.desc": "Cost per 1M output tokens in USD. Default: $15.00 (Claude Sonnet 4.x). Update this if Anthropic changes pricing.",
   "config.pricing.cacheReadPerMillion.desc": "Cost per 1M cache-read tokens in USD. Default: $0.30 (Claude Sonnet 4.x). Update this if Anthropic changes pricing.",
-  "config.pricing.cacheCreatePerMillion.desc": "Cost per 1M cache-creation tokens in USD. Default: $3.75 (Claude Sonnet 4.x). Update this if Anthropic changes pricing."
+  "config.pricing.cacheCreatePerMillion.desc": "Cost per 1M cache-creation tokens in USD. Default: $3.75 (Claude Sonnet 4.x). Update this if Anthropic changes pricing.",
+  "config.pricing.useModelPricing.desc": "Price each entry by its model (Opus, Sonnet, Haiku, Fable…) using built-in Anthropic rates. Unrecognized models — and every entry when disabled — use the claudeStatus.pricing.* rates above."
 }

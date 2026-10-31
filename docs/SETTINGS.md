@@ -195,6 +195,11 @@ What the status bar and dashboard show, depending on your Claude plan and key se
     "default": 3.75,
     "minimum": 0,
     "description": "Cost per 1M cache-creation tokens in USD. Default: $3.75 (Claude Sonnet 4.x)."
+  },
+  "claudeStatus.pricing.useModelPricing": {
+    "type": "boolean",
+    "default": true,
+    "description": "Price each entry by its model using built-in Anthropic rates. Unrecognized models — and every entry when disabled — use the claudeStatus.pricing.* rates."
   }
 }
 ```

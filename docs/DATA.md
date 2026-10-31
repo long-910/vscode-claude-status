@@ -37,6 +37,38 @@ Each line is a JSON object. Relevant fields (verified against Claude Code v2.1.x
 
 ### Cost Calculation
 
+#### Model-aware pricing (default)
+
+Every assistant entry carries `message.model`. With `claudeStatus.pricing.useModelPricing`
+enabled (the default), each entry is priced by its model using built-in rates
+(`resolveModelPricing()` in `jsonlReader.ts`, first match wins, USD per 1M tokens):
+
+| Match (`message.model`) | Family | Input | Output | Cache read |
+|---|---|---|---|---|
+| `fable-5-1`, `mythos-5-1` | Fable / Mythos 5.1 | $10.00 | $50.00 | $0.25 |
+| `fable`, `mythos` | Fable / Mythos 5 | $10.00 | $50.00 | $1.00 |
+| `opus-5-5` | Opus 5.5 | $4.00 | $20.00 | $0.20 |
+| `claude-3-opus`, `opus-4-1`, `opus-4-YYYYMMDD` | Opus 3 / 4.0 / 4.1 | $15.00 | $75.00 | $1.50 |
+| `opus` | Opus 4.5 – 5 | $5.00 | $25.00 | $0.50 |
+| `sonnet-5` | Sonnet 5 / 5.5 | $2.00 | $10.00 | $0.20 |
+| `sonnet` | Sonnet 3.x – 4.x | $3.00 | $15.00 | $0.30 |
+| `haiku-5` | Haiku 5.5 (prompt ≤ 100K tokens) | $0.10 | $0.50 | $0.01 |
+| `haiku-5` | Haiku 5.5 (prompt > 100K tokens) | $0.50 | $2.50 | $0.05 |
+| `claude-3-5-haiku` | Haiku 3.5 | $0.80 | $4.00 | $0.08 |
+| `claude-3-haiku` | Haiku 3 | $0.25 | $1.25 | $0.03 |
+| `haiku` | Haiku 4.5 | $1.00 | $5.00 | $0.10 |
+
+5-minute cache writes are 1.25x and 1-hour cache writes 2x the model's input rate. "Prompt"
+for the Haiku 5.5 rate card is `input + cache read + cache creation` tokens of the entry.
+
+Entries whose model is not recognized (e.g. `<synthetic>`, missing `model`) — and every
+entry when `useModelPricing` is `false` — use the manual rates below. All cost consumers
+(status bar totals, project cost, prediction, heatmap) take the same `CostOptions`
+(`config.costOptions`), so they always agree. The dashboard's token breakdown lists the
+5-hour cost per model (`costByModel5h`).
+
+#### Manual rates
+
 Default rates are based on Claude Sonnet 4.x pricing.
 **All four rates are user-configurable** via `claudeStatus.pricing.*` settings.
 
@@ -152,6 +184,15 @@ second while streaming. To keep the extension host's memory and CPU flat (#48):
 `readAllUsage()`, project cost and prediction all share this index. The heatmap
 (up to `heatmap.days` of history) is computed separately, only while the
 dashboard is open, reading at most 4 files at a time.
+
+### Streaming Deduplication (applies to ALL readers)
+
+Claude Code writes one JSONL entry per content block of a streaming response, all
+sharing the same `requestId` and the same `usage`. Every reader — `readJsonlFile()`,
+the usage index, and the heatmap — dedupes per file with `usageDedupeKey()`
+(`requestId`, falling back to `message.id`). Entries with neither key are all counted.
+New readers must use the same helper, or their totals will be inflated 2–4× in
+agentic sessions.
 
 ---
 

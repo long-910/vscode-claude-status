@@ -11,6 +11,7 @@ import type { TokenUsage } from './jsonlReader';
 export interface UsageRecord {
   timestamp: number  // ms
   usage: TokenUsage
+  model?: string     // e.g. "claude-sonnet-5-5"; used for model-aware pricing
 }
 
 /** Oldest entry kept in memory — the widest window any caller aggregates (project cost: 30 days). */
@@ -25,6 +26,17 @@ interface FileState {
   offset: number                // bytes consumed so far (always at a line boundary)
   records: UsageRecord[]
   seenKeys: Set<string>         // requestId / message.id dedupe keys seen in this file
+}
+
+/**
+ * Claude Code writes one JSONL entry per content block of a streaming
+ * response, all sharing the same requestId and usage. Every reader dedupes on
+ * this key so each API call is counted once. Returns null when absent.
+ */
+export function usageDedupeKey(obj: Record<string, unknown>): string | null {
+  if (typeof obj.requestId === 'string' && obj.requestId) { return obj.requestId; }
+  const id = (obj.message as Record<string, unknown> | undefined)?.id;
+  return typeof id === 'string' && id ? id : null;
 }
 
 const files = new Map<string, FileState>();
@@ -47,13 +59,10 @@ function ingestLine(state: FileState, line: string, retainSince: number): void {
     return; // skip malformed lines
   }
   if (obj.type !== 'assistant' || typeof obj.timestamp !== 'string') { return; }
-  const message = obj.message as { id?: unknown; usage?: Partial<TokenUsage> } | undefined;
+  const message = obj.message as { model?: unknown; usage?: Partial<TokenUsage> } | undefined;
   if (!message) { return; }
 
-  const dedupeKey =
-    (typeof obj.requestId === 'string' && obj.requestId) ||
-    (typeof message.id === 'string' && message.id) ||
-    null;
+  const dedupeKey = usageDedupeKey(obj);
   if (dedupeKey) {
     if (state.seenKeys.has(dedupeKey)) { return; }
     state.seenKeys.add(dedupeKey);
@@ -75,6 +84,7 @@ function ingestLine(state: FileState, line: string, retainSince: number): void {
         ? { ephemeral_1h_input_tokens: u.cache_creation.ephemeral_1h_input_tokens }
         : undefined,
     },
+    model: typeof message.model === 'string' ? message.model : undefined,
   });
 }
 

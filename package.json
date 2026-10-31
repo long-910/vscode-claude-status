@@ -225,6 +225,11 @@
           "default": 3.75,
           "minimum": 0,
           "description": "%config.pricing.cacheCreatePerMillion.desc%"
+        },
+        "claudeStatus.pricing.useModelPricing": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.pricing.useModelPricing.desc%"
         }
       }
     }

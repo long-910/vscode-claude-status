@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import type { ClaudeProvider } from './data/apiClient';
-import type { TokenPricing } from './data/jsonlReader';
+import type { CostOptions, TokenPricing } from './data/jsonlReader';
 
 export class ExtensionConfig {
   private get cfg() {
@@ -83,6 +83,14 @@ export class ExtensionConfig {
       cacheReadPerMillion:  this.cfg.get('pricing.cacheReadPerMillion', 0.30),
       cacheCreatePerMillion: this.cfg.get('pricing.cacheCreatePerMillion', 3.75),
     };
+  }
+
+  get useModelPricing(): boolean {
+    return this.cfg.get('pricing.useModelPricing', true);
+  }
+
+  get costOptions(): CostOptions {
+    return { pricing: this.tokenPricing, useModelPricing: this.useModelPricing };
   }
 
   async setDisplayMode(mode: 'percent' | 'cost'): Promise<void> {

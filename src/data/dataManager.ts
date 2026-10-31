@@ -26,6 +26,7 @@ export interface ClaudeUsageData {
   tokensOut5h: number
   tokensCacheRead5h: number
   tokensCacheCreate5h: number
+  costByModel5h: Record<string, number>
 
   // Rate limit metadata
   has7dLimit: boolean      // false for plans without a 7d window or non-Claude.ai providers
@@ -72,7 +73,7 @@ export class DataManager {
   }
 
   async getUsageData(forceRefresh = false): Promise<ClaudeUsageData> {
-    const [localUsage, cache] = await Promise.all([readAllUsage(config.tokenPricing), readCache()]);
+    const [localUsage, cache] = await Promise.all([readAllUsage(config.costOptions), readCache()]);
 
     // Determine provider type (user config or auto-detection)
     const configuredProvider = config.claudeProvider;
@@ -162,7 +163,7 @@ export class DataManager {
 
   async refreshProjectCosts(): Promise<void> {
     try {
-      this.lastProjectCosts = await getAllProjectCosts(config.tokenPricing);
+      this.lastProjectCosts = await getAllProjectCosts(config.costOptions);
     } catch {
       this.lastProjectCosts = [];
     }
@@ -224,6 +225,11 @@ export class DataManager {
     }
   }
 
+  /** Force the next heatmap access to recompute (e.g. after pricing changes). */
+  invalidateHeatmap(): void {
+    this.heatmapComputedAt = 0;
+  }
+
   setDashboardOpen(open: boolean): void {
     this.dashboardOpen = open;
   }
@@ -276,6 +282,7 @@ export class DataManager {
         this.lastData.cost5h,
         this.lastData.costDay,
         config.dailyBudget,
+        config.costOptions,
       );
       this.lastPrediction = prediction;
       return prediction;
@@ -295,7 +302,7 @@ export class DataManager {
     }
     const projectsDir = getClaudeProjectsDir();
     try {
-      const data = await computeHeatmapData(config.heatmapDays);
+      const data = await computeHeatmapData(config.heatmapDays, config.costOptions);
       // The data directory changed mid-computation — recompute from the new one
       if (projectsDir !== getClaudeProjectsDir()) { return this.getHeatmapData(); }
       this.lastHeatmapData = data;

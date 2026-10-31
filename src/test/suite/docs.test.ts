@@ -33,7 +33,8 @@ function anchors(markdown: string): Set<string> {
   const result = new Set<string>();
   const seen = new Map<string, number>();
   let inFence = false;
-  for (const line of markdown.split('\n')) {
+  // Windows checkouts may have CRLF line endings (core.autocrlf) — split on both
+  for (const line of markdown.split(/\r?\n/)) {
     if (line.startsWith('```')) { inFence = !inFence; continue; }
     const m = !inFence && /^#{1,6}\s+(.*)$/.exec(line);
     if (!m) { continue; }

@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as os from 'os';
 import * as path from 'path';
 import { DataManager, ClaudeUsageData, PredictionData } from './data/dataManager';
-import { dailyUsageToCsv, dailyUsageToJson } from './data/exportUsage';
+import { dailyUsageToCsv, dailyUsageToJson, exportFileName } from './data/exportUsage';
 import { StatusBarManager } from './statusBar';
 import { ClaudeStatusTreeProvider } from './treeView';
 import { config } from './config';
@@ -146,11 +146,8 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
 
-      // Local date, matching the YYYY-MM-DD keys in the exported rows
-      const now = new Date();
-      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       const uri = await vscode.window.showSaveDialog({
-        defaultUri: vscode.Uri.file(path.join(os.homedir(), `claude-usage-${today}.${pick.format}`)),
+        defaultUri: vscode.Uri.file(path.join(os.homedir(), exportFileName(pick.format, new Date()))),
         filters: pick.format === 'csv' ? { CSV: ['csv'] } : { JSON: ['json'] },
       });
       if (!uri) { return; } // cancelled

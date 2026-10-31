@@ -35,5 +35,6 @@
   "config.pricing.cacheCreatePerMillion.desc": "Cost per 1M cache-creation tokens in USD. Default: $3.75 (Claude Sonnet 4.x). Update this if Anthropic changes pricing.",
   "config.pricing.useModelPricing.desc": "Price each entry by its model (Opus, Sonnet, Haiku, Fable…) using built-in Anthropic rates. Unrecognized models — and every entry when disabled — use the claudeStatus.pricing.* rates above.",
   "view.container.title": "Claude Status",
-  "view.overview.title": "Usage Overview"
+  "view.overview.title": "Usage Overview",
+  "config.pricing.modelOverrides.desc": "Per-model rates (USD per 1M tokens) that take precedence over the built-in table — use this for a newly released model or a price change before the extension is updated. Keys match part of the model id (the longest match wins), e.g. `{ \"claude-opus-6\": { \"inputPerMillion\": 4, \"outputPerMillion\": 20 } }`. Cache read defaults to 0.1× input and cache create to 1.25× input."
 }

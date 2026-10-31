@@ -122,5 +122,8 @@
   "Toggle % / $ Display": "切换 % / $ 显示",
   "Set Budget…": "设置预算…",
   "Export Usage Data…": "导出使用数据…",
-  "Cost by weekday × hour (last 30 days)": "按星期×小时的费用（最近30天）"
+  "Cost by weekday × hour (last 30 days)": "按星期×小时的费用（最近30天）",
+  "Newer than the built-in price table — priced at the latest known rate of its family. Set exact rates in claudeStatus.pricing.modelOverrides.": "该模型比内置费率表更新 — 按同系列最新的已知费率估算。可在 claudeStatus.pricing.modelOverrides 中设置准确费率。",
+  "Unrecognized model — priced at the claudeStatus.pricing.* rates.": "无法识别的模型 — 按 claudeStatus.pricing.* 费率计价。",
+  "Priced by claudeStatus.pricing.modelOverrides.": "按 claudeStatus.pricing.modelOverrides 中的费率计价。"
 }

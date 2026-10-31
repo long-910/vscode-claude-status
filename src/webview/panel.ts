@@ -72,6 +72,9 @@ function buildI18n(): Record<string, string> {
     cacheRead:             t('Cache read'),
     cacheCreate:           t('Cache create'),
     byModel:               t('By model (5h)'),
+    pricingEstimated:      t('Newer than the built-in price table — priced at the latest known rate of its family. Set exact rates in claudeStatus.pricing.modelOverrides.'),
+    pricingManual:         t('Unrecognized model — priced at the claudeStatus.pricing.* rates.'),
+    pricingOverride:       t('Priced by claudeStatus.pricing.modelOverrides.'),
     modelPricingOn:        t('Model-aware pricing is on — these rates apply only to unrecognized models.'),
     cacheGood:             t('Good! Cache is saving cost.'),
     cacheLow:              t('Low cache reuse.'),
@@ -918,7 +921,12 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
         for (const m of models) {
           // "claude-sonnet-4-5-20250929" → "sonnet-4-5"
           const shortName = m.replace(/^claude-/, '').replace(/-\d{8}$/, '');
-          html += '<div class="cost-row"><span class="cost-label">' + esc(shortName) + '</span>' +
+          // Flag models not priced from the built-in table: ≈ estimated, * manual / override
+          const source = (usage.pricingByModel5h || {})[m];
+          const flag = { estimated: ' ≈', manual: ' *', override: ' *' }[source] || '';
+          const hint = { estimated: i18n.pricingEstimated, manual: i18n.pricingManual, override: i18n.pricingOverride }[source];
+          html += '<div class="cost-row"><span class="cost-label"' + (hint ? ' title="' + esc(hint) + '"' : '') + '>' +
+            esc(shortName + flag) + '</span>' +
             '<span>$' + byModel[m].toFixed(4) + '</span></div>';
         }
       }

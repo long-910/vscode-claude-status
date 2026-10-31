@@ -20,6 +20,7 @@ function makeData(overrides: Partial<ClaudeUsageData> = {}): ClaudeUsageData {
     tokensCacheRead5h: 0,
     tokensCacheCreate5h: 0,
     costByModel5h: {},
+    pricingByModel5h: {},
     lastUpdated: new Date(),
     cacheAge: 0,
     dataSource: 'api',

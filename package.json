@@ -256,6 +256,21 @@
           "type": "boolean",
           "default": true,
           "description": "%config.pricing.useModelPricing.desc%"
+        },
+        "claudeStatus.pricing.modelOverrides": {
+          "type": "object",
+          "default": {},
+          "markdownDescription": "%config.pricing.modelOverrides.desc%",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["inputPerMillion", "outputPerMillion"],
+            "properties": {
+              "inputPerMillion": { "type": "number", "minimum": 0 },
+              "outputPerMillion": { "type": "number", "minimum": 0 },
+              "cacheReadPerMillion": { "type": "number", "minimum": 0 },
+              "cacheCreatePerMillion": { "type": "number", "minimum": 0 }
+            }
+          }
         }
       }
     }

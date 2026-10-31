@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { dailyUsageToCsv, dailyUsageToJson } from '../../data/exportUsage';
+import { dailyUsageToCsv, dailyUsageToJson, exportFileName } from '../../data/exportUsage';
 import type { DailyUsage } from '../../webview/heatmap';
 
 const sample: DailyUsage[] = [
@@ -53,6 +53,14 @@ suite('ExportUsage', () => {
       assert.strictEqual(parsed.days, 0);
       assert.strictEqual(parsed.totalCostUsd, 0);
       assert.deepStrictEqual(parsed.daily, []);
+    });
+  });
+  suite('exportFileName', () => {
+    test('regression: uses the local date, not the UTC date', () => {
+      // 00:30 local on Jan 2 — the UTC date differs in any timezone east of UTC
+      const lateNight = new Date(2026, 0, 2, 0, 30);
+      assert.strictEqual(exportFileName('csv', lateNight), 'claude-usage-2026-01-02.csv');
+      assert.strictEqual(exportFileName('json', new Date(2026, 11, 31, 23, 59)), 'claude-usage-2026-12-31.json');
     });
   });
 });

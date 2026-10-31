@@ -122,5 +122,8 @@
   "Toggle % / $ Display": "% / $ 表示を切り替え",
   "Set Budget…": "予算を設定…",
   "Export Usage Data…": "使用データをエクスポート…",
-  "Cost by weekday × hour (last 30 days)": "曜日×時間帯別コスト（直近30日）"
+  "Cost by weekday × hour (last 30 days)": "曜日×時間帯別コスト（直近30日）",
+  "Newer than the built-in price table — priced at the latest known rate of its family. Set exact rates in claudeStatus.pricing.modelOverrides.": "組み込みの単価表より新しいモデルです — 同じファミリーの最新の既知単価で概算しています。正確な単価は claudeStatus.pricing.modelOverrides で設定できます。",
+  "Unrecognized model — priced at the claudeStatus.pricing.* rates.": "未知のモデルです — claudeStatus.pricing.* の単価で計算しています。",
+  "Priced by claudeStatus.pricing.modelOverrides.": "claudeStatus.pricing.modelOverrides の単価で計算しています。"
 }

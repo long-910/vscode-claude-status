@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { readAllUsage, wasJsonlUpdatedRecently, getClaudeProjectsDir } from './jsonlReader';
+import type { PricingSource } from './pricing';
 import { clearUsageIndex } from './usageIndex';
 import { fetchRateLimitData, detectProvider, RateLimitData, ClaudeProvider } from './apiClient';
 import { readCache, writeCache, isCacheValid, getCacheAge } from './cache';
@@ -27,6 +28,7 @@ export interface ClaudeUsageData {
   tokensCacheRead5h: number
   tokensCacheCreate5h: number
   costByModel5h: Record<string, number>
+  pricingByModel5h: Record<string, PricingSource>
 
   // Rate limit metadata
   has7dLimit: boolean      // false for plans without a 7d window or non-Claude.ai providers

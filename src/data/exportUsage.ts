@@ -29,3 +29,11 @@ export function dailyUsageToJson(daily: DailyUsage[]): string {
     2
   ) + '\n';
 }
+
+/** Default file name, dated in local time to match the YYYY-MM-DD row keys. */
+export function exportFileName(format: 'csv' | 'json', now: Date): string {
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `claude-usage-${yyyy}-${mm}-${dd}.${format}`;
+}

@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
-import { calculateCost, forEachJsonlLine, readJsonlFile, resolveModelPricing, usageCost, DEFAULT_PRICING, TokenUsage } from '../../data/jsonlReader';
+import { calculateCost, forEachJsonlLine, readJsonlFile } from '../../data/jsonlReader';
 
 suite('JsonlReader', () => {
   test('calculateCost returns 0 for zero tokens', () => {
@@ -133,66 +133,7 @@ suite('JsonlReader', () => {
     assert.strictEqual(cost, 2.00);
   });
 
-  suite('model-aware pricing', () => {
-    const mtok = (fields: Partial<TokenUsage>): TokenUsage => ({
-      input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, ...fields,
-    });
-    const inOut = (model: string) => {
-      const p = resolveModelPricing(model, DEFAULT_PRICING);
-      return [p.inputPerMillion, p.outputPerMillion];
-    };
-
-    test('resolves each model family to its published rate', () => {
-      assert.deepStrictEqual(inOut('claude-fable-5-1'), [10, 50]);
-      assert.deepStrictEqual(inOut('claude-fable-5'), [10, 50]);
-      assert.deepStrictEqual(inOut('claude-opus-5-5'), [4, 20]);
-      assert.deepStrictEqual(inOut('claude-opus-5'), [5, 25]);
-      assert.deepStrictEqual(inOut('claude-opus-4-5-20251101'), [5, 25]);
-      assert.deepStrictEqual(inOut('claude-sonnet-5-5'), [2, 10]);
-      assert.deepStrictEqual(inOut('claude-sonnet-4-5-20250929'), [3, 15]);
-      assert.deepStrictEqual(inOut('claude-3-5-sonnet-20241022'), [3, 15]);
-      assert.deepStrictEqual(inOut('claude-haiku-5-5'), [0.10, 0.50]);
-      assert.deepStrictEqual(inOut('claude-haiku-4-5-20251001'), [1, 5]);
-      assert.deepStrictEqual(inOut('claude-3-5-haiku-20241022'), [0.80, 4]);
-    });
-
-    test('legacy Opus (3, 4.0, 4.1) matches before generic Opus', () => {
-      assert.deepStrictEqual(inOut('claude-3-opus-20240229'), [15, 75]);
-      assert.deepStrictEqual(inOut('claude-opus-4-20250514'), [15, 75]);
-      assert.deepStrictEqual(inOut('claude-opus-4-1-20250805'), [15, 75]);
-    });
-
-    test('model-specific cache-read rates', () => {
-      assert.strictEqual(resolveModelPricing('claude-fable-5-1', DEFAULT_PRICING).cacheReadPerMillion, 0.25);
-      assert.strictEqual(resolveModelPricing('claude-opus-5-5', DEFAULT_PRICING).cacheReadPerMillion, 0.20);
-      assert.strictEqual(resolveModelPricing('claude-sonnet-5-5', DEFAULT_PRICING).cacheReadPerMillion, 0.20);
-    });
-
-    test('Haiku 5.5 switches to the long-prompt rate card above 100K prompt tokens', () => {
-      const short = resolveModelPricing('claude-haiku-5-5', DEFAULT_PRICING, mtok({ input_tokens: 50_000, cache_read_input_tokens: 50_000 }));
-      const long = resolveModelPricing('claude-haiku-5-5', DEFAULT_PRICING, mtok({ input_tokens: 1_000, cache_read_input_tokens: 100_000 }));
-      assert.strictEqual(short.inputPerMillion, 0.10);
-      assert.strictEqual(long.inputPerMillion, 0.50);
-      assert.strictEqual(long.outputPerMillion, 2.50);
-    });
-
-    test('unknown or missing models fall back to the manual rates', () => {
-      const manual = { inputPerMillion: 7, outputPerMillion: 8, cacheReadPerMillion: 0.7, cacheCreatePerMillion: 8.75 };
-      assert.strictEqual(resolveModelPricing('<synthetic>', manual), manual);
-      assert.strictEqual(resolveModelPricing(undefined, manual), manual);
-    });
-
-    test('usageCost honours the useModelPricing toggle', () => {
-      const usage = mtok({ input_tokens: 1_000_000, output_tokens: 1_000_000 });
-      assert.strictEqual(usageCost(usage, 'claude-opus-5-5', { pricing: DEFAULT_PRICING, useModelPricing: true }), 24);
-      assert.strictEqual(usageCost(usage, 'claude-opus-5-5', { pricing: DEFAULT_PRICING, useModelPricing: false }), 18);
-    });
-
-    test('1-hour cache writes are 2x the model input rate', () => {
-      const usage = mtok({ cache_creation_input_tokens: 1_000_000, cache_creation: { ephemeral_1h_input_tokens: 1_000_000 } });
-      assert.strictEqual(usageCost(usage, 'claude-opus-5-5'), 8);
-    });
-
+  suite('model field', () => {
     test('readJsonlFile keeps message.model', async () => {
       const tmp = path.join(os.tmpdir(), `jsonlReader-model-${Date.now()}.jsonl`);
       await fs.writeFile(tmp, JSON.stringify({

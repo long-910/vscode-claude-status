@@ -35,5 +35,6 @@
   "config.pricing.cacheCreatePerMillion.desc": "キャッシュ作成トークン 1M あたりのコスト（USD）。デフォルト: $3.75（Claude Sonnet 4.x）。Anthropic が料金を変更した場合は更新してください。",
   "config.pricing.useModelPricing.desc": "各エントリをモデル（Opus・Sonnet・Haiku・Fable など）ごとの組み込み単価で計算します。未知のモデル、および無効時はすべてのエントリに上記の claudeStatus.pricing.* の単価を使用します。",
   "view.container.title": "Claude Status",
-  "view.overview.title": "使用状況の概要"
+  "view.overview.title": "使用状況の概要",
+  "config.pricing.modelOverrides.desc": "モデルごとの単価（USD / 1M トークン）。組み込みの単価表より優先されます。新しくリリースされたモデルや価格改定に、拡張機能の更新を待たずに対応できます。キーはモデル ID の一部と照合されます（最長一致）。例: `{ \"claude-opus-6\": { \"inputPerMillion\": 4, \"outputPerMillion\": 20 } }`。キャッシュ読み取りは入力の 0.1 倍、キャッシュ作成は 1.25 倍が既定値です。"
 }

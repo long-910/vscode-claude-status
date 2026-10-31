@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import type { ClaudeProvider } from './data/apiClient';
-import type { CostOptions, TokenPricing } from './data/jsonlReader';
+import type { CostOptions, ModelPricingOverrides, TokenPricing } from './data/pricing';
 
 export class ExtensionConfig {
   private get cfg() {
@@ -93,8 +93,17 @@ export class ExtensionConfig {
     return this.cfg.get('pricing.useModelPricing', true);
   }
 
+  get modelPricingOverrides(): ModelPricingOverrides {
+    const v = this.cfg.get<unknown>('pricing.modelOverrides', {});
+    return v && typeof v === 'object' && !Array.isArray(v) ? v as ModelPricingOverrides : {};
+  }
+
   get costOptions(): CostOptions {
-    return { pricing: this.tokenPricing, useModelPricing: this.useModelPricing };
+    return {
+      pricing: this.tokenPricing,
+      useModelPricing: this.useModelPricing,
+      modelOverrides: this.modelPricingOverrides,
+    };
   }
 
   async setDisplayMode(mode: 'percent' | 'cost'): Promise<void> {

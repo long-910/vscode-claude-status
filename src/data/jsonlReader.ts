@@ -3,6 +3,14 @@ import * as path from 'path';
 import * as readline from 'readline';
 import { getClaudeHome } from './claudeHome';
 import { readUsageRecords, usageDedupeKey } from './usageIndex';
+import { usageCost, pricingSource, CostOptions, DEFAULT_COST_OPTIONS, PricingSource } from './pricing';
+
+// Pricing lives in ./pricing; re-exported here for existing importers
+export {
+  calculateCost, usageCost, resolveModelPricing, parseModelId, normalizeModelId, pricingSource,
+  DEFAULT_PRICING, DEFAULT_COST_OPTIONS,
+} from './pricing';
+export type { TokenPricing, CostOptions, ModelPricingOverrides, PricingSource } from './pricing';
 
 export interface CacheCreationBreakdown {
   ephemeral_5m_input_tokens?: number
@@ -43,130 +51,7 @@ export interface AggregatedUsage {
   tokensCacheRead5h: number
   tokensCacheCreate5h: number
   costByModel5h: Record<string, number>  // model id → cost in the 5h window
-}
-
-export interface TokenPricing {
-  inputPerMillion: number
-  outputPerMillion: number
-  cacheReadPerMillion: number
-  cacheCreatePerMillion: number
-}
-
-export const DEFAULT_PRICING: TokenPricing = {
-  inputPerMillion: 3.00,
-  outputPerMillion: 15.00,
-  cacheReadPerMillion: 0.30,
-  cacheCreatePerMillion: 3.75,
-};
-
-const ONE_HOUR_CACHE_WRITE_MULTIPLIER = 2;
-
-const rate = (input: number, output: number, cacheRead: number): TokenPricing => ({
-  inputPerMillion: input,
-  outputPerMillion: output,
-  cacheReadPerMillion: cacheRead,
-  cacheCreatePerMillion: input * 1.25,  // 5-minute cache write
-});
-
-interface ModelPricingRule {
-  pattern: RegExp
-  pricing: TokenPricing
-  // Rate card for prompts (input + cache tokens) above `threshold` tokens
-  longPrompt?: { threshold: number; pricing: TokenPricing }
-}
-
-// Built-in per-model rates (USD per 1M tokens), matched against the JSONL
-// entry's message.model. Anthropic's published pricing: 5-minute cache write
-// = 1.25x input, 1-hour cache write = 2x input, cache read = 0.1x input unless
-// noted. First match wins, so specific patterns precede their family pattern.
-const MODEL_PRICING_RULES: ReadonlyArray<ModelPricingRule> = [
-  // Fable 5.1 / Mythos 5.1 — cache read 0.025x
-  { pattern: /(fable|mythos)-5-1/i, pricing: rate(10.00, 50.00, 0.25) },
-  { pattern: /fable|mythos/i, pricing: rate(10.00, 50.00, 1.00) },
-  // Opus 5.5 — cache read 0.05x
-  { pattern: /opus-5-5/i, pricing: rate(4.00, 20.00, 0.20) },
-  // Legacy Opus (3, 4.0, 4.1)
-  { pattern: /claude-3-opus|opus-4-1(?!\d)|opus-4-20\d{6}/i, pricing: rate(15.00, 75.00, 1.50) },
-  // Opus 4.5 – 4.8, Opus 5
-  { pattern: /opus/i, pricing: rate(5.00, 25.00, 0.50) },
-  // Sonnet 5 / 5.5
-  { pattern: /sonnet-5/i, pricing: rate(2.00, 10.00, 0.20) },
-  // Sonnet 3.x – 4.x
-  { pattern: /sonnet/i, pricing: rate(3.00, 15.00, 0.30) },
-  // Haiku 5.x — two rate cards chosen by prompt length
-  {
-    pattern: /haiku-5/i,
-    pricing: rate(0.10, 0.50, 0.01),
-    longPrompt: { threshold: 100_000, pricing: rate(0.50, 2.50, 0.05) },
-  },
-  { pattern: /claude-3-5-haiku/i, pricing: rate(0.80, 4.00, 0.08) },
-  { pattern: /claude-3-haiku/i, pricing: rate(0.25, 1.25, 0.03) },
-  // Haiku 4.5
-  { pattern: /haiku/i, pricing: rate(1.00, 5.00, 0.10) },
-];
-
-function promptTokens(usage: TokenUsage): number {
-  return (usage.input_tokens || 0) +
-    (usage.cache_read_input_tokens || 0) +
-    (usage.cache_creation_input_tokens || 0);
-}
-
-/**
- * Built-in rate for a recognized model, or `fallback` (the user-configured
- * claudeStatus.pricing.* rates) when the model is unknown, e.g. `<synthetic>`.
- * Pass `usage` to select a long-prompt rate card where the model has one.
- */
-export function resolveModelPricing(
-  model: string | undefined,
-  fallback: TokenPricing,
-  usage?: TokenUsage,
-): TokenPricing {
-  if (!model) { return fallback; }
-  const rule = MODEL_PRICING_RULES.find(r => r.pattern.test(model));
-  if (!rule) { return fallback; }
-  if (rule.longPrompt && usage && promptTokens(usage) > rule.longPrompt.threshold) {
-    return rule.longPrompt.pricing;
-  }
-  return rule.pricing;
-}
-
-export interface CostOptions {
-  pricing: TokenPricing      // manual rates; also the fallback for unknown models
-  useModelPricing: boolean   // when true, recognized models use built-in rates
-}
-
-export const DEFAULT_COST_OPTIONS: CostOptions = {
-  pricing: DEFAULT_PRICING,
-  useModelPricing: true,
-};
-
-/** Cost of one usage entry, priced by its model when model pricing is enabled. */
-export function usageCost(
-  usage: TokenUsage,
-  model: string | undefined,
-  options: CostOptions = DEFAULT_COST_OPTIONS,
-): number {
-  const pricing = options.useModelPricing
-    ? resolveModelPricing(model, options.pricing, usage)
-    : options.pricing;
-  return calculateCost(usage, pricing);
-}
-
-export function calculateCost(usage: TokenUsage, pricing: TokenPricing = DEFAULT_PRICING): number {
-  const cacheCreateTotal = usage.cache_creation_input_tokens || 0;
-  const cacheCreate1h = Math.min(
-    Math.max(usage.cache_creation?.ephemeral_1h_input_tokens || 0, 0),
-    cacheCreateTotal
-  );
-  const cacheCreate5m = cacheCreateTotal - cacheCreate1h;
-
-  return (
-    ((usage.input_tokens || 0) / 1_000_000) * pricing.inputPerMillion +
-    ((usage.output_tokens || 0) / 1_000_000) * pricing.outputPerMillion +
-    ((usage.cache_read_input_tokens || 0) / 1_000_000) * pricing.cacheReadPerMillion +
-    (cacheCreate5m / 1_000_000) * pricing.cacheCreatePerMillion +
-    (cacheCreate1h / 1_000_000) * pricing.inputPerMillion * ONE_HOUR_CACHE_WRITE_MULTIPLIER
-  );
+  pricingByModel5h: Record<string, PricingSource>  // model id → how it was priced
 }
 
 export function getClaudeProjectsDir(): string {
@@ -298,6 +183,7 @@ export async function readAllUsage(options: CostOptions = DEFAULT_COST_OPTIONS):
     tokensCacheRead5h: 0,
     tokensCacheCreate5h: 0,
     costByModel5h: {},
+    pricingByModel5h: {},
   };
 
   // Files untouched for 7 days cannot contain entries inside any window below
@@ -321,6 +207,9 @@ export async function readAllUsage(options: CostOptions = DEFAULT_COST_OPTIONS):
       result.tokensCacheCreate5h += usage.cache_creation_input_tokens || 0;
       if (model) {
         result.costByModel5h[model] = (result.costByModel5h[model] || 0) + cost;
+        if (!(model in result.pricingByModel5h)) {
+          result.pricingByModel5h[model] = pricingSource(model, options);
+        }
       }
     }
   }

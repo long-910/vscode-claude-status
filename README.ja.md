@@ -112,6 +112,7 @@ VS Code ステータスバーにピン留めされたリアルタイム使用状
 - **安全性インジケーター** — 30分以上余裕がある場合は「重いタスクを開始しても安全」と表示
 - **日次予算** — 任意のUSD上限を設定可能；設定した閾値（デフォルト80%）に達するとプログレスバーとアラートが表示
 - **週次予算** — 任意のUSD週次上限（`claudeStatus.budget.weeklyUsd`）とプログレスバー
+- **月次予算** — 暦月単位の任意のUSD上限（`claudeStatus.budget.monthlyUsd`）。従量課金のエンタープライズの利用上限（spend limit）の管理などに。「今月」の累計はサイドバーとツールチップにも表示
 - **VS Code通知** — ≤30分でノンブロッキング警告、≤10分で「ダッシュボードを開く」アクション付きエラーダイアログ；予算アラートはウィンドウにつき1回
 
 **設定 → Claude Status** またはコマンドパレットから設定可能：
@@ -226,7 +227,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | `claudeStatus.displayMode` | `"percent"` \| `"cost"` | `"percent"` | ステータスバー表示モード |
 | `claudeStatus.statusBar.alignment` | `"left"` \| `"right"` | `"left"` | ステータスバーの位置 |
 | `claudeStatus.statusBar.showProjectCost` | `boolean` | `true` | ステータスバーにプロジェクトコストを表示 |
-| `claudeStatus.statusBar.format` | `string \| null` | `null` | カスタムラベルテンプレート。プレースホルダー: `${usage5h}`, `${usage7d}`, `${cost5h}`, `${cost7d}`, `${costDay}`。`null` = デフォルト自動生成 |
+| `claudeStatus.statusBar.format` | `string \| null` | `null` | カスタムラベルテンプレート。プレースホルダー: `${usage5h}`, `${usage7d}`, `${bar5h}`, `${bar7d}`, `${cost5h}`, `${cost7d}`, `${costDay}`, `${costMonth}`。`null` = デフォルト自動生成 |
 | `claudeStatus.statusBar.showSparkline` | `boolean` | `false` | ステータスバーにコンパクトな 5h 利用率メーター（▰▰▰▱▱）を表示 |
 | `claudeStatus.payAsYouGo.showTimeWindows` | `boolean` | `true` | 従量課金（APIキー・Bedrock）で 5h / 7d ウィンドウの使用量を表示。オフにすると代わりに今日のコストを表示（サブスクには影響なし） |
 | `claudeStatus.cache.ttlSeconds` | `number` (60–3600) | `300` | APIキャッシュTTL（秒） |
@@ -234,6 +235,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | `claudeStatus.realtime.enabled` | `boolean` | `false` | TTL秒ごとにAPIをポーリング（`rateLimitApi.enabled` が必要） |
 | `claudeStatus.budget.dailyUsd` | `number \| null` | `null` | 日次予算（USD）（`null` = 無効） |
 | `claudeStatus.budget.weeklyUsd` | `number \| null` | `null` | 週次予算（USD） |
+| `claudeStatus.budget.monthlyUsd` | `number \| null` | `null` | 暦月の予算（USD。しきい値に達すると月に1回警告） |
 | `claudeStatus.budget.alertThresholdPercent` | `number` (1–100) | `80` | 予算アラート閾値（%） |
 | `claudeStatus.notifications.rateLimitWarning` | `boolean` | `true` | レート制限が近い時に警告 |
 | `claudeStatus.notifications.rateLimitWarningThresholdMinutes` | `number` (5–120) | `30` | 制限の何分前に警告を表示 |

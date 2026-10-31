@@ -23,6 +23,7 @@ export interface ClaudeUsageData {
   cost5h: number
   costDay: number
   cost7d: number
+  costMonth: number
   tokensIn5h: number
   tokensOut5h: number
   tokensCacheRead5h: number

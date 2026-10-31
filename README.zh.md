@@ -107,6 +107,7 @@
 - **安全指示器** — 剩余 > 30 分钟时显示"可安全启动繁重任务"
 - **日预算** — 可设置 USD 上限；达到配置阈值（默认 80%）时触发进度条和告警
 - **周预算** — 可选的每周 USD 上限（`claudeStatus.budget.weeklyUsd`）与进度条
+- **月预算** — 可选的自然月 USD 上限（`claudeStatus.budget.monthlyUsd`），例如用于跟踪按量付费 Enterprise 的支出限额；“本月”累计也显示在侧边栏和提示中
 - **VS Code 通知** — ≤30 分钟时非阻塞警告，≤10 分钟时带"打开仪表板"操作的错误对话框；预算告警每个窗口触发一次
 
 通过**设置 → Claude Status** 或命令面板进行配置：
@@ -219,7 +220,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | `claudeStatus.displayMode` | `"percent"` \| `"cost"` | `"percent"` | 状态栏显示模式 |
 | `claudeStatus.statusBar.alignment` | `"left"` \| `"right"` | `"left"` | 状态栏位置 |
 | `claudeStatus.statusBar.showProjectCost` | `boolean` | `true` | 在状态栏显示项目费用 |
-| `claudeStatus.statusBar.format` | `string \| null` | `null` | 自定义标签模板。占位符：`${usage5h}`, `${usage7d}`, `${cost5h}`, `${cost7d}`, `${costDay}`。`null` = 默认自动生成 |
+| `claudeStatus.statusBar.format` | `string \| null` | `null` | 自定义标签模板。占位符：`${usage5h}`, `${usage7d}`, `${bar5h}`, `${bar7d}`, `${cost5h}`, `${cost7d}`, `${costDay}`, `${costMonth}`。`null` = 默认自动生成 |
 | `claudeStatus.statusBar.showSparkline` | `boolean` | `false` | 在状态栏显示紧凑的 5h 利用率仪表（▰▰▰▱▱） |
 | `claudeStatus.payAsYouGo.showTimeWindows` | `boolean` | `true` | 按量付费（API 密钥、Bedrock）时显示 5h / 7d 窗口用量。关闭后改为显示今日费用（不影响订阅） |
 | `claudeStatus.cache.ttlSeconds` | `number` (60–3600) | `300` | API 缓存 TTL（秒） |
@@ -227,6 +228,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | `claudeStatus.realtime.enabled` | `boolean` | `false` | 每隔 TTL 秒轮询速率限制 API（需启用 `rateLimitApi.enabled`） |
 | `claudeStatus.budget.dailyUsd` | `number \| null` | `null` | 每日预算（USD）（`null` = 禁用） |
 | `claudeStatus.budget.weeklyUsd` | `number \| null` | `null` | 每周预算（USD） |
+| `claudeStatus.budget.monthlyUsd` | `number \| null` | `null` | 自然月预算（USD，达到阈值时每月提醒一次） |
 | `claudeStatus.budget.alertThresholdPercent` | `number` (1–100) | `80` | 预算告警阈值（%） |
 | `claudeStatus.notifications.rateLimitWarning` | `boolean` | `true` | 速率限制临近时发出警告 |
 | `claudeStatus.notifications.rateLimitWarningThresholdMinutes` | `number` (5–120) | `30` | 限制前多少分钟发出警告 |

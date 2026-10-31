@@ -15,6 +15,7 @@ function makeData(overrides: Partial<ClaudeUsageData> = {}): ClaudeUsageData {
     cost5h: 1.23,
     costDay: 2.50,
     cost7d: 10.00,
+    costMonth: 30.00,
     tokensIn5h: 0,
     tokensOut5h: 0,
     tokensCacheRead5h: 0,
@@ -97,10 +98,30 @@ suite('TreeView', () => {
         provider.dispose();
         return rows;
       };
-      assert.deepStrictEqual(costRows(makeData({ providerType: 'api-key', dataSource: 'local-only' })), ['Today']);
-      assert.deepStrictEqual(costRows(makeData()), ['5h', 'Today', '7 days'], 'subscriptions unaffected');
+      assert.deepStrictEqual(costRows(makeData({ providerType: 'api-key', dataSource: 'local-only' })), ['Today', 'This month']);
+      assert.deepStrictEqual(costRows(makeData()), ['5h', 'Today', '7 days', 'This month'], 'subscriptions unaffected');
     } finally {
       await cfg.update('payAsYouGo.showTimeWindows', prev, vscode.ConfigurationTarget.Global);
+    }
+  });
+
+  test('This month shows spend against claudeStatus.budget.monthlyUsd', async () => {
+    const cfg = vscode.workspace.getConfiguration('claudeStatus');
+    const prev = cfg.inspect<number | null>('budget.monthlyUsd')?.globalValue;
+    const monthRow = () => {
+      const provider = new ClaudeStatusTreeProvider(fakeManager(makeData({ costMonth: 45 })));
+      const section = provider.getChildren().find(n => n.item.label === 'Token Cost');
+      const row = provider.getChildren(section).find(n => n.item.label === 'This month');
+      provider.dispose();
+      return row?.item.description;
+    };
+    try {
+      await cfg.update('budget.monthlyUsd', undefined, vscode.ConfigurationTarget.Global);
+      assert.strictEqual(monthRow(), '$45.00');
+      await cfg.update('budget.monthlyUsd', 60, vscode.ConfigurationTarget.Global);
+      assert.strictEqual(monthRow(), '$45.00 / $60.00 (75%)');
+    } finally {
+      await cfg.update('budget.monthlyUsd', prev, vscode.ConfigurationTarget.Global);
     }
   });
 });

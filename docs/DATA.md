@@ -214,8 +214,10 @@ second while streaming. To keep the extension host's memory and CPU flat (#48):
   is re-read from the start.
 - **Skip old files.** A transcript's mtime is >= every entry in it, so files
   whose mtime is older than the window being aggregated are not read at all.
-- **Bounded retention.** Records older than 30 days (the widest window, project
-  cost) are dropped, and files not modified in 30 days are evicted.
+- **Bounded retention.** Records older than 32 days (the widest window: the calendar
+  month, up to 31 days, plus a day of margin) are dropped, and files not modified in 32
+  days are evicted. `readAllUsage()` reads files modified since the earlier of 7 days ago
+  and the 1st of the month.
 
 `readAllUsage()`, project cost and prediction all share this index. The heatmap
 (up to `heatmap.days` of history) is computed separately, only while the

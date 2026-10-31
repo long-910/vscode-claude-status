@@ -34,7 +34,8 @@ Rate Limit                     (claude-ai provider with rate-limit data only)
 Token Cost
 ├─ 5h           $1.23
 ├─ Today        $2.50
-└─ 7 days       $10.00
+├─ 7 days       $10.00
+└─ This month   $45.10 / $60.00 (75%)   (budget part only with budget.monthlyUsd; icon yellow ≥75%, red ≥90%)
 Projects                        (only when workspace projects matched)
 └─ <name>       Today: $3.21 · 7d: $18.45   (tooltip = project dir path)
 Actions

@@ -159,4 +159,19 @@ suite('Cost options (regression)', () => {
       await cfg().update('claudeProvider', prevProvider, vscode.ConfigurationTarget.Global);
     }
   });
+
+  test('readAllUsage: costMonth counts the calendar month only', async () => {
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+    const now = Date.now();
+    // One call just after the 1st (or a second ago on the 1st's first minute), one just before it
+    await fs.writeFile(file, [
+      line('this-month', 'claude-opus-5-5', now - Math.min(monthStart.getTime() + 60e3, now - 1000)),
+      line('last-month', 'claude-opus-5-5', now - (monthStart.getTime() - 3600e3)),
+    ].join('\n') + '\n');
+    clearUsageIndex();
+    const u = await readAllUsage(DEFAULT_COST_OPTIONS);
+    assert.ok(near(u.costMonth, opusCost), `costMonth ${u.costMonth}`);
+  });
 });

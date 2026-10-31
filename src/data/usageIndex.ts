@@ -14,8 +14,11 @@ export interface UsageRecord {
   model?: string     // e.g. "claude-sonnet-5-5"; used for model-aware pricing
 }
 
-/** Oldest entry kept in memory — the widest window any caller aggregates (project cost: 30 days). */
-export const INDEX_RETENTION_MS = 30 * 24 * 3600 * 1000;
+/**
+ * Oldest entry kept in memory — the widest window any caller aggregates: the
+ * calendar month (up to 31 days, plus a day of margin for DST / clock skew).
+ */
+export const INDEX_RETENTION_MS = 32 * 24 * 3600 * 1000;
 
 const CHUNK_SIZE = 1024 * 1024;
 const NEWLINE = 0x0a;

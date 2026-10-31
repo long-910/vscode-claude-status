@@ -59,7 +59,8 @@ function applyFormat(format: string, data: ClaudeUsageData): string {
     .replace(/\$\{bar7d\}/g, buildUtilizationBar(utilization7d))
     .replace(/\$\{cost5h\}/g, cost5h.toFixed(2))
     .replace(/\$\{cost7d\}/g, cost7d.toFixed(2))
-    .replace(/\$\{costDay\}/g, costDay.toFixed(2));
+    .replace(/\$\{costDay\}/g, costDay.toFixed(2))
+    .replace(/\$\{costMonth\}/g, data.costMonth.toFixed(2));
 }
 
 /**
@@ -139,6 +140,14 @@ export function buildLabel(data: ClaudeUsageData, projectCosts: ProjectCostData[
   return isStale ? `${main}${staleSuffix}` : main;
 }
 
+function monthLine(data: ClaudeUsageData): string {
+  const budget = config.monthlyBudget;
+  const suffix = budget && budget > 0
+    ? ` / $${budget.toFixed(2)} (${Math.round((data.costMonth / budget) * 100)}%)`
+    : '';
+  return `${vscode.l10n.t('This month')}: $${data.costMonth.toFixed(2)}${suffix}`;
+}
+
 export function buildTooltip(data: ClaudeUsageData, projectCosts: ProjectCostData[] = []): string {
   const {
     utilization5h, utilization7d, resetIn5h, resetIn7d,
@@ -189,6 +198,7 @@ export function buildTooltip(data: ClaudeUsageData, projectCosts: ProjectCostDat
   } else {
     lines.push(`${vscode.l10n.t('Today')}: $${costDay.toFixed(2)}`);
   }
+  lines.push(monthLine(data));
 
   if (projectCosts.length > 0) {
     lines.push('');

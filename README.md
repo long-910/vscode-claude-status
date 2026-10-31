@@ -125,6 +125,8 @@ the 5 h rate limit is exhausted and warns you before it happens.
 - **Daily budget** — set an optional USD cap; progress bar and alerts fire when
   the configured threshold (default 80 %) is reached
 - **Weekly budget** — optional USD weekly cap with progress bar (`claudeStatus.budget.weeklyUsd`)
+- **Monthly budget** — optional USD cap for the calendar month (`claudeStatus.budget.monthlyUsd`), e.g. to
+  track a spend limit on a usage-based Enterprise plan; *This month* is also shown in the sidebar and tooltip
 - **VS Code notifications** — non-blocking warning at ≤ 30 min, error dialog
   at ≤ 10 min (with "Open Dashboard" action); budget alert fires once per window
 
@@ -251,7 +253,7 @@ All settings are under the `claudeStatus` namespace in VS Code Settings.
 | `claudeStatus.displayMode` | `"percent"` \| `"cost"` | `"percent"` | Status bar display mode |
 | `claudeStatus.statusBar.alignment` | `"left"` \| `"right"` | `"left"` | Status bar position |
 | `claudeStatus.statusBar.showProjectCost` | `boolean` | `true` | Show project cost in status bar |
-| `claudeStatus.statusBar.format` | `string \| null` | `null` | Custom label template. Placeholders: `${usage5h}`, `${usage7d}`, `${cost5h}`, `${cost7d}`, `${costDay}`. `null` = default auto-generated label |
+| `claudeStatus.statusBar.format` | `string \| null` | `null` | Custom label template. Placeholders: `${usage5h}`, `${usage7d}`, `${bar5h}`, `${bar7d}`, `${cost5h}`, `${cost7d}`, `${costDay}`, `${costMonth}`. `null` = default auto-generated label |
 | `claudeStatus.statusBar.showSparkline` | `boolean` | `false` | Show a compact 5h utilization meter (▰▰▰▱▱) in the status bar |
 | `claudeStatus.payAsYouGo.showTimeWindows` | `boolean` | `true` | Pay-as-you-go (API key, Bedrock): show 5h / 7d window figures. Turn off to show today's cost instead (subscriptions unaffected) |
 | `claudeStatus.cache.ttlSeconds` | `number` (60–3600) | `300` | API cache TTL in seconds |
@@ -259,6 +261,7 @@ All settings are under the `claudeStatus` namespace in VS Code Settings.
 | `claudeStatus.realtime.enabled` | `boolean` | `false` | Poll rate-limit API every TTL seconds (requires `rateLimitApi.enabled`) |
 | `claudeStatus.budget.dailyUsd` | `number \| null` | `null` | Daily budget in USD (`null` = disabled) |
 | `claudeStatus.budget.weeklyUsd` | `number \| null` | `null` | Weekly budget in USD |
+| `claudeStatus.budget.monthlyUsd` | `number \| null` | `null` | Budget in USD for the calendar month (warns once a month at the alert threshold) |
 | `claudeStatus.budget.alertThresholdPercent` | `number` (1–100) | `80` | Budget alert threshold % |
 | `claudeStatus.notifications.rateLimitWarning` | `boolean` | `true` | Warn when rate limit is near |
 | `claudeStatus.notifications.rateLimitWarningThresholdMinutes` | `number` (5–120) | `30` | Minutes before limit to show warning |

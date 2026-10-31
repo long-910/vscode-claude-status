@@ -167,6 +167,15 @@
           "minimum": 0,
           "description": "%config.budget.weeklyUsd.desc%"
         },
+        "claudeStatus.budget.monthlyUsd": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "default": null,
+          "minimum": 0,
+          "description": "%config.budget.monthlyUsd.desc%"
+        },
         "claudeStatus.budget.alertThresholdPercent": {
           "type": "number",
           "default": 80,

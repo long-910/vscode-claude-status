@@ -77,11 +77,23 @@ export function buildRecommendation(exhaustionIn: number): string {
 {
   "claudeStatus.budget.dailyUsd": 20.0,
   "claudeStatus.budget.weeklyUsd": 100.0,
+  "claudeStatus.budget.monthlyUsd": 400.0,
   "claudeStatus.budget.alertThresholdPercent": 80
 }
 ```
 
 Default: no budget set (`null` = disabled).
+
+| Budget | Period | Compared with | Shown in | Notification |
+|---|---|---|---|---|
+| `dailyUsd` | local calendar day | `costDay` | dashboard bar + exhaustion time | once per day (also re-armed on a 5h window reset) |
+| `weeklyUsd` | rolling 7 days | `cost7d` | dashboard bar | — |
+| `monthlyUsd` | local calendar month | `costMonth` | dashboard bar, sidebar *This month*, tooltip | once per month |
+
+The monthly budget is meant for spend limits on usage-based plans (e.g. usage-based
+Enterprise, where admins set monthly limits per organization or user). `costMonth` is
+summed in `readAllUsage()` from the same usage index, which keeps 32 days so a 31-day month
+is always covered.
 
 ### Budget Exhaustion Prediction
 
@@ -127,15 +139,23 @@ async function checkAndNotify(prediction: PredictionData, config: ExtensionConfi
     }
   }
 
+  // Budget alerts are tracked per calendar period by BudgetAlertTracker
+  // (src/data/budget.ts): a new day re-arms the daily alert and a new month the
+  // monthly one — needed for pay-as-you-go, which never sees a window reset
   if (prediction.budgetRemaining !== null && config.dailyBudget) {
     const used = config.dailyBudget - prediction.budgetRemaining
     const pct = (used / config.dailyBudget) * 100
-    if (pct >= config.budgetAlertThreshold && !wasNotified('budget')) {
+    if (pct >= config.budgetAlertThreshold && budgetAlerts.shouldShow('day')) {
       vscode.window.showWarningMessage(
-        `Claude Code: Daily budget ${Math.round(pct)}% used ($${used.toFixed(2)} / $${config.dailyBudget})`
+        `Claude Code: Daily budget ${config.budgetAlertThreshold}% used ($${used.toFixed(2)} / $${config.dailyBudget})`
       )
-      markNotified('budget')
     }
+  }
+  if (budgetThresholdReached(data.costMonth, config.monthlyBudget, config.budgetAlertThreshold) &&
+      budgetAlerts.shouldShow('month')) {
+    vscode.window.showWarningMessage(
+      `Claude Code: Monthly budget ${pct}% used ($${data.costMonth} / $${config.monthlyBudget})`
+    )
   }
 }
 ```

@@ -7,22 +7,41 @@ import { StatusBarManager } from './statusBar';
 import { ClaudeStatusTreeProvider } from './treeView';
 import { config } from './config';
 import { setClaudeHome } from './data/claudeHome';
+import { BudgetAlertTracker, budgetThresholdReached } from './data/budget';
 
 // --- Notification system ---
-// Deduplication: keys are cleared when the 5h rate-limit window resets
+// Deduplication: rate-limit keys are cleared when the 5h rate-limit window resets
 const notifiedKeys = new Set<string>();
+// Budget alerts: once per calendar day / month. The daily one is also re-armed
+// on a window reset, as before; the monthly one is not.
+const budgetAlerts = new BudgetAlertTracker();
 let prevResetIn5h = 0;
 
 function checkWindowReset(resetIn5h: number): void {
   // If resetIn5h increased by more than 1 hour, the window has reset
   if (resetIn5h > prevResetIn5h + 3600) {
     notifiedKeys.clear();
+    budgetAlerts.rearm('day');
   }
   prevResetIn5h = resetIn5h;
 }
 
 async function checkAndNotify(data: ClaudeUsageData, prediction: PredictionData | null): Promise<void> {
   checkWindowReset(data.resetIn5h);
+
+  // Monthly budget — from the usage totals, independent of the prediction
+  const monthlyBudget = config.monthlyBudget;
+  if (
+    config.budgetWarning &&
+    budgetThresholdReached(data.costMonth, monthlyBudget, config.budgetAlertThreshold) &&
+    budgetAlerts.shouldShow('month')
+  ) {
+    vscode.window.showWarningMessage(
+      vscode.l10n.t('Claude Code: Monthly budget {0}% used (${1} / ${2})',
+        Math.round((data.costMonth / (monthlyBudget as number)) * 100), data.costMonth.toFixed(2), monthlyBudget as number)
+    );
+  }
+
   if (!prediction) { return; }
 
   const { estimatedExhaustionIn } = prediction;
@@ -53,8 +72,7 @@ async function checkAndNotify(data: ClaudeUsageData, prediction: PredictionData 
   // Budget warning
   if (config.budgetWarning && prediction.budgetRemaining !== null && config.dailyBudget !== null) {
     const remainingPct = (prediction.budgetRemaining / config.dailyBudget) * 100;
-    if (remainingPct <= (100 - config.budgetAlertThreshold) && !notifiedKeys.has('budget')) {
-      notifiedKeys.add('budget');
+    if (remainingPct <= (100 - config.budgetAlertThreshold) && budgetAlerts.shouldShow('day')) {
       const used = (config.dailyBudget - prediction.budgetRemaining).toFixed(2);
       vscode.window.showWarningMessage(
         vscode.l10n.t('Claude Code: Daily budget {0}% used (${1} / ${2})', config.budgetAlertThreshold, used, config.dailyBudget)

@@ -29,6 +29,11 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   other non-subscription usage, turn off the 5-hour / 7-day window figures (a Claude.ai
   subscription concept) and show today's cost instead in the status bar, sidebar and
   dashboard. Subscriptions are unaffected.
+- **Monthly budget** (`claudeStatus.budget.monthlyUsd`) and **this month's cost** — the
+  calendar-month total is shown in the dashboard Token Cost card, the sidebar and the
+  tooltip, with a dashboard progress bar and a once-a-month warning at
+  `budget.alertThresholdPercent` when a budget is set. Useful for spend limits on
+  usage-based Enterprise plans. Custom status bar formats gain `${costMonth}`.
 - **Usage-based Claude.ai plans** (e.g. usage-based Enterprise — seat fee plus all usage at
   API rates, no per-seat 5-hour / weekly limits) are detected from Claude Code's account info
   (`oauthAccount.billingType: "usage_based"` in `~/.claude.json`) as the new provider
@@ -62,6 +67,9 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The daily budget warning was only re-armed by a 5-hour window reset, so pay-as-you-go
+  users (API key, Bedrock, usage-based plans) never saw it again after the first day of a
+  VS Code session. It now re-arms every calendar day as well.
 - A failed rate-limit request without rate-limit headers (e.g. an expired token) was shown
   as live `0%`; it now falls back to the cached value.
 - **Heatmap over-counted streaming responses** — it was the last reader without

@@ -38,5 +38,6 @@
   "view.overview.title": "使用情况概览",
   "config.pricing.modelOverrides.desc": "按模型设置的费率（USD / 百万令牌），优先于内置费率表——可在扩展更新前用于新发布的模型或价格调整。键与模型 ID 的一部分匹配（最长匹配优先），例如 `{ \"claude-opus-6\": { \"inputPerMillion\": 4, \"outputPerMillion\": 20 } }`。缓存读取默认为输入的 0.1 倍，缓存创建默认为 1.25 倍。",
   "config.payAsYouGo.showTimeWindows.desc": "在按量付费（API 密钥、AWS Bedrock 等非订阅方式）时显示 5 小时 / 7 天窗口的用量。这些窗口是 Claude.ai 订阅的速率限制概念；关闭后改为显示今日费用。对 Claude.ai 订阅无影响。",
-  "config.claudeProvider.claudeAiUsage": "按量付费方案的 Claude.ai 登录（如按 API 费率计费的按量付费 Enterprise）— 无 5h / 7d 窗口，仅显示令牌费用，不调用速率限制 API。根据 Claude Code 的账户信息自动检测。"
+  "config.claudeProvider.claudeAiUsage": "按量付费方案的 Claude.ai 登录（如按 API 费率计费的按量付费 Enterprise）— 无 5h / 7d 窗口，仅显示令牌费用，不调用速率限制 API。根据 Claude Code 的账户信息自动检测。",
+  "config.budget.monthlyUsd.desc": "当前自然月的支出预算（USD，null = 禁用）——例如与按量付费 Enterprise 的支出限额保持一致。显示在仪表板、侧边栏和提示中；达到 budget.alertThresholdPercent 时每月提醒一次。"
 }

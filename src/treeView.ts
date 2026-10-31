@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { DataManager, ClaudeUsageData, ProjectCostData } from './data/dataManager';
 import { formatDuration, showTimeWindows } from './statusBar';
+import { config } from './config';
 
 // Tree node: a plain TreeItem plus optional pre-built children
 interface TreeNode {
@@ -67,13 +68,21 @@ function buildUsageSection(data: ClaudeUsageData): TreeNode | null {
 
 function buildCostSection(data: ClaudeUsageData): TreeNode {
   const today = leaf(vscode.l10n.t('Today'), { description: `$${data.costDay.toFixed(2)}`, icon: 'calendar' });
+  const budget = config.monthlyBudget;
+  const month = leaf(vscode.l10n.t('This month'), {
+    description: `$${data.costMonth.toFixed(2)}` + (budget && budget > 0
+      ? ` / $${budget.toFixed(2)} (${Math.round((data.costMonth / budget) * 100)}%)` : ''),
+    icon: 'graph-line',
+    iconColor: budget && budget > 0 ? utilizationColor(data.costMonth / budget) : undefined,
+  });
   if (!showTimeWindows(data)) {
-    return section(vscode.l10n.t('Token Cost'), 'credit-card', [today]);
+    return section(vscode.l10n.t('Token Cost'), 'credit-card', [today, month]);
   }
   return section(vscode.l10n.t('Token Cost'), 'credit-card', [
     leaf('5h', { description: `$${data.cost5h.toFixed(2)}`, icon: 'flame' }),
     today,
     leaf(vscode.l10n.t('7 days'), { description: `$${data.cost7d.toFixed(2)}`, icon: 'history' }),
+    month,
   ]);
 }
 

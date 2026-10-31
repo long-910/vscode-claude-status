@@ -53,6 +53,10 @@ export class ExtensionConfig {
     return this.cfg.get('budget.weeklyUsd', null);
   }
 
+  get monthlyBudget(): number | null {
+    return this.cfg.get('budget.monthlyUsd', null);
+  }
+
   get budgetAlertThreshold(): number {
     return this.cfg.get('budget.alertThresholdPercent', 80);
   }

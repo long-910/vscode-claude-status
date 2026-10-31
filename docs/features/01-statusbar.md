@@ -230,6 +230,7 @@ Users can override the auto-generated label with a template string containing pl
 | `${cost5h}` | 5h local token cost, USD 2 d.p. (e.g. `1.23`) |
 | `${cost7d}` | 7d local token cost, USD 2 d.p. |
 | `${costDay}` | Today's local token cost, USD 2 d.p. |
+| `${costMonth}` | This calendar month's local token cost, USD 2 d.p. |
 
 ### Priority and fallback rules
 

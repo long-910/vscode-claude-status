@@ -76,7 +76,7 @@ For every non-`claude-ai` row, `payAsYouGo.showTimeWindows: false` changes the l
   "claudeStatus.statusBar.format": {
     "type": ["string", "null"],
     "default": null,
-    "description": "Custom status bar format string. Use placeholders: ${usage5h}, ${usage7d}, ${bar5h}, ${bar7d}, ${cost5h}, ${cost7d}, ${costDay}. null = default auto-generated label."
+    "description": "Custom status bar format string. Use placeholders: ${usage5h}, ${usage7d}, ${bar5h}, ${bar7d}, ${cost5h}, ${cost7d}, ${costDay}, ${costMonth}. null = default auto-generated label."
   },
 
   "claudeStatus.statusBar.showSparkline": {
@@ -123,6 +123,13 @@ For every non-`claude-ai` row, `payAsYouGo.showTimeWindows: false` changes the l
     "default": null,
     "minimum": 0,
     "description": "Weekly budget in USD. Set to null to disable."
+  },
+
+  "claudeStatus.budget.monthlyUsd": {
+    "type": ["number", "null"],
+    "default": null,
+    "minimum": 0,
+    "description": "Budget in USD for the current calendar month (local time), e.g. to match a spend limit on a usage-based Enterprise plan. Set to null to disable."
   },
 
   "claudeStatus.budget.alertThresholdPercent": {
@@ -254,6 +261,7 @@ Set `claudeStatus.statusBar.format` to a template string to replace the default 
 | `${cost5h}` | decimal string | `1.23` | Local token cost in the last 5h (USD, 2 decimal places). |
 | `${cost7d}` | decimal string | `5.67` | Local token cost in the last 7 days (USD, 2 decimal places). |
 | `${costDay}` | decimal string | `2.34` | Local token cost today (USD, 2 decimal places). |
+| `${costMonth}` | decimal string | `45.10` | Local token cost this calendar month (USD, 2 decimal places). |
 
 ### Examples
 

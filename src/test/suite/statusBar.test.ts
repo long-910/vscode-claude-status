@@ -15,6 +15,7 @@ function makeData(overrides: Partial<ClaudeUsageData> = {}): ClaudeUsageData {
     cost5h: 1.23,
     costDay: 2.50,
     cost7d: 10.00,
+    costMonth: 30.00,
     tokensIn5h: 50_000,
     tokensOut5h: 10_000,
     tokensCacheRead5h: 5_000,
@@ -213,5 +214,32 @@ suite('StatusBar', () => {
         await cfg().update('statusBar.format', undefined, vscode.ConfigurationTarget.Global);
       }
     });
+  });
+
+  test('tooltip shows this month, with the monthly budget when set', async () => {
+    const cfg = vscode.workspace.getConfiguration('claudeStatus');
+    const prev = cfg.inspect<number | null>('budget.monthlyUsd')?.globalValue;
+    try {
+      await cfg.update('budget.monthlyUsd', undefined, vscode.ConfigurationTarget.Global);
+      assert.ok(buildTooltip(makeData()).includes('This month: $30.00\n'), 'no budget');
+      await cfg.update('budget.monthlyUsd', 120, vscode.ConfigurationTarget.Global);
+      assert.ok(buildTooltip(makeData()).includes('This month: $30.00 / $120.00 (25%)'));
+    } finally {
+      await cfg.update('budget.monthlyUsd', prev, vscode.ConfigurationTarget.Global);
+    }
+  });
+
+  test('custom format supports ${costMonth}', async () => {
+    const cfg = vscode.workspace.getConfiguration('claudeStatus');
+    await cfg.update('statusBar.format', '$${costMonth} this month', vscode.ConfigurationTarget.Global);
+    try {
+      assert.strictEqual(buildLabel(makeData({ dataSource: 'cache' })), '$30.00 this month');
+    } finally {
+      await cfg.update('statusBar.format', undefined, vscode.ConfigurationTarget.Global);
+    }
+  });
+
+  test('regression: the default status bar label is unchanged by the month total', () => {
+    assert.strictEqual(buildLabel(makeData({ dataSource: 'cache' })), '🤖 5h:50% 7d:30%');
   });
 });

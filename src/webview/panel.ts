@@ -9,6 +9,7 @@ interface DashboardSettings {
   apiEnabled: boolean;
   cacheTtlSeconds: number;
   weeklyBudget: number | null;
+  monthlyBudget: number | null;
   statusBarFormat: string | null;
   useModelPricing: boolean;
   showTimeWindows: boolean;   // false hides the 5h / 7d figures (pay-as-you-go only)
@@ -59,6 +60,10 @@ function buildI18n(): Record<string, string> {
     perHour:               t('/hr'),
     dailyBudget:           t('Daily budget'),
     weeklyBudget:          t('Weekly budget'),
+    monthlyBudget:         t('Monthly budget'),
+    monthlyExhausted:      t('⚠️ Monthly budget exhausted'),
+    monthlyNearlyExhausted: t('⚠️ Monthly budget nearly exhausted'),
+    thisMonth:             t('This month'),
     budgetExhausted:       t('💸 Daily budget exhausted'),
     weeklyExhausted:       t('⚠️ Weekly budget exhausted'),
     weeklyNearlyExhausted: t('⚠️ Weekly budget nearly exhausted'),
@@ -480,6 +485,10 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
         <span class="cost-label">${i18n.days7}</span>
         <span id="cost-7d">—</span>
       </div>
+      <div class="cost-row">
+        <span class="cost-label">${i18n.thisMonth}</span>
+        <span id="cost-month-actual">—</span>
+      </div>
       <div class="cost-row" id="cost-month-row" style="display:none">
         <span class="cost-label">${i18n.monthEst}</span>
         <span id="cost-month">—</span>
@@ -686,6 +695,7 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
       document.getElementById('cost-5h').textContent  = '$' + usage.cost5h.toFixed(2);
       document.getElementById('cost-day').textContent = '$' + usage.costDay.toFixed(2);
       document.getElementById('cost-7d').textContent  = '$' + usage.cost7d.toFixed(2);
+      document.getElementById('cost-month-actual').textContent = '$' + (usage.costMonth || 0).toFixed(2);
 
       // Monthly projection
       const monthRow = document.getElementById('cost-month-row');
@@ -829,6 +839,27 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
         if (weeklyPct >= 80) {
           html += '<div class="alert warning">' +
             (weeklyPct >= 100 ? i18n.weeklyExhausted : i18n.weeklyNearlyExhausted) + '</div>';
+        }
+      }
+
+      // Monthly budget (calendar month)
+      if (settings && settings.monthlyBudget && usage) {
+        const monthlySpent = usage.costMonth || 0;
+        const monthlyTotal = settings.monthlyBudget;
+        const monthlyPct = Math.min(100, (monthlySpent / monthlyTotal) * 100);
+        const monthlyFillClass = monthlyPct >= 80 ? ' error' : monthlyPct >= 60 ? ' warning' : '';
+        html += '<div class="progress-row" style="margin-top:8px" id="monthly-budget-row">' +
+          '<div class="progress-labels">' +
+          '<span>' + i18n.monthlyBudget + '</span>' +
+          '<span>$' + monthlySpent.toFixed(2) + ' / $' + monthlyTotal.toFixed(2) +
+          ' (' + Math.round(monthlyPct) + '%)</span>' +
+          '</div>' +
+          '<div class="progress-track"><div class="progress-fill' + monthlyFillClass + '" style="width:' +
+          monthlyPct.toFixed(1) + '%"></div></div>' +
+          '</div>';
+        if (monthlyPct >= 80) {
+          html += '<div class="alert warning">' +
+            (monthlyPct >= 100 ? i18n.monthlyExhausted : i18n.monthlyNearlyExhausted) + '</div>';
         }
       }
 
@@ -1474,6 +1505,7 @@ export class DashboardPanel {
           apiEnabled: config.rateLimitApiEnabled,
           cacheTtlSeconds: config.cacheTtlSeconds,
           weeklyBudget: config.weeklyBudget,
+          monthlyBudget: config.monthlyBudget,
           statusBarFormat: config.statusBarFormat,
           useModelPricing: config.useModelPricing,
           showTimeWindows: usage.providerType === 'claude-ai' || config.payAsYouGoShowTimeWindows,

@@ -4,6 +4,7 @@ import * as readline from 'readline';
 import { getClaudeHome } from './claudeHome';
 import { readUsageRecords, usageDedupeKey } from './usageIndex';
 import { usageCost, pricingSource, normalizeModelId, CostOptions, DEFAULT_COST_OPTIONS, PricingSource } from './pricing';
+import { startOfMonth } from './budget';
 
 // Pricing lives in ./pricing; re-exported here for existing importers
 export {
@@ -48,6 +49,7 @@ export interface AggregatedUsage {
   cost5h: number
   costDay: number
   cost7d: number
+  costMonth: number   // since local midnight on the 1st of this month
   tokensIn5h: number
   tokensOut5h: number
   tokensCacheRead5h: number
@@ -182,6 +184,7 @@ export async function readAllUsage(options: CostOptions = DEFAULT_COST_OPTIONS):
     cost5h: 0,
     costDay: 0,
     cost7d: 0,
+    costMonth: 0,
     tokensIn5h: 0,
     tokensOut5h: 0,
     tokensCacheRead5h: 0,
@@ -190,15 +193,21 @@ export async function readAllUsage(options: CostOptions = DEFAULT_COST_OPTIONS):
     pricingByModel5h: {},
   };
 
-  // Files untouched for 7 days cannot contain entries inside any window below
-  const files = await findAllJsonlFiles(now - window7d);
-  const records = await readUsageRecords(files, now - window7d);
+  // Widest window: the last 7 days or the calendar month, whichever starts first.
+  // Files untouched since then cannot contain entries inside any window below.
+  const monthStart = startOfMonth(new Date(now));
+  const since = Math.min(now - window7d, monthStart);
+  const files = await findAllJsonlFiles(since);
+  const records = await readUsageRecords(files, since);
   for (const { timestamp: ts, usage, model } of records) {
     const cost = usageCost(usage, model, options);
 
     const age = now - ts;
     if (age <= window7d) {
       result.cost7d += cost;
+    }
+    if (ts >= monthStart) {
+      result.costMonth += cost;
     }
     if (ts >= startOfToday.getTime()) {
       result.costDay += cost;

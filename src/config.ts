@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import type { ClaudeProvider } from './data/apiClient';
-import type { TokenPricing } from './data/jsonlReader';
+import type { CostOptions, ModelPricingOverrides, TokenPricing } from './data/pricing';
 
 export class ExtensionConfig {
   private get cfg() {
@@ -23,6 +23,16 @@ export class ExtensionConfig {
     return this.cfg.get('statusBar.format', null);
   }
 
+  // Pay-as-you-go providers (API key, Bedrock, …) have no 5h / 7d rate-limit
+  // windows; this hides the window-based figures for them
+  get payAsYouGoShowTimeWindows(): boolean {
+    return this.cfg.get('payAsYouGo.showTimeWindows', true);
+  }
+
+  get showSparkline(): boolean {
+    return this.cfg.get('statusBar.showSparkline', false);
+  }
+
   get cacheTtlSeconds(): number {
     return this.cfg.get('cache.ttlSeconds', 300);
   }
@@ -41,6 +51,10 @@ export class ExtensionConfig {
 
   get weeklyBudget(): number | null {
     return this.cfg.get('budget.weeklyUsd', null);
+  }
+
+  get monthlyBudget(): number | null {
+    return this.cfg.get('budget.monthlyUsd', null);
   }
 
   get budgetAlertThreshold(): number {
@@ -82,6 +96,23 @@ export class ExtensionConfig {
       outputPerMillion:     this.cfg.get('pricing.outputPerMillion', 15.00),
       cacheReadPerMillion:  this.cfg.get('pricing.cacheReadPerMillion', 0.30),
       cacheCreatePerMillion: this.cfg.get('pricing.cacheCreatePerMillion', 3.75),
+    };
+  }
+
+  get useModelPricing(): boolean {
+    return this.cfg.get('pricing.useModelPricing', true);
+  }
+
+  get modelPricingOverrides(): ModelPricingOverrides {
+    const v = this.cfg.get<unknown>('pricing.modelOverrides', {});
+    return v && typeof v === 'object' && !Array.isArray(v) ? v as ModelPricingOverrides : {};
+  }
+
+  get costOptions(): CostOptions {
+    return {
+      pricing: this.tokenPricing,
+      useModelPricing: this.useModelPricing,
+      modelOverrides: this.modelPricingOverrides,
     };
   }
 

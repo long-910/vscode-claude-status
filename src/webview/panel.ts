@@ -3,13 +3,19 @@ import * as crypto from 'crypto';
 import { DataManager, ClaudeUsageData, ProjectCostData, PredictionData, HeatmapData } from '../data/dataManager';
 import { config } from '../config';
 import type { TokenPricing } from '../data/jsonlReader';
+import { providerLabel, showTimeWindows } from '../statusBar';
+import { projectMonthCost } from '../data/budget';
 
 interface DashboardSettings {
   provider: string;
+  providerLabel: string;
   apiEnabled: boolean;
   cacheTtlSeconds: number;
   weeklyBudget: number | null;
+  monthlyBudget: number | null;
   statusBarFormat: string | null;
+  useModelPricing: boolean;
+  showTimeWindows: boolean;   // false hides the 5h / 7d figures (pay-as-you-go only)
 }
 
 interface DashboardMessage {
@@ -17,6 +23,7 @@ interface DashboardMessage {
   projectCosts: ProjectCostData[];
   prediction: PredictionData | null;
   heatmap: HeatmapData | null;
+  monthEstimate: number | null;
   pricing: TokenPricing;
   settings: DashboardSettings;
 }
@@ -43,7 +50,7 @@ function buildI18n(): Record<string, string> {
     project:               t('Project'),
     prediction:            t('Prediction'),
     pricingSettings:       t('Pricing & Settings'),
-    usageHistory:          t('Usage History'),
+    usageHistory:          t('Usage History ({0} days)', '<span id="heatmap-days">90</span>'),
     loadingProject:        t('Loading project data…'),
     noProjectData:         t('No project data'),
     loadingPrediction:     t('Loading prediction…'),
@@ -57,6 +64,10 @@ function buildI18n(): Record<string, string> {
     perHour:               t('/hr'),
     dailyBudget:           t('Daily budget'),
     weeklyBudget:          t('Weekly budget'),
+    monthlyBudget:         t('Monthly budget'),
+    monthlyExhausted:      t('⚠️ Monthly budget exhausted'),
+    monthlyNearlyExhausted: t('⚠️ Monthly budget nearly exhausted'),
+    thisMonth:             t('This month'),
     budgetExhausted:       t('💸 Daily budget exhausted'),
     weeklyExhausted:       t('⚠️ Weekly budget exhausted'),
     weeklyNearlyExhausted: t('⚠️ Weekly budget nearly exhausted'),
@@ -70,6 +81,11 @@ function buildI18n(): Record<string, string> {
     output:                t('Output'),
     cacheRead:             t('Cache read'),
     cacheCreate:           t('Cache create'),
+    byModel:               t('By model (5h)'),
+    pricingEstimated:      t('Newer than the built-in price table — priced at the latest known rate of its family. Set exact rates in claudeStatus.pricing.modelOverrides.'),
+    pricingManual:         t('Unrecognized model — priced at the claudeStatus.pricing.* rates.'),
+    pricingOverride:       t('Priced by claudeStatus.pricing.modelOverrides.'),
+    modelPricingOn:        t('Model-aware pricing is on — these rates apply only to unrecognized models.'),
     cacheGood:             t('Good! Cache is saving cost.'),
     cacheLow:              t('Low cache reuse.'),
     noCacheReads:          t('No cache reads in this window.'),
@@ -91,6 +107,7 @@ function buildI18n(): Record<string, string> {
     less:                  t('Less'),
     more:                  t('More'),
     avgByHour:             t('Avg cost by hour of day (last 30 days)'),
+    punchcardTitle:        t('Cost by weekday × hour (last 30 days)'),
     resetsIn:              t('resets in'),
     calculating:           t('Calculating…'),
     cacheTtl:              t('Cache TTL'),
@@ -404,6 +421,21 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
       color: var(--vscode-descriptionForeground);
       margin: 12px 0 4px;
     }
+
+    /* ---- Punch card (weekday × hour) ---- */
+    .punchcard-container { overflow-x: auto; padding-bottom: 4px; }
+    .punchcard-grid {
+      display: grid;
+      grid-template-columns: 30px repeat(24, 12px);
+      gap: 2px;
+      align-items: center;
+    }
+    .pc-label {
+      font-size: 0.65em;
+      color: var(--vscode-descriptionForeground);
+      white-space: nowrap;
+    }
+    .pc-hour { text-align: center; }
   </style>
 </head>
 <body>
@@ -418,7 +450,7 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
   </div>
 
   <!-- Current Usage -->
-  <div class="card">
+  <div class="card" id="current-usage-card">
     <div class="card-title">${i18n.currentUsage}</div>
     <div class="progress-row">
       <div class="progress-labels">
@@ -444,7 +476,7 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
     <!-- Token Cost -->
     <div class="card">
       <div class="card-title">${i18n.tokenCost}</div>
-      <div class="cost-row">
+      <div class="cost-row" id="cost-5h-row">
         <span class="cost-label">5h</span>
         <span id="cost-5h">—</span>
       </div>
@@ -452,15 +484,19 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
         <span class="cost-label">${i18n.today}</span>
         <span id="cost-day">—</span>
       </div>
-      <div class="cost-row">
+      <div class="cost-row" id="cost-7d-row">
         <span class="cost-label">${i18n.days7}</span>
         <span id="cost-7d">—</span>
+      </div>
+      <div class="cost-row">
+        <span class="cost-label">${i18n.thisMonth}</span>
+        <span id="cost-month-actual">—</span>
       </div>
       <div class="cost-row" id="cost-month-row" style="display:none">
         <span class="cost-label">${i18n.monthEst}</span>
         <span id="cost-month">—</span>
       </div>
-      <div style="margin-top:6px">
+      <div style="margin-top:6px" id="breakdown-wrap">
         <button class="detail-toggle" id="breakdown-toggle">▶ ${i18n.tokenBreakdown}</button>
         <div id="token-breakdown" class="token-breakdown" style="display:none"></div>
       </div>
@@ -496,7 +532,7 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
   <!-- Usage History (Feature 05) -->
   <div class="card">
     <div class="card-title">
-      ${i18n.usageHistory} (<span id="heatmap-days">90</span> ${i18n.days7})
+      ${i18n.usageHistory}
     </div>
     <div id="heatmap-content">
       <div class="placeholder">${i18n.loadingHistory}</div>
@@ -604,6 +640,14 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
     }
 
     function updateUsage(usage, mode) {
+      // Pay-as-you-go with claudeStatus.payAsYouGo.showTimeWindows off: hide
+      // every 5h / 7d figure (the token breakdown is 5h-based too)
+      const timeWindows = !(lastData && lastData.settings && lastData.settings.showTimeWindows === false);
+      for (const id of ['current-usage-card', 'cost-5h-row', 'cost-7d-row', 'breakdown-wrap']) {
+        const el = document.getElementById(id);
+        if (el) { el.style.display = timeWindows ? '' : 'none'; }
+      }
+
       const denied = usage.limitStatus === 'denied';
       const isClaudeAi = usage.providerType === 'claude-ai';
       const useCostMode = !isClaudeAi || usage.dataSource === 'local-only' || mode === 'cost';
@@ -654,14 +698,14 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
       document.getElementById('cost-5h').textContent  = '$' + usage.cost5h.toFixed(2);
       document.getElementById('cost-day').textContent = '$' + usage.costDay.toFixed(2);
       document.getElementById('cost-7d').textContent  = '$' + usage.cost7d.toFixed(2);
+      document.getElementById('cost-month-actual').textContent = '$' + (usage.costMonth || 0).toFixed(2);
 
-      // Monthly projection
+      // Monthly projection (computed by the extension from this month's cost so far)
       const monthRow = document.getElementById('cost-month-row');
+      const monthEstimate = lastData ? lastData.monthEstimate : null;
       if (monthRow) {
-        const dailyAvg = usage.costDay > 0 ? usage.costDay
-          : usage.cost7d > 0 ? usage.cost7d / 7 : 0;
-        if (dailyAvg > 0) {
-          document.getElementById('cost-month').textContent = '$' + (dailyAvg * 30).toFixed(2);
+        if (monthEstimate !== null) {
+          document.getElementById('cost-month').textContent = '$' + monthEstimate.toFixed(2);
           monthRow.style.display = '';
         } else {
           monthRow.style.display = 'none';
@@ -800,6 +844,27 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
         }
       }
 
+      // Monthly budget (calendar month)
+      if (settings && settings.monthlyBudget && usage) {
+        const monthlySpent = usage.costMonth || 0;
+        const monthlyTotal = settings.monthlyBudget;
+        const monthlyPct = Math.min(100, (monthlySpent / monthlyTotal) * 100);
+        const monthlyFillClass = monthlyPct >= 80 ? ' error' : monthlyPct >= 60 ? ' warning' : '';
+        html += '<div class="progress-row" style="margin-top:8px" id="monthly-budget-row">' +
+          '<div class="progress-labels">' +
+          '<span>' + i18n.monthlyBudget + '</span>' +
+          '<span>$' + monthlySpent.toFixed(2) + ' / $' + monthlyTotal.toFixed(2) +
+          ' (' + Math.round(monthlyPct) + '%)</span>' +
+          '</div>' +
+          '<div class="progress-track"><div class="progress-fill' + monthlyFillClass + '" style="width:' +
+          monthlyPct.toFixed(1) + '%"></div></div>' +
+          '</div>';
+        if (monthlyPct >= 80) {
+          html += '<div class="alert warning">' +
+            (monthlyPct >= 100 ? i18n.monthlyExhausted : i18n.monthlyNearlyExhausted) + '</div>';
+        }
+      }
+
       // Recommendation (i18n via recommendationKey)
       const recI18n = {
         'safe':               i18n.recSafe,
@@ -852,16 +917,20 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
       if (el) { el.style.display = breakdownOpen ? 'block' : 'none'; }
       if (btn) { btn.textContent = (breakdownOpen ? '▼' : '▶') + ' ' + i18n.tokenBreakdown; }
       if (breakdownOpen && lastData) {
-        renderTokenBreakdown(lastData.usage, lastData.pricing);
+        renderTokenBreakdown(lastData.usage, lastData.pricing, lastData.settings);
       }
     }
 
-    function renderTokenBreakdown(usage, pricing) {
+    function renderTokenBreakdown(usage, pricing, settings) {
       const el = document.getElementById('token-breakdown');
       if (!el || !pricing) { return; }
 
       function fmtK(n) { return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n); }
       function tokenCost(tokens, ratePerM) { return (tokens / 1_000_000) * ratePerM; }
+      // With model-aware pricing the manual rates don't apply to most entries,
+      // so per-type rows show tokens only and the per-model list carries cost
+      const byModelPricing = !!(settings && settings.useModelPricing);
+      function costSuffix(c) { return byModelPricing ? '' : ' = $' + c.toFixed(4); }
 
       const inCost   = tokenCost(usage.tokensIn5h,         pricing.inputPerMillion);
       const outCost  = tokenCost(usage.tokensOut5h,        pricing.outputPerMillion);
@@ -874,16 +943,35 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
 
       let html =
         '<div class="cost-row"><span class="cost-label">' + i18n.input + '</span>' +
-        '<span>' + fmtK(usage.tokensIn5h) + ' tok = $' + inCost.toFixed(4) + '</span></div>' +
+        '<span>' + fmtK(usage.tokensIn5h) + ' tok' + costSuffix(inCost) + '</span></div>' +
         '<div class="cost-row"><span class="cost-label">' + i18n.output + '</span>' +
-        '<span>' + fmtK(usage.tokensOut5h) + ' tok = $' + outCost.toFixed(4) + '</span></div>';
+        '<span>' + fmtK(usage.tokensOut5h) + ' tok' + costSuffix(outCost) + '</span></div>';
 
       if (usage.tokensCacheRead5h > 0 || usage.tokensCacheCreate5h > 0) {
         html +=
           '<div class="cost-row"><span class="cost-label">' + i18n.cacheRead + '</span>' +
-          '<span>' + fmtK(usage.tokensCacheRead5h) + ' tok = $' + rdCost.toFixed(4) + '</span></div>' +
+          '<span>' + fmtK(usage.tokensCacheRead5h) + ' tok' + costSuffix(rdCost) + '</span></div>' +
           '<div class="cost-row"><span class="cost-label">' + i18n.cacheCreate + '</span>' +
-          '<span>' + fmtK(usage.tokensCacheCreate5h) + ' tok = $' + crCost.toFixed(4) + '</span></div>';
+          '<span>' + fmtK(usage.tokensCacheCreate5h) + ' tok' + costSuffix(crCost) + '</span></div>';
+      }
+
+      // Per-model cost breakdown (5h window)
+      const byModel = usage.costByModel5h || {};
+      const models = Object.keys(byModel).sort((a, b) => byModel[b] - byModel[a]);
+      if (models.length > 0) {
+        html += '<div class="cost-row" style="margin-top:6px"><span class="cost-label" style="font-weight:600">' +
+          i18n.byModel + '</span></div>';
+        for (const m of models) {
+          // Keys are normalized ids: "claude-sonnet-4-5" → "sonnet-4-5"
+          const shortName = m.replace(/^claude-/, '');
+          // Flag models not priced from the built-in table: ≈ estimated, * manual / override
+          const source = (usage.pricingByModel5h || {})[m];
+          const flag = { estimated: ' ≈', manual: ' *', override: ' *' }[source] || '';
+          const hint = { estimated: i18n.pricingEstimated, manual: i18n.pricingManual, override: i18n.pricingOverride }[source];
+          html += '<div class="cost-row"><span class="cost-label"' + (hint ? ' title="' + esc(hint) + '"' : '') + '>' +
+            esc(shortName + flag) + '</span>' +
+            '<span>$' + byModel[m].toFixed(4) + '</span></div>';
+        }
       }
 
       html += '<div class="cache-efficiency">';
@@ -921,11 +1009,7 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
       const el = document.getElementById('pricing-content');
       if (!el || !pricing) { return; }
 
-      const providerLabel = {
-        'claude-ai': 'Claude.ai',
-        'aws-bedrock': 'AWS Bedrock',
-        'api-key': 'API Key',
-      }[settings.provider] || settings.provider;
+      const providerLabel = settings.providerLabel || settings.provider;
 
       const apiStatus = settings.apiEnabled
         ? '<span class="settings-badge ok">' + i18n.apiEnabled + '</span>'
@@ -948,6 +1032,9 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
         '<span class="pg-rate">$' + pricing.cacheCreatePerMillion.toFixed(2) + '</span>' +
         '<span class="pg-unit">/ 1M tokens</span>' +
         '</div>' +
+        (settings.useModelPricing
+          ? '<div style="margin-top:4px;font-size:0.85em;color:var(--vscode-descriptionForeground)">' + esc(i18n.modelPricingOn) + '</div>'
+          : '') +
         '<div class="settings-row">' +
         '<span class="settings-badge">' + esc(providerLabel) + '</span>' +
         apiStatus +
@@ -1183,12 +1270,39 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
         '<div class="hm-cell l4"></div>' +
         ' ' + i18n.more + '</div>';
 
+      // Punch card: weekday × hour cost matrix (reuses heatmap cell levels)
+      let punchcardHtml = '';
+      const dowHour = heatmap.dowHour;
+      if (dowHour && dowHour.length === 7) {
+        const maxCell = Math.max(...dowHour.flat(), 0.0001);
+        // Localized short weekday names — 2026-01-04 is a Sunday
+        const dowNames = Array.from({ length: 7 }, (_, d) =>
+          new Date(2026, 0, 4 + d).toLocaleString(undefined, { weekday: 'short' }));
+        let grid = '<div class="pc-label"></div>';
+        for (let h = 0; h < 24; h++) {
+          grid += '<div class="pc-label pc-hour">' + (h % 3 === 0 ? h : '') + '</div>';
+        }
+        for (let d = 0; d < 7; d++) {
+          grid += '<div class="pc-label">' + esc(dowNames[d]) + '</div>';
+          for (let h = 0; h < 24; h++) {
+            const cost = dowHour[d][h];
+            const level = getCostLevel(cost, maxCell);
+            grid += '<div class="hm-cell l' + level + '" title="' +
+              esc(dowNames[d] + ' ' + String(h).padStart(2, '0') + ':00 — $' + cost.toFixed(3)) + '"></div>';
+          }
+        }
+        punchcardHtml =
+          '<div class="hourly-title">' + i18n.punchcardTitle + '</div>' +
+          '<div class="punchcard-container"><div class="punchcard-grid">' + grid + '</div></div>';
+      }
+
       el.innerHTML =
         '<div class="heatmap-container">' +
         '<div class="hm-header">' + headerHtml + '</div>' +
         '<div class="heatmap-grid">' + gridHtml + '</div>' +
         '</div>' +
         legendHtml +
+        punchcardHtml +
         '<div class="hourly-title">' + i18n.avgByHour + '</div>' +
         '<canvas id="hourlyChart" height="80"></canvas>';
 
@@ -1262,7 +1376,7 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
         updatePredictionChart(msg.data.usage, msg.data.prediction);
         if (msg.data.heatmap) { updateHeatmap(msg.data.heatmap); }
         // Refresh open panels on data update
-        if (breakdownOpen) { renderTokenBreakdown(msg.data.usage, msg.data.pricing); }
+        if (breakdownOpen) { renderTokenBreakdown(msg.data.usage, msg.data.pricing, msg.data.settings); }
         renderPricingContent(msg.data.pricing, msg.data.settings);
       } else if (msg.type === 'setDisplayMode') {
         currentMode = msg.mode;
@@ -1382,13 +1496,18 @@ export class DashboardPanel {
         projectCosts: this.dataManager.getLastProjectCosts(),
         prediction,
         heatmap,
+        monthEstimate: projectMonthCost(usage.costMonth),
         pricing: config.tokenPricing,
         settings: {
           provider: usage.providerType,
+          providerLabel: providerLabel(usage.providerType),
           apiEnabled: config.rateLimitApiEnabled,
           cacheTtlSeconds: config.cacheTtlSeconds,
           weeklyBudget: config.weeklyBudget,
+          monthlyBudget: config.monthlyBudget,
           statusBarFormat: config.statusBarFormat,
+          useModelPricing: config.useModelPricing,
+          showTimeWindows: showTimeWindows(usage),
         },
       },
     };

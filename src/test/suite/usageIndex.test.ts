@@ -2,7 +2,9 @@ import * as assert from 'assert';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
-import { readUsageRecords, clearUsageIndex, INDEX_RETENTION_MS } from '../../data/usageIndex';
+import { readUsageRecords, clearUsageIndex, firstSeen, indexedFileCount, parseUsageLine, INDEX_RETENTION_MS } from '../../data/usageIndex';
+import { findAllJsonlFiles } from '../../data/jsonlReader';
+import { DEFAULT_CLAUDE_HOME, setClaudeHome } from '../../data/claudeHome';
 
 suite('UsageIndex', () => {
   let tmpFile: string;
@@ -94,5 +96,97 @@ suite('UsageIndex', () => {
   test('returns [] for a missing file', async () => {
     const records = await readUsageRecords([path.join(os.tmpdir(), 'does-not-exist-usage-index.jsonl')], since());
     assert.deepStrictEqual(records, []);
+  });
+  test('keeps message.model on each record', async () => {
+    await fs.writeFile(tmpFile, JSON.stringify({
+      type: 'assistant', timestamp: new Date().toISOString(), requestId: 'r1',
+      message: { model: 'claude-opus-5-5', usage: { input_tokens: 1, output_tokens: 1 } },
+    }) + '\n');
+    const [record] = await readUsageRecords([tmpFile], since());
+    assert.strictEqual(record.model, 'claude-opus-5-5');
+  });
+
+  test('keeps pricing modifiers (speed, inference_geo) only when present', async () => {
+    const rec = (requestId: string, extra: Record<string, unknown>) => JSON.stringify({
+      type: 'assistant', timestamp: new Date().toISOString(), requestId,
+      message: { model: 'claude-opus-5-5', usage: { input_tokens: 1, output_tokens: 1, ...extra } },
+    }) + '\n';
+    await fs.writeFile(tmpFile, rec('a', { speed: 'fast', inference_geo: 'us' }) + rec('b', {}));
+    const [a, b] = await readUsageRecords([tmpFile], since());
+    assert.strictEqual(a.usage.speed, 'fast');
+    assert.strictEqual(a.usage.inference_geo, 'us');
+    assert.ok(!('speed' in b.usage) && !('inference_geo' in b.usage));
+  });
+
+  suite('parseUsageLine / firstSeen (shared with the heatmap)', () => {
+    const usage = { input_tokens: 5, output_tokens: 2 };
+    const ts = new Date().toISOString();
+
+    test('dedupe key: requestId, falling back to message.id, else none', () => {
+      assert.strictEqual(parseUsageLine(JSON.stringify({ type: 'assistant', timestamp: ts, requestId: 'r', message: { id: 'm', usage } }))?.dedupeKey, 'r');
+      assert.strictEqual(parseUsageLine(JSON.stringify({ type: 'assistant', timestamp: ts, message: { id: 'm', usage } }))?.dedupeKey, 'm');
+      assert.strictEqual(parseUsageLine(JSON.stringify({ type: 'assistant', timestamp: ts, message: { usage } }))?.dedupeKey, null);
+    });
+
+    test('skips non-assistant, malformed and usage-less lines', () => {
+      assert.strictEqual(parseUsageLine('{"type":"user","timestamp":"x"}'), null);
+      assert.strictEqual(parseUsageLine('not json'), null);
+      assert.strictEqual(parseUsageLine(JSON.stringify({ type: 'assistant', timestamp: ts, message: { id: 'm' } }))?.record, null);
+      assert.strictEqual(parseUsageLine(JSON.stringify({ type: 'assistant', timestamp: 'bad', message: { usage } }))?.record, null);
+    });
+
+    test('normalizes missing token fields to 0 and keeps model', () => {
+      const r = parseUsageLine(JSON.stringify({ type: 'assistant', timestamp: ts, message: { model: 'claude-opus-5-5', usage: { output_tokens: 3 } } }))?.record;
+      assert.deepStrictEqual([r?.usage.input_tokens, r?.usage.output_tokens, r?.usage.cache_read_input_tokens, r?.model], [0, 3, 0, 'claude-opus-5-5']);
+    });
+
+    test('firstSeen dedupes keyed lines and always counts keyless ones', () => {
+      const seen = new Set<string>();
+      assert.deepStrictEqual([firstSeen(seen, 'a'), firstSeen(seen, 'a'), firstSeen(seen, null), firstSeen(seen, null)], [true, false, true, true]);
+    });
+
+    test('streaming duplicates sharing message.id (no requestId) count once', async () => {
+      const line = JSON.stringify({ type: 'assistant', timestamp: ts, message: { id: 'msg_x', usage } }) + '\n';
+      await fs.writeFile(tmpFile, line + line + line);
+      assert.strictEqual((await readUsageRecords([tmpFile], since())).length, 1);
+    });
+  });
+
+  test('regression (#48): consumed bytes are never read again — only appended ones', async () => {
+    await fs.writeFile(tmpFile, entry('r1', 11));
+    assert.deepStrictEqual((await readUsageRecords([tmpFile], since())).map(r => r.usage.input_tokens), [11]);
+    // Rewrite the same bytes with a different value but the same size: a re-read would see 99
+    await fs.writeFile(tmpFile, entry('r1', 99));
+    assert.deepStrictEqual((await readUsageRecords([tmpFile], since())).map(r => r.usage.input_tokens), [11]);
+    await fs.appendFile(tmpFile, entry('r2', 22));
+    assert.deepStrictEqual((await readUsageRecords([tmpFile], since())).map(r => r.usage.input_tokens), [11, 22]);
+  });
+
+  test('regression (#48): findAllJsonlFiles skips transcripts not modified since the cutoff', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'find-files-'));
+    const dir = path.join(home, 'projects', '-p');
+    await fs.mkdir(dir, { recursive: true });
+    const fresh = path.join(dir, 'fresh.jsonl');
+    const old = path.join(dir, 'old.jsonl');
+    await fs.writeFile(fresh, entry('a'));
+    await fs.writeFile(old, entry('b'));
+    const tenDaysAgo = (Date.now() - 10 * 24 * 3600e3) / 1000;
+    await fs.utimes(old, tenDaysAgo, tenDaysAgo);
+    setClaudeHome(home);
+    try {
+      assert.deepStrictEqual((await findAllJsonlFiles()).map(f => path.basename(f)).sort(), ['fresh.jsonl', 'old.jsonl']);
+      assert.deepStrictEqual((await findAllJsonlFiles(Date.now() - 7 * 24 * 3600e3)).map(f => path.basename(f)), ['fresh.jsonl']);
+    } finally {
+      setClaudeHome(DEFAULT_CLAUDE_HOME);
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  test('indexedFileCount reflects the files held in memory', async () => {
+    await fs.writeFile(tmpFile, entry('r1'));
+    await readUsageRecords([tmpFile], since());
+    assert.strictEqual(indexedFileCount(), 1);
+    clearUsageIndex();
+    assert.strictEqual(indexedFileCount(), 0);
   });
 });

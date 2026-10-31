@@ -10,7 +10,7 @@
 [![Open VSX](https://img.shields.io/open-vsx/v/long-kudo/vscode-claude-status?style=flat-square&label=Open%20VSX)](https://open-vsx.org/extension/long-kudo/vscode-claude-status)
 [![Downloads](https://img.shields.io/visual-studio-marketplace/d/long-kudo.vscode-claude-status?style=flat-square&logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=long-kudo.vscode-claude-status)
 [![Rating](https://img.shields.io/visual-studio-marketplace/r/long-kudo.vscode-claude-status?style=flat-square&logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=long-kudo.vscode-claude-status)
-[![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.73.0-007ACC?style=flat-square)](https://code.visualstudio.com/)
+[![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.82.0-007ACC?style=flat-square)](https://code.visualstudio.com/)
 
 [![License: MIT](https://img.shields.io/github/license/long-910/vscode-claude-status?style=flat-square)](LICENSE)
 [![CI](https://github.com/long-910/vscode-claude-status/actions/workflows/ci.yml/badge.svg)](https://github.com/long-910/vscode-claude-status/actions/workflows/ci.yml)
@@ -29,8 +29,10 @@
 
 It reads session data from `~/.claude/projects/` locally (no extra network calls)
 and queries the Anthropic API at most once per 5 minutes to fetch rate-limit
-utilization headers. All token costs are calculated client-side using configurable
-per-token rates (defaults: Claude Sonnet 4.x pricing).
+utilization headers. All token costs are calculated client-side, priced per model
+(Opus, Sonnet, Haiku, Fable…) with built-in rates. Models newer than the built-in
+table are estimated from their family's latest rate, and exact rates can be set with
+`claudeStatus.pricing.modelOverrides`.
 
 > [!NOTE]
 > **API calls are minimal and only happen while Claude Code is active.**
@@ -43,10 +45,10 @@ per-token rates (defaults: Claude Sonnet 4.x pricing).
 > staleness indicator. Without any cache, the display falls back to cost-only.
 
 > [!WARNING]
-> **Cost figures are estimates.** Default rates are based on Anthropic's publicly
-> announced pricing at the time of implementation and may not reflect future changes.
-> If pricing changes, update the `claudeStatus.pricing.*` settings to match the
-> latest rates on the [Anthropic pricing page](https://www.anthropic.com/pricing).
+> **Cost figures are estimates** at Anthropic's list API prices (checked 2026-10-31),
+> calculated from local transcripts. Negotiated discounts, seat fees and partner
+> (Bedrock / Vertex) pricing are not included. For a new model or a price change, set
+> `claudeStatus.pricing.modelOverrides` — see [docs/PRICING.md](docs/PRICING.md).
 
 ---
 
@@ -63,27 +65,35 @@ Real-time usage summary pinned to the VS Code status bar.
 | Rate limit hit | `🤖 5h:100%✗` |
 | 5h-only plan (no 7d window) | `🤖 5h:45%` |
 | Cost mode | `🤖 5h:$14.21 7d:$53.17` |
-| AWS Bedrock / API key (cost only) | `🤖 5h:$0.15 7d:$0.42` |
+| Pay-as-you-go (API key, Bedrock, usage-based Enterprise) | `🤖 5h:$0.15 7d:$0.42` |
+| Pay-as-you-go, `payAsYouGo.showTimeWindows: false` | `🤖 Today:$0.15` |
+| With meter (`statusBar.showSparkline`) | `🤖 5h:▰▰▰▱▱ 62% 7d:41%` |
 | With project cost | `🤖 5h:78% 7d:84% \| my-app:$3.21` |
 | Stale cache | `🤖 5h:78% 7d:84% [10m ago]` |
 | Not logged in | `🤖 Not logged in` |
 
 Hover for a detailed tooltip with full token breakdown and reset times.
 
+### 🧭 Sidebar Overview *(VS Code-native)*
+
+A dedicated Activity Bar icon opens a native tree view with rate-limit windows,
+token costs (5h / today / 7d / this month, with the monthly budget), per-project costs,
+and quick actions — all the key numbers without opening the dashboard panel.
+
 ### 🗂 Dashboard Panel
 
 Click the status bar item to open a rich dashboard panel with:
 
 - **Current Usage** — colour-coded progress bars for 5 h and 7 d windows
-- **Token Cost** — 5 h / today / 7 d / month (est.) costs; expandable **token breakdown**
-  shows per-type counts (input / output / cache read / cache create) with individual costs
-  and cache hit ratio
+- **Token Cost** — 5 h / today / 7 d / this month / month (est.) costs; expandable **token breakdown**
+  shows per-type counts (input / output / cache read / cache create), a per-model cost list
+  for the 5 h window, and cache hit ratio
 - **Project Cost** — per-workspace breakdown (today / 7 days / 30 days)
-- **Prediction** — burn rate ($/hr), time-to-exhaustion, daily & weekly budget tracking;
+- **Prediction** — burn rate ($/hr), time-to-exhaustion, daily / weekly / monthly budget tracking;
   **Rate Limit Timeline chart** visualises the projected 5 h utilization from now to reset
 - **Pricing & Settings** — always-visible card showing current token pricing rates,
   provider, API state, and cache TTL; opens VS Code settings with one click
-- **Usage History** — GitHub-style daily heatmap + hourly pattern bar chart
+- **Usage History** — GitHub-style daily heatmap, hourly pattern bar chart and weekday × hour punch card
 
 The panel supports light, dark, and high-contrast VS Code themes natively.
 
@@ -117,8 +127,10 @@ the 5 h rate limit is exhausted and warns you before it happens.
 - **Daily budget** — set an optional USD cap; progress bar and alerts fire when
   the configured threshold (default 80 %) is reached
 - **Weekly budget** — optional USD weekly cap with progress bar (`claudeStatus.budget.weeklyUsd`)
+- **Monthly budget** — optional USD cap for the calendar month (`claudeStatus.budget.monthlyUsd`), e.g. to
+  track a spend limit on a usage-based Enterprise plan; *This month* is also shown in the sidebar and tooltip
 - **VS Code notifications** — non-blocking warning at ≤ 30 min, error dialog
-  at ≤ 10 min (with "Open Dashboard" action); budget alert fires once per window
+  at ≤ 10 min (with "Open Dashboard" action); budget alerts at most once per day / month
 
 Configure via **Settings → Claude Status** or the command palette:
 
@@ -134,6 +146,8 @@ Understand your long-term usage patterns at a glance.
   green intensity reflects daily spend; hover any cell for exact date and cost
 - **Hourly bar chart** — average cost per hour of day (last 30 days); shows when
   you typically use Claude Code most heavily
+- **Punch card** — weekday × hour cost matrix (last 30 days); shows weekly patterns
+  such as "Monday mornings"
 
 Number of days is configurable via `claudeStatus.heatmap.days` (30 / 60 / 90).
 
@@ -141,42 +155,39 @@ Number of days is configurable via `claudeStatus.heatmap.days` (30 / 60 / 90).
 
 ## Requirements
 
-- **VS Code** 1.73 or newer
-- **Claude Code CLI** with active sessions — the extension reads
-  `~/.claude/projects/**/*.jsonl` for token cost data
+- **VS Code** 1.82 or newer
 
-**Authentication is optional** depending on your provider:
-
-| Provider | Authentication | Display |
-|----------|---------------|---------|
-| Claude.ai subscription | `claude login` — credentials stored in macOS Keychain (v2.x+) or `~/.claude/.credentials.json`; detected automatically | Rate-limit % + cost |
-| AWS Bedrock | AWS credentials (env vars or `~/.aws/`) | Cost only |
-| Anthropic API key | `ANTHROPIC_API_KEY` env var | Cost only |
+> [!IMPORTANT]
+> **Minimum VS Code version raised from 1.73 to 1.82.** The rate-limit % (Claude.ai
+> subscriptions) is fetched with the global `fetch` API, which the extension host only
+> provides from VS Code 1.82 (Electron 25 / Node.js 18). On VS Code 1.73 – 1.81 (Node.js 16)
+> it was never available, so subscribers saw `🤖 Not logged in` (or an old cached %) instead of
+> their usage — the floor now states the real requirement. On VS Code 1.81 or older, keep extension version 0.7.0, or update
+> VS Code.
+- **Claude Code** with at least one session — the extension reads
+  `~/.claude/projects/**/*.jsonl` (or `claudeStatus.claudeHome`) for token cost
 
 ---
 
-## Plan Compatibility
+## Supported Plans
 
-> **Note:** This extension is developed and tested by the author on a
-> **Claude.ai Pro plan** (which provides both 5 h and 7 d rate-limit windows).
->
-> Other plans and providers — including AWS Bedrock, direct API key, Claude.ai
-> Free, and any plan that exposes only a 5 h window — are supported on a
-> best-effort basis via auto-detection. If you encounter unexpected behaviour on
-> your plan, please [open an issue](https://github.com/long-910/vscode-claude-status/issues)
-> and include your plan type. We will investigate and add support promptly.
+The plan is detected automatically; no extra login is needed.
 
-**Behaviour by plan type:**
+| Plan | Detected from | Status bar | Rate-limit API |
+|---|---|---|---|
+| Claude.ai Pro / Max, seat-based Team / Enterprise | `claude login` credentials (`~/.claude/.credentials.json` or the macOS Keychain) | `5h:45% 7d:32%` — the 7d part hides itself when the plan has no weekly window | at most once per 5 min, only while Claude Code is active |
+| Usage-based Claude.ai plan (e.g. usage-based Enterprise) | Claude Code's account info (`billingType: "usage_based"` in `~/.claude.json`) | cost only | never |
+| Anthropic API key | `ANTHROPIC_API_KEY` | cost only | never |
+| AWS Bedrock | AWS environment variables | cost only | never |
 
-| Plan | Rate-limit display | 7d window |
-|------|--------------------|-----------|
-| Claude.ai Pro / Max (5h + 7d) | `5h:45% 7d:32%` | ✅ |
-| Claude.ai Pro / any 5h-only tier | `5h:45%` | auto-hidden |
-| AWS Bedrock | cost only (`5h:$0.15 7d:$0.42`) | N/A |
-| Anthropic API key | cost only | N/A |
+On pay-as-you-go plans, `claudeStatus.payAsYouGo.showTimeWindows: false` shows today's cost
+instead of the 5h / 7d figures, and `claudeStatus.budget.monthlyUsd` tracks a spend limit.
+If detection picks the wrong plan, set `claudeStatus.claudeProvider`.
+Details: [docs/PLANS.md](docs/PLANS.md).
 
-If auto-detection does not work for your setup, set `claudeStatus.claudeProvider`
-explicitly in VS Code Settings.
+> Developed and tested on a Claude.ai Pro plan; other plans are supported on a best-effort
+> basis. Please [open an issue](https://github.com/long-910/vscode-claude-status/issues)
+> with your plan type if something looks wrong.
 
 ---
 
@@ -219,54 +230,73 @@ The extension activates automatically on VS Code startup (`onStartupFinished`).
 | **Claude Status: Open Dashboard** | Open dashboard panel |
 | **Claude Status: Toggle % / $ Display** | Switch display mode |
 | **Claude Status: Set Budget…** | Set or disable daily USD budget |
+| **Claude Status: Export Usage Data…** | Export daily usage history to CSV or JSON |
 
 ---
 
 ## Configuration
 
-All settings are under the `claudeStatus` namespace in VS Code Settings.
+All settings are under the `claudeStatus` namespace in VS Code Settings. Full reference:
+[docs/SETTINGS.md](docs/SETTINGS.md).
 
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `claudeStatus.displayMode` | `"percent"` \| `"cost"` | `"percent"` | Status bar display mode |
-| `claudeStatus.statusBar.alignment` | `"left"` \| `"right"` | `"left"` | Status bar position |
-| `claudeStatus.statusBar.showProjectCost` | `boolean` | `true` | Show project cost in status bar |
-| `claudeStatus.statusBar.format` | `string \| null` | `null` | Custom label template. Placeholders: `${usage5h}`, `${usage7d}`, `${cost5h}`, `${cost7d}`, `${costDay}`. `null` = default auto-generated label |
-| `claudeStatus.cache.ttlSeconds` | `number` (60–3600) | `300` | API cache TTL in seconds |
-| `claudeStatus.rateLimitApi.enabled` | `boolean` | `true` | Fetch rate-limit % from Anthropic API. When disabled, no new API calls are made; cached % is still shown with a staleness indicator (`[Xm ago]`) if available |
-| `claudeStatus.realtime.enabled` | `boolean` | `false` | Poll rate-limit API every TTL seconds (requires `rateLimitApi.enabled`) |
-| `claudeStatus.budget.dailyUsd` | `number \| null` | `null` | Daily budget in USD (`null` = disabled) |
-| `claudeStatus.budget.weeklyUsd` | `number \| null` | `null` | Weekly budget in USD |
-| `claudeStatus.budget.alertThresholdPercent` | `number` (1–100) | `80` | Budget alert threshold % |
-| `claudeStatus.notifications.rateLimitWarning` | `boolean` | `true` | Warn when rate limit is near |
-| `claudeStatus.notifications.rateLimitWarningThresholdMinutes` | `number` (5–120) | `30` | Minutes before limit to show warning |
-| `claudeStatus.notifications.budgetWarning` | `boolean` | `true` | Warn when budget threshold exceeded |
-| `claudeStatus.heatmap.days` | `30 \| 60 \| 90` | `90` | Days shown in usage heatmap |
-| `claudeStatus.claudeHome` | `string` | `".claude"` | Claude Code data directory. Relative to home dir; absolute paths and `~` supported. User settings only. On macOS the Keychain fallback always reads the default profile |
-| `claudeStatus.credentials.path` | `string \| null` | `null` | Custom credentials file path |
-| `claudeStatus.claudeProvider` | `"auto"` \| `"claude-ai"` \| `"aws-bedrock"` \| `"api-key"` | `"auto"` | Provider type (auto-detect or explicit) |
-| `claudeStatus.pricing.inputPerMillion` | `number` | `3.00` | USD per 1M input tokens |
-| `claudeStatus.pricing.outputPerMillion` | `number` | `15.00` | USD per 1M output tokens |
-| `claudeStatus.pricing.cacheReadPerMillion` | `number` | `0.30` | USD per 1M cache-read tokens |
-| `claudeStatus.pricing.cacheCreatePerMillion` | `number` | `3.75` | USD per 1M cache-creation tokens |
+### Display
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `claudeStatus.displayMode` | `"percent"` | `"percent"` or `"cost"` in the status bar |
+| `claudeStatus.statusBar.alignment` | `"left"` | `"left"` or `"right"` |
+| `claudeStatus.statusBar.showProjectCost` | `true` | Show the current project's cost in the status bar |
+| `claudeStatus.statusBar.format` | `null` | Custom label, e.g. `"${usage5h}% \| $${costDay}"`. Placeholders: `${usage5h}`, `${usage7d}`, `${bar5h}`, `${bar7d}`, `${cost5h}`, `${cost7d}`, `${costDay}`, `${costMonth}` |
+| `claudeStatus.statusBar.showSparkline` | `false` | Compact 5h meter (▰▰▰▱▱) next to the percentage |
+| `claudeStatus.payAsYouGo.showTimeWindows` | `true` | Pay-as-you-go plans: `false` shows today's cost instead of 5h / 7d figures (subscriptions unaffected) |
+| `claudeStatus.heatmap.days` | `90` | Days in the usage heatmap (30 / 60 / 90) |
+
+### Plan, data source & API
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `claudeStatus.claudeProvider` | `"auto"` | `"auto"`, `"claude-ai"`, `"claude-ai-usage"` (usage-based Claude.ai plan), `"aws-bedrock"`, `"api-key"` |
+| `claudeStatus.claudeHome` | `".claude"` | Claude Code data directory (relative to home; absolute and `~` work). User settings only |
+| `claudeStatus.credentials.path` | `null` | Custom credentials file. User settings only |
+| `claudeStatus.rateLimitApi.enabled` | `true` | Fetch rate-limit % (subscriptions). Off: no API calls; the last cached % stays visible with `[Xm ago]` |
+| `claudeStatus.cache.ttlSeconds` | `300` | Rate-limit cache TTL (60–3600 s) |
+| `claudeStatus.realtime.enabled` | `false` | Keep the rate-limit % fresh while Claude Code is idle too (at most every 5 min, ≈ 12 small API calls per idle hour) |
+
+### Budgets & notifications
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `claudeStatus.budget.dailyUsd` | `null` | Daily budget in USD (`null` = off) |
+| `claudeStatus.budget.weeklyUsd` | `null` | Budget for the last 7 days (dashboard bar) |
+| `claudeStatus.budget.monthlyUsd` | `null` | Budget for the calendar month, e.g. an Enterprise spend limit |
+| `claudeStatus.budget.alertThresholdPercent` | `80` | Warn at this % of the daily / monthly budget |
+| `claudeStatus.notifications.budgetWarning` | `true` | Budget notifications (at most once per day / month) |
+| `claudeStatus.notifications.rateLimitWarning` | `true` | Warn before the 5h limit is reached (subscriptions) |
+| `claudeStatus.notifications.rateLimitWarningThresholdMinutes` | `30` | Minutes before exhaustion to warn (5–120) |
+
+### Pricing
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `claudeStatus.pricing.useModelPricing` | `true` | Price each entry by its model with built-in rates |
+| `claudeStatus.pricing.modelOverrides` | `{}` | Exact rates per model, e.g. `{ "claude-opus-6": { "inputPerMillion": 4, "outputPerMillion": 20 } }` |
+| `claudeStatus.pricing.inputPerMillion` | `3.00` | Manual rates (USD / 1M tokens) for unrecognized models, or for everything when model pricing is off |
+| `claudeStatus.pricing.outputPerMillion` | `15.00` | 〃 |
+| `claudeStatus.pricing.cacheReadPerMillion` | `0.30` | 〃 |
+| `claudeStatus.pricing.cacheCreatePerMillion` | `3.75` | 〃 |
 
 ```jsonc
-// Example: settings.json
+// Example: usage-based Enterprise with a $400 monthly spend limit
+{
+  "claudeStatus.payAsYouGo.showTimeWindows": false,   // 🤖 Today:$3.21 instead of 5h / 7d
+  "claudeStatus.budget.monthlyUsd": 400,
+  "claudeStatus.budget.dailyUsd": 30
+}
+
+// Example: Claude.ai subscription, cost view, no outbound API calls
 {
   "claudeStatus.displayMode": "cost",
-  "claudeStatus.cache.ttlSeconds": 120,
-  "claudeStatus.budget.dailyUsd": 5.00,
-  "claudeStatus.budget.alertThresholdPercent": 80,
-  "claudeStatus.statusBar.showProjectCost": true,
-  // For AWS Bedrock users — skip OAuth detection, show cost only:
-  "claudeStatus.claudeProvider": "aws-bedrock",
-  // Disable new rate-limit API calls (cached % still shown with staleness indicator):
-  // "claudeStatus.rateLimitApi.enabled": false,
-  // If Anthropic changes pricing, update these values to match:
-  "claudeStatus.pricing.inputPerMillion": 3.00,
-  "claudeStatus.pricing.outputPerMillion": 15.00,
-  "claudeStatus.pricing.cacheReadPerMillion": 0.30,
-  "claudeStatus.pricing.cacheCreatePerMillion": 3.75
+  "claudeStatus.rateLimitApi.enabled": false
 }
 ```
 
@@ -276,22 +306,21 @@ All settings are under the `claudeStatus` namespace in VS Code Settings.
 
 | Feature | Status |
 |---------|--------|
-| Data layer (JSONL reader, API client, cache) | ✅ v0.1.0 |
-| Status bar with % / $ display | ✅ v0.1.0 |
-| WebView dashboard skeleton | ✅ v0.1.0 |
-| Project-level cost tracking | ✅ v0.1.0 |
-| Usage prediction & budget alerts | ✅ v0.2.0 |
-| Session history heatmap | ✅ v0.3.0 |
-| VS Code Marketplace publication | ✅ v0.3.0 |
-| Rate Limit Timeline chart | ✅ v0.4.0 |
-| Token breakdown with cache efficiency | ✅ v0.4.0 |
-| Monthly cost projection | ✅ v0.4.0 |
-| Weekly budget progress bar | ✅ v0.4.0 |
-| Pricing & Settings card in dashboard | ✅ v0.4.0 |
+| Status bar, dashboard, project cost, prediction & budget alerts, heatmap | ✅ v0.1.0 – v0.3.0 |
+| Rate Limit Timeline, token breakdown, weekly budget, Pricing & Settings card | ✅ v0.4.0 |
 | i18n — English / Japanese / Chinese | ✅ v0.4.1 |
 | macOS Keychain credential fallback (Claude Code v2.x+) | ✅ v0.6.0 |
-| Configurable Claude Code data directory (`claudeStatus.claudeHome`) | ✅ v0.7.0 |
-| Extension host OOM fix — incremental JSONL reads, coalesced watcher | ✅ v0.7.0 |
+| Configurable data directory, OOM fix (incremental reads) | ✅ v0.7.0 |
+| Model-aware pricing (checked against the official price list), per-model breakdown, model overrides | ✅ Unreleased |
+| Usage-based Enterprise support, pay-as-you-go view, monthly budget | ✅ Unreleased |
+| Sidebar tree view, status bar meter, usage export (CSV / JSON), punch card | ✅ Unreleased |
+
+---
+
+## Documentation
+
+Specifications, plan behaviour, pricing and the full settings reference live in
+[docs/](docs/README.md).
 
 ---
 

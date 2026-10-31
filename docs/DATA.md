@@ -6,7 +6,7 @@
 
 Claude Code writes session data to:
 ```
-~/.claude/projects/<project-hash>/*.jsonl
+<claudeHome>/projects/<project-hash>/*.jsonl      # claudeHome defaults to ~/.claude
 ```
 
 Each line is a JSON object. Relevant fields (verified against Claude Code v2.1.x):
@@ -17,12 +17,18 @@ Each line is a JSON object. Relevant fields (verified against Claude Code v2.1.x
   "type": "assistant",
   "timestamp": "2026-02-24T10:23:45.123Z",
   "cwd": "/home/user/my-project",
+  "requestId": "req_011C…",              // shared by every content block of one response
   "message": {
+    "id": "msg_01…",
+    "model": "claude-opus-5-5",
     "usage": {
       "input_tokens": 1234,
       "output_tokens": 567,
       "cache_read_input_tokens": 8900,
-      "cache_creation_input_tokens": 450
+      "cache_creation_input_tokens": 450,
+      "cache_creation": { "ephemeral_5m_input_tokens": 0, "ephemeral_1h_input_tokens": 450 },
+      "speed": "fast",                    // only in fast mode
+      "inference_geo": "us"               // only with US-only inference
     }
   }
 }
@@ -37,62 +43,19 @@ Each line is a JSON object. Relevant fields (verified against Claude Code v2.1.x
 
 ### Cost Calculation
 
-Default rates are based on Claude Sonnet 4.x pricing.
-**All four rates are user-configurable** via `claudeStatus.pricing.*` settings.
-
-| Token type | Setting key | Default (USD / 1M) |
-|------------|-------------|-------------------|
-| Input | `claudeStatus.pricing.inputPerMillion` | $3.00 |
-| Output | `claudeStatus.pricing.outputPerMillion` | $15.00 |
-| Cache read | `claudeStatus.pricing.cacheReadPerMillion` | $0.30 |
-| Cache create (5-minute TTL) | `claudeStatus.pricing.cacheCreatePerMillion` | $3.75 |
-
-Cache writes with a **1-hour TTL** are billed by Anthropic at 2x the input rate rather than
-the 1.25x of the 5-minute tier, so they are priced as `inputPerMillion * 2` and follow the
-`inputPerMillion` setting. Claude Code reports the split in `usage.cache_creation`
-(`ephemeral_5m_input_tokens` / `ephemeral_1h_input_tokens`); entries predating that field
-keep the whole `cache_creation_input_tokens` bucket on the 5-minute rate.
-
-> [!WARNING]
-> **Pricing disclaimer — costs are estimates only.**
-> Default rates reflect Anthropic's publicly announced pricing at the time of
-> implementation. Anthropic may change rates at any time without notice.
-> If pricing has changed, update the `claudeStatus.pricing.*` settings to match
-> the latest figures on the [Anthropic pricing page](https://www.anthropic.com/pricing).
-
-```typescript
-export interface TokenPricing {
-  inputPerMillion: number
-  outputPerMillion: number
-  cacheReadPerMillion: number
-  cacheCreatePerMillion: number
-}
-
-const ONE_HOUR_CACHE_WRITE_MULTIPLIER = 2
-
-function calculateCost(usage: TokenUsage, pricing: TokenPricing): number {
-  const cacheCreateTotal = usage.cache_creation_input_tokens || 0
-  const cacheCreate1h = Math.min(
-    Math.max(usage.cache_creation?.ephemeral_1h_input_tokens || 0, 0),
-    cacheCreateTotal
-  )
-  const cacheCreate5m = cacheCreateTotal - cacheCreate1h
-
-  return (
-    ((usage.input_tokens || 0) / 1_000_000) * pricing.inputPerMillion +
-    ((usage.output_tokens || 0) / 1_000_000) * pricing.outputPerMillion +
-    ((usage.cache_read_input_tokens || 0) / 1_000_000) * pricing.cacheReadPerMillion +
-    (cacheCreate5m / 1_000_000) * pricing.cacheCreatePerMillion +
-    (cacheCreate1h / 1_000_000) * pricing.inputPerMillion * ONE_HOUR_CACHE_WRITE_MULTIPLIER
-  )
-}
-```
+Cost is always calculated from token counts — see **[PRICING.md](PRICING.md)** for model
+resolution, the rate table, modifiers and settings.
 
 ### Time Windows
 
-- **5h window**: entries where `timestamp >= now - 5 * 3600 * 1000`
-- **Day window**: entries where `timestamp >= start of today (local time)`
-- **7d window**: entries where `timestamp >= now - 7 * 24 * 3600 * 1000`
+| Field | Window |
+|---|---|
+| `cost5h`, `tokens*5h`, `costByModel5h` | `timestamp >= now − 5 h` |
+| `costDay` | since local midnight |
+| `cost7d` | `timestamp >= now − 7 days` |
+| `costMonth` | since local midnight on the 1st (`startOfMonth()`, `src/data/localTime.ts`) |
+| project `costToday` / `cost7d` / `cost30d` | same rules, per workspace project (`projectCost.ts`) |
+| heatmap | `heatmap.days` (30 / 60 / 90) days; hourly chart and punch card: 30 days |
 
 ### Project Path Mapping
 
@@ -108,21 +71,17 @@ with `-` (not just `/`). Implemented in `projectCost.ts`:
 export function workspacePathToHash(workspacePath: string): string {
   return workspacePath.replace(/[^a-zA-Z0-9]/g, '-')
 }
-
-function workspacePathToProjectDir(workspacePath: string): string {
-  const hash = workspacePathToHash(workspacePath)
-  return path.join(os.homedir(), '.claude', 'projects', hash)
-}
 ```
+
+If that directory does not exist, `workspacePathToProjectDir()` falls back to scanning
+project directories for a transcript whose `cwd` equals the workspace path. See
+[features/03-project-cost.md](features/03-project-cost.md).
 
 ### FileSystemWatcher
 
 ```typescript
 const watcher = vscode.workspace.createFileSystemWatcher(
-  new vscode.RelativePattern(
-    vscode.Uri.file(path.join(os.homedir(), '.claude', 'projects')),
-    '**/*.jsonl'
-  )
+  new vscode.RelativePattern(vscode.Uri.file(getClaudeProjectsDir()), '**/*.jsonl')
 )
 // Coalesced: at most one refresh per 5 s while Claude Code is streaming
 watcher.onDidChange(() => dataManager.scheduleRefresh())
@@ -146,12 +105,26 @@ second while streaming. To keep the extension host's memory and CPU flat (#48):
   is re-read from the start.
 - **Skip old files.** A transcript's mtime is >= every entry in it, so files
   whose mtime is older than the window being aggregated are not read at all.
-- **Bounded retention.** Records older than 30 days (the widest window, project
-  cost) are dropped, and files not modified in 30 days are evicted.
+- **Bounded retention.** Records older than 32 days (the widest window: the calendar
+  month, up to 31 days, plus a day of margin) are dropped, and files not modified in 32
+  days are evicted. `readAllUsage()` reads files modified since the earlier of 7 days ago
+  and the 1st of the month.
 
 `readAllUsage()`, project cost and prediction all share this index. The heatmap
-(up to `heatmap.days` of history) is computed separately, only while the
-dashboard is open, reading at most 4 files at a time.
+(up to `heatmap.days` of history) is read separately — only while the dashboard is open,
+at most 4 files at a time — with the same file discovery (`findAllJsonlFiles()`) and the
+same line parser.
+
+### Line parsing and streaming deduplication (all readers)
+
+`parseUsageLine()` (`usageIndex.ts`) is the only place that decides which lines carry usage
+and how usage is normalized; the usage index and the heatmap both use it.
+
+Claude Code writes one JSONL entry per content block of a streaming response, all sharing
+the same `requestId` and the same `usage`. Each reader dedupes per file with `firstSeen()`
+on the key from `usageDedupeKey()` (`requestId`, falling back to `message.id`); entries with
+neither key are all counted. A new reader must go through `parseUsageLine()` / `firstSeen()`,
+or its totals will be inflated 2–4× in agentic sessions.
 
 ---
 
@@ -159,14 +132,12 @@ dashboard is open, reading at most 4 files at a time.
 
 ### When the API is called
 
-The rate-limit API call is controlled by two settings:
+Only for the `claude-ai` provider — see [PLANS.md](PLANS.md#rate-limit-api-calls-claude-ai-only)
+for the full table. `claudeStatus.rateLimitApi.enabled` is the master switch.
+`claudeStatus.realtime.enabled` adds polling while Claude Code is idle, never more often than
+every 5 minutes (`rateLimitCallDue()` in `dataManager.ts`).
 
-| Setting | Default | Behaviour |
-|---------|---------|-----------|
-| `claudeStatus.rateLimitApi.enabled` | `true` | Master switch — set to `false` to stop API calls |
-| `claudeStatus.realtime.enabled` | `false` | When `true`, polls every `cache.ttlSeconds` regardless of activity |
-
-**Default flow (`rateLimitApi.enabled: true`, `realtime.enabled: false`):**
+**Default flow:**
 
 ```
 Claude active  →  JSONL updated  →  1 API call  →  cache  →  display %
@@ -180,25 +151,8 @@ Cache exists (claude-ai)  →  show cached % with [Xm ago] stale indicator
 No cache or non-claude-ai →  cost-only mode (no percentages)
 ```
 
-> [!NOTE]
-> **Why is the default enabled, and why is API consumption negligible?**
->
-> The API is called only when Claude Code has been **recently active** — i.e., a
-> JSONL file was updated within the last `cache.ttlSeconds` (default: 5 min).
-> When you stop using Claude Code, the extension stops calling the API entirely.
->
-> Each call sends a minimal 1-token payload to `claude-haiku-4-5-20251001` solely to
-> retrieve response headers — no real work is done by the model.
-> Typical cost: **≈ $0.00013 per call (≈ 9 tokens)**.
->
-> | Usage pattern | Calls/day | Estimated cost/month |
-> |---------------|-----------|----------------------|
-> | 4 h active/day (default mode) | ~48 | ~$0.002 |
-> | Always-on realtime mode | ~288 | ~$0.012 |
->
-> Disable with `claudeStatus.rateLimitApi.enabled: false` if your environment
-> blocks outbound HTTPS to `api.anthropic.com`. Cached percentages will still
-> be shown (with a stale-age indicator) as long as a prior cache file exists.
+The probe costs ≈ 9 tokens of `claude-haiku-4-5` (≈ $0.00013) — about $0.002 / month at
+4 active hours a day.
 
 ### Endpoint
 
@@ -277,7 +231,8 @@ interface ClaudeCredentials {
   }
 }
 
-const credPath = customPath ?? path.join(os.homedir(), '.claude', '.credentials.json')
+const credPath = customPath ?? path.join(getClaudeHome(), '.credentials.json')
+// macOS: no file → Keychain entry "Claude Code-credentials"
 const creds: ClaudeCredentials = JSON.parse(await fs.readFile(credPath, 'utf-8'))
 const token = creds.claudeAiOauth?.accessToken
 ```
@@ -287,18 +242,19 @@ and show a status bar message guiding the user to log in with Claude Code.
 
 ### Provider Detection
 
-```typescript
-export type ClaudeProvider = 'claude-ai' | 'aws-bedrock' | 'api-key' | 'unknown'
+`detectProvider()` returns `'claude-ai' | 'claude-ai-usage' | 'aws-bedrock' | 'api-key' | 'unknown'`.
+The detection order and what each provider shows are in [PLANS.md](PLANS.md).
 
-async function detectProvider(customCredPath?: string | null): Promise<ClaudeProvider> {
-  // 1. OAuth credentials → claude-ai
-  // 2. AWS env vars → aws-bedrock
-  // 3. ANTHROPIC_API_KEY → api-key
-  // 4. fallback → unknown
-}
-```
+**Usage-based plans** (`src/data/accountInfo.ts`): `readOAuthAccountInfo()` reads
+`oauthAccount.billingType` from Claude Code's global config (`getGlobalConfigPath()`:
+`~/.claude.json`, or `<claudeHome>/.claude.json` for a custom data directory — the
+`CLAUDE_CONFIG_DIR` layout). The file can be large (it holds per-project history), so it is
+parsed again only when its mtime or size changes. `"usage_based"` → `claude-ai-usage`, which
+never calls the rate-limit API.
 
-Non-`claude-ai` providers always use cost mode (no rate limit percentages).
+`fetchRateLimitData()` rejects an error response that carries no unified rate-limit headers (expired
+token, outage), so the caller falls back to the cache instead of reporting 0 % as live data; 429
+responses carry the headers and are reported as `denied`.
 
 ---
 
@@ -307,7 +263,7 @@ Non-`claude-ai` providers always use cost mode (no rate limit percentages).
 ### Cache File Location
 
 ```
-~/.claude/vscode-claude-status-cache.json
+<claudeHome>/vscode-claude-status-cache.json      # ~/.claude by default
 ```
 
 ### Cache Schema (Version 2)
@@ -360,4 +316,4 @@ async function shouldCallApi(cache): Promise<boolean> {
 ```
 
 `wasJsonlUpdatedRecently(seconds)`: check if any `.jsonl` file under
-`~/.claude/projects/` has an `mtime` within the last `seconds` seconds.
+`<claudeHome>/projects/` has an `mtime` within the last `seconds` seconds.

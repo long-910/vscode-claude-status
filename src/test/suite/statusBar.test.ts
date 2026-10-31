@@ -1,5 +1,6 @@
 import * as assert from 'assert';
-import { buildLabel, buildTooltip, formatDuration } from '../../statusBar';
+import * as vscode from 'vscode';
+import { buildLabel, buildTooltip, buildUtilizationBar, formatDuration } from '../../statusBar';
 import { ClaudeUsageData } from '../../data/dataManager';
 
 function makeData(overrides: Partial<ClaudeUsageData> = {}): ClaudeUsageData {
@@ -14,10 +15,13 @@ function makeData(overrides: Partial<ClaudeUsageData> = {}): ClaudeUsageData {
     cost5h: 1.23,
     costDay: 2.50,
     cost7d: 10.00,
+    costMonth: 30.00,
     tokensIn5h: 50_000,
     tokensOut5h: 10_000,
     tokensCacheRead5h: 5_000,
     tokensCacheCreate5h: 1_000,
+    costByModel5h: {},
+    pricingByModel5h: {},
     lastUpdated: new Date(),
     cacheAge: 30,
     dataSource: 'cache',
@@ -51,6 +55,37 @@ suite('formatDuration', () => {
     assert.strictEqual(formatDuration(86400), '1d');
     assert.strictEqual(formatDuration(90000), '1d 1h');
     assert.strictEqual(formatDuration(172800), '2d');
+  });
+
+  test('rolls rounded units over instead of showing 60m / 24h', () => {
+    assert.strictEqual(formatDuration(3590), '1h');      // 59m 50s
+    assert.strictEqual(formatDuration(7170), '2h');      // 1h 59m 30s
+    assert.strictEqual(formatDuration(86370), '1d');     // 23h 59m 30s
+    assert.strictEqual(formatDuration(259000), '3d');    // 2d 23h 56m 40s
+  });
+});
+
+suite('buildUtilizationBar', () => {
+  test('renders empty, partial, and full bars', () => {
+    assert.strictEqual(buildUtilizationBar(0), '▱▱▱▱▱');
+    assert.strictEqual(buildUtilizationBar(0.6), '▰▰▰▱▱');
+    assert.strictEqual(buildUtilizationBar(1), '▰▰▰▰▰');
+  });
+
+  test('rounds to the nearest cell', () => {
+    assert.strictEqual(buildUtilizationBar(0.09), '▱▱▱▱▱');  // 0.45 cells → 0
+    assert.strictEqual(buildUtilizationBar(0.11), '▰▱▱▱▱');  // 0.55 cells → 1
+    assert.strictEqual(buildUtilizationBar(0.5), '▰▰▰▱▱');   // 2.5 cells → 3 (round half up)
+  });
+
+  test('clamps out-of-range utilization', () => {
+    assert.strictEqual(buildUtilizationBar(-0.5), '▱▱▱▱▱');
+    assert.strictEqual(buildUtilizationBar(1.7), '▰▰▰▰▰');
+  });
+
+  test('respects a custom width', () => {
+    assert.strictEqual(buildUtilizationBar(0.5, 8), '▰▰▰▰▱▱▱▱');
+    assert.strictEqual(buildUtilizationBar(0.5, 8).length, 8);
   });
 });
 
@@ -127,5 +162,84 @@ suite('StatusBar', () => {
   test('buildTooltip shows no-credentials message', () => {
     const tooltip = buildTooltip(makeData({ dataSource: 'no-credentials' }));
     assert.ok(tooltip.includes('not logged in') || tooltip.includes('Not logged'), tooltip);
+  });
+
+  suite('claudeStatus.payAsYouGo.showTimeWindows', () => {
+    const KEY = 'payAsYouGo.showTimeWindows';
+    const cfg = () => vscode.workspace.getConfiguration('claudeStatus');
+    const set = (v: boolean | undefined) => cfg().update(KEY, v, vscode.ConfigurationTarget.Global);
+    let prev: boolean | undefined;
+    const apiKey = () => makeData({ providerType: 'api-key', dataSource: 'local-only', cost5h: 1.23, costDay: 2.50, cost7d: 10.00 });
+
+    suiteSetup(() => { prev = cfg().inspect<boolean>(KEY)?.globalValue; });
+    teardown(() => set(prev));
+
+    test('regression: default (on) keeps the 5h / 7d cost label for pay-as-you-go', async () => {
+      await set(undefined);
+      assert.strictEqual(buildLabel(apiKey()), '🤖 5h:$1.23 7d:$10.00');
+      assert.ok(buildTooltip(apiKey()).includes('5h:'));
+    });
+
+    test('off: pay-as-you-go shows today\'s cost only', async () => {
+      await set(false);
+      assert.strictEqual(buildLabel(apiKey()), '🤖 Today:$2.50');
+      assert.strictEqual(buildLabel(apiKey(), [mockProject]), '🤖 Today:$2.50 | my-app:$3.21');
+      const tooltip = buildTooltip(apiKey());
+      assert.ok(tooltip.includes('Today: $2.50'), tooltip);
+      assert.ok(!tooltip.includes('5h:') && !tooltip.includes('7d:'), tooltip);
+    });
+
+    test('usage-based Claude.ai sign-in is treated as pay-as-you-go', async () => {
+      const usageBased = () => makeData({ providerType: 'claude-ai-usage', dataSource: 'local-only', cost5h: 1.23, costDay: 2.50, cost7d: 10.00 });
+      await set(undefined);
+      assert.strictEqual(buildLabel(usageBased()), '🤖 5h:$1.23 7d:$10.00');
+      assert.ok(buildTooltip(usageBased()).includes('Claude Code (Claude.ai usage-based)'));
+      assert.ok(!buildTooltip(usageBased()).includes('5h window'), 'no rate-limit section');
+      await set(false);
+      assert.strictEqual(buildLabel(usageBased()), '🤖 Today:$2.50');
+    });
+
+    test('off: Claude.ai subscriptions are unaffected', async () => {
+      await set(false);
+      assert.ok(buildLabel(makeData({ dataSource: 'cache' })).startsWith('🤖 5h:50%'));
+      assert.ok(buildTooltip(makeData()).includes('5h window'));
+    });
+
+    test('off: a custom status bar format is left as written', async () => {
+      await set(false);
+      await cfg().update('statusBar.format', '${cost5h}', vscode.ConfigurationTarget.Global);
+      try {
+        assert.strictEqual(buildLabel(apiKey()), '1.23');
+      } finally {
+        await cfg().update('statusBar.format', undefined, vscode.ConfigurationTarget.Global);
+      }
+    });
+  });
+
+  test('tooltip shows this month, with the monthly budget when set', async () => {
+    const cfg = vscode.workspace.getConfiguration('claudeStatus');
+    const prev = cfg.inspect<number | null>('budget.monthlyUsd')?.globalValue;
+    try {
+      await cfg.update('budget.monthlyUsd', undefined, vscode.ConfigurationTarget.Global);
+      assert.ok(buildTooltip(makeData()).includes('This month: $30.00\n'), 'no budget');
+      await cfg.update('budget.monthlyUsd', 120, vscode.ConfigurationTarget.Global);
+      assert.ok(buildTooltip(makeData()).includes('This month: $30.00 / $120.00 (25%)'));
+    } finally {
+      await cfg.update('budget.monthlyUsd', prev, vscode.ConfigurationTarget.Global);
+    }
+  });
+
+  test('custom format supports ${costMonth}', async () => {
+    const cfg = vscode.workspace.getConfiguration('claudeStatus');
+    await cfg.update('statusBar.format', '$${costMonth} this month', vscode.ConfigurationTarget.Global);
+    try {
+      assert.strictEqual(buildLabel(makeData({ dataSource: 'cache' })), '$30.00 this month');
+    } finally {
+      await cfg.update('statusBar.format', undefined, vscode.ConfigurationTarget.Global);
+    }
+  });
+
+  test('regression: the default status bar label is unchanged by the month total', () => {
+    assert.strictEqual(buildLabel(makeData({ dataSource: 'cache' })), '🤖 5h:50% 7d:30%');
   });
 });

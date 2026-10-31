@@ -77,11 +77,23 @@ export function buildRecommendation(exhaustionIn: number): string {
 {
   "claudeStatus.budget.dailyUsd": 20.0,
   "claudeStatus.budget.weeklyUsd": 100.0,
+  "claudeStatus.budget.monthlyUsd": 400.0,
   "claudeStatus.budget.alertThresholdPercent": 80
 }
 ```
 
 Default: no budget set (`null` = disabled).
+
+| Budget | Period | Compared with | Shown in | Notification |
+|---|---|---|---|---|
+| `dailyUsd` | local calendar day | `costDay` | dashboard bar + exhaustion time | once per day (also re-armed on a 5h window reset) |
+| `weeklyUsd` | rolling 7 days | `cost7d` | dashboard bar | — |
+| `monthlyUsd` | local calendar month | `costMonth` | dashboard bar, sidebar *This month*, tooltip | once per month |
+
+The monthly budget is meant for spend limits on usage-based plans (e.g. usage-based
+Enterprise, where admins set monthly limits per organization or user). `costMonth` is
+summed in `readAllUsage()` from the same usage index, which keeps 32 days so a 31-day month
+is always covered.
 
 ### Budget Exhaustion Prediction
 
@@ -103,55 +115,26 @@ if (dailyBudget !== null) {
 
 ## Notification System
 
-### VSCode Notifications
+`checkAndNotify()` in `src/extension.ts` runs on every data update. All notifications are
+non-modal and can be turned off in Settings.
 
-Use `vscode.window.showWarningMessage` / `showErrorMessage`:
-
-```typescript
-async function checkAndNotify(prediction: PredictionData, config: ExtensionConfig) {
-  const { estimatedExhaustionIn } = prediction
-
-  if (estimatedExhaustionIn !== null) {
-    if (estimatedExhaustionIn < 600 && !wasNotified('ratelimit-critical')) {
-      const action = await vscode.window.showErrorMessage(
-        `Claude Code: Rate limit in ~${Math.round(estimatedExhaustionIn / 60)} min`,
-        'Open Dashboard', 'Dismiss'
-      )
-      if (action === 'Open Dashboard') openDashboard()
-      markNotified('ratelimit-critical')
-    } else if (estimatedExhaustionIn < 1800 && !wasNotified('ratelimit-warning')) {
-      vscode.window.showWarningMessage(
-        `Claude Code: Rate limit in ~${Math.round(estimatedExhaustionIn / 60)} min`
-      )
-      markNotified('ratelimit-warning')
-    }
-  }
-
-  if (prediction.budgetRemaining !== null && config.dailyBudget) {
-    const used = config.dailyBudget - prediction.budgetRemaining
-    const pct = (used / config.dailyBudget) * 100
-    if (pct >= config.budgetAlertThreshold && !wasNotified('budget')) {
-      vscode.window.showWarningMessage(
-        `Claude Code: Daily budget ${Math.round(pct)}% used ($${used.toFixed(2)} / $${config.dailyBudget})`
-      )
-      markNotified('budget')
-    }
-  }
-}
-```
+| Notification | Condition | Kind | Shown at most | Setting |
+|---|---|---|---|---|
+| Rate limit critical | predicted 5h exhaustion < 10 min (`claude-ai` only) | error, with *Open Dashboard* | once per 5h window | `notifications.rateLimitWarning` |
+| Rate limit warning | predicted exhaustion < `rateLimitWarningThresholdMinutes` (default 30) | warning | once per 5h window | `notifications.rateLimitWarning` |
+| Daily budget | `costDay` ≥ `alertThresholdPercent` % of `budget.dailyUsd` | warning | once per calendar day (also re-armed on a 5h window reset) | `notifications.budgetWarning` |
+| Monthly budget | `costMonth` ≥ `alertThresholdPercent` % of `budget.monthlyUsd` | warning | once per calendar month | `notifications.budgetWarning` |
 
 ### Notification Deduplication
 
-Notifications must not repeat within a single session window.
-Use an in-memory `Set<string>` of notified keys, cleared when the 5h window resets.
-
-```typescript
-const notifiedKeys = new Set<string>()
-
-function wasNotified(key: string): boolean { return notifiedKeys.has(key) }
-function markNotified(key: string): void { notifiedKeys.add(key) }
-function onWindowReset(): void { notifiedKeys.clear() }
-```
+- Rate-limit keys live in a `Set` that is cleared when the 5h window resets (detected as
+  `resetIn5h` jumping up by more than an hour).
+- Budget alerts use `BudgetAlertTracker` (`src/data/budget.ts`), keyed by calendar period
+  (`budgetPeriodKey()`): a new day re-arms the daily alert and a new month the monthly one.
+  This matters for pay-as-you-go providers, which never see a window reset. A window reset
+  re-arms only the daily alert.
+- The weekly budget (`budget.weeklyUsd`, rolling 7 days) is shown in the dashboard only and
+  has no notification.
 
 ---
 

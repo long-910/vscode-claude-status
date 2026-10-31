@@ -1,21 +1,38 @@
 import * as vscode from 'vscode';
 import { ClaudeUsageData, ProjectCostData } from './data/dataManager';
+import type { ClaudeProvider } from './data/apiClient';
 import { config } from './config';
+import { formatDuration as formatDurationWith } from './webview/formatDuration';
 
+/** "1h 30m" etc., localized. One algorithm (with its 60m / 24h rollover) for every surface. */
 export function formatDuration(seconds: number): string {
-  if (seconds < 3600) {
-    return vscode.l10n.t('{0}m', Math.round(seconds / 60));
+  const t = vscode.l10n.t;
+  return formatDurationWith(seconds, {
+    unitM: t('{0}m', '__N__'),
+    unitH: t('{0}h', '__N__'),
+    unitHM: t('{0}h {1}m', '__N__', '__N2__'),
+    unitD: t('{0}d', '__N__'),
+    unitDH: t('{0}d {1}h', '__N__', '__N2__'),
+  });
+}
+
+/** Display name of a provider, for the tooltip and the dashboard. */
+export function providerLabel(provider: ClaudeProvider): string {
+  switch (provider) {
+    case 'claude-ai': return 'Claude.ai';
+    case 'claude-ai-usage': return vscode.l10n.t('Claude.ai usage-based');
+    case 'aws-bedrock': return vscode.l10n.t('AWS Bedrock');
+    case 'api-key': return vscode.l10n.t('API Key');
+    default: return vscode.l10n.t('Claude Code');
   }
-  if (seconds < 86400) {
-    const hours = Math.floor(seconds / 3600);
-    const mins = Math.round((seconds % 3600) / 60);
-    if (mins === 0) { return vscode.l10n.t('{0}h', hours); }
-    return vscode.l10n.t('{0}h {1}m', hours, mins);
-  }
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.round((seconds % 86400) / 3600);
-  if (hours === 0) { return vscode.l10n.t('{0}d', days); }
-  return vscode.l10n.t('{0}d {1}h', days, hours);
+}
+
+/** "$45.00", or "$45.00 / $60.00 (75%)" when claudeStatus.budget.monthlyUsd is set. */
+export function formatMonthCost(data: Pick<ClaudeUsageData, 'costMonth'>): string {
+  const budget = config.monthlyBudget;
+  const spent = `$${data.costMonth.toFixed(2)}`;
+  if (!budget || budget <= 0) { return spent; }
+  return `${spent} / $${budget.toFixed(2)} (${Math.round((data.costMonth / budget) * 100)}%)`;
 }
 
 function formatTokens(n: number): string {
@@ -33,6 +50,13 @@ function buildBar(utilization: number, width: number): string {
   return 'X'.repeat(filled) + '.'.repeat(width - filled);
 }
 
+// Compact utilization meter for the status bar label (e.g. "▰▰▰▱▱" at 60%)
+export function buildUtilizationBar(utilization: number, width = 5): string {
+  const clamped = Math.min(1, Math.max(0, utilization));
+  const filled = Math.round(clamped * width);
+  return '▰'.repeat(filled) + '▱'.repeat(width - filled);
+}
+
 function truncateName(name: string): string {
   return name.length > 12 ? name.slice(0, 11) + '…' : name;
 }
@@ -42,13 +66,25 @@ function applyFormat(format: string, data: ClaudeUsageData): string {
   return format
     .replace(/\$\{usage5h\}/g, `${Math.round(utilization5h * 100)}`)
     .replace(/\$\{usage7d\}/g, `${Math.round(utilization7d * 100)}`)
+    .replace(/\$\{bar5h\}/g, buildUtilizationBar(utilization5h))
+    .replace(/\$\{bar7d\}/g, buildUtilizationBar(utilization7d))
     .replace(/\$\{cost5h\}/g, cost5h.toFixed(2))
     .replace(/\$\{cost7d\}/g, cost7d.toFixed(2))
-    .replace(/\$\{costDay\}/g, costDay.toFixed(2));
+    .replace(/\$\{costDay\}/g, costDay.toFixed(2))
+    .replace(/\$\{costMonth\}/g, data.costMonth.toFixed(2));
+}
+
+/**
+ * Whether to show the 5h / 7d window figures. Always for Claude.ai
+ * subscriptions; for pay-as-you-go providers (API key, Bedrock, unknown) only
+ * while claudeStatus.payAsYouGo.showTimeWindows is on (default).
+ */
+export function showTimeWindows(data: Pick<ClaudeUsageData, 'providerType'>): boolean {
+  return data.providerType === 'claude-ai' || config.payAsYouGoShowTimeWindows;
 }
 
 export function buildLabel(data: ClaudeUsageData, projectCosts: ProjectCostData[] = []): string {
-  const { dataSource, utilization5h, utilization7d, limitStatus, cost5h, cost7d, cacheAge, has7dLimit, providerType } = data;
+  const { dataSource, utilization5h, utilization7d, limitStatus, cost5h, costDay, cost7d, cacheAge, has7dLimit, providerType } = data;
   const displayMode = config.displayMode;
 
   if (dataSource === 'no-credentials') {
@@ -72,7 +108,11 @@ export function buildLabel(data: ClaudeUsageData, projectCosts: ProjectCostData[
   let part5h: string;
   let part7d: string;
 
-  if (useCostMode) {
+  if (useCostMode && !showTimeWindows(data)) {
+    // Pay-as-you-go without time windows: today's spend only
+    part5h = `${vscode.l10n.t('Today')}:$${costDay.toFixed(2)}`;
+    part7d = '';
+  } else if (useCostMode) {
     part5h = `5h:$${cost5h.toFixed(2)}`;
     part7d = ` 7d:$${cost7d.toFixed(2)}`;
   } else {
@@ -81,8 +121,9 @@ export function buildLabel(data: ClaudeUsageData, projectCosts: ProjectCostData[
       part5h = `5h:100%✗`;
       part7d = '';
     } else {
+      const spark5h = config.showSparkline ? `${buildUtilizationBar(utilization5h)} ` : '';
       const warn5h = utilization5h >= 0.75 ? '⚠' : '';
-      part5h = `5h:${formatPercent(utilization5h)}${warn5h}`;
+      part5h = `5h:${spark5h}${formatPercent(utilization5h)}${warn5h}`;
       if (has7dLimit) {
         const warn7d = utilization7d >= 0.75 ? '⚠' : '';
         part7d = ` 7d:${formatPercent(utilization7d)}${warn7d}`;
@@ -143,19 +184,20 @@ export function buildTooltip(data: ClaudeUsageData, projectCosts: ProjectCostDat
     }
     lines.push('');
   } else {
-    const providerLabel = providerType === 'aws-bedrock' ? vscode.l10n.t('AWS Bedrock')
-      : providerType === 'api-key' ? vscode.l10n.t('API Key')
-      : vscode.l10n.t('Claude Code');
-    lines.push(`Claude Code (${providerLabel})`, '─────────────────────────────', '');
+    lines.push(`Claude Code (${providerLabel(providerType)})`, '─────────────────────────────', '');
   }
 
-  lines.push(
-    vscode.l10n.t('Token Cost (local)'),
-    '─────────────────────────────',
-    `5h:   in:${formatTokens(tokensIn5h)} out:${formatTokens(tokensOut5h)}  $${cost5h.toFixed(2)}`,
-    `day:  $${costDay.toFixed(2)}`,
-    `7d:   $${cost7d.toFixed(2)}`,
-  );
+  lines.push(vscode.l10n.t('Token Cost (local)'), '─────────────────────────────');
+  if (showTimeWindows(data)) {
+    lines.push(
+      `5h:   in:${formatTokens(tokensIn5h)} out:${formatTokens(tokensOut5h)}  $${cost5h.toFixed(2)}`,
+      `day:  $${costDay.toFixed(2)}`,
+      `7d:   $${cost7d.toFixed(2)}`,
+    );
+  } else {
+    lines.push(`${vscode.l10n.t('Today')}: $${costDay.toFixed(2)}`);
+  }
+  lines.push(`${vscode.l10n.t('This month')}: ${formatMonthCost(data)}`);
 
   if (projectCosts.length > 0) {
     lines.push('');

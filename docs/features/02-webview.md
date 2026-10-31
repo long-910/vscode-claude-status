@@ -173,12 +173,17 @@ panel.webview.postMessage({
     projectCosts: ProjectCostData[],   // array (multi-root aware)
     prediction: PredictionData | null,
     heatmap: HeatmapData | null,
-    pricing: TokenPricing,             // current claudeStatus.pricing.* values
+    pricing: TokenPricing,             // manual claudeStatus.pricing.* rates
     settings: {
       provider: string,                // detected/configured provider type
+      providerLabel: string,           // display name (statusBar.providerLabel())
       apiEnabled: boolean,             // claudeStatus.rateLimitApi.enabled
       cacheTtlSeconds: number,         // claudeStatus.cache.ttlSeconds
       weeklyBudget: number | null,     // claudeStatus.budget.weeklyUsd
+      monthlyBudget: number | null,    // claudeStatus.budget.monthlyUsd
+      statusBarFormat: string | null,  // claudeStatus.statusBar.format
+      useModelPricing: boolean,        // claudeStatus.pricing.useModelPricing
+      showTimeWindows: boolean,        // false hides 5h / 7d figures (pay-as-you-go only)
     },
   }
 })
@@ -341,6 +346,14 @@ per-type token counts and costs using the `usage` and `pricing` fields from the
 | Cache read | `tokensCacheRead5h / 1M × pricing.cacheReadPerMillion` |
 | Cache create | `tokensCacheCreate5h / 1M × pricing.cacheCreatePerMillion` |
 | Cache hit ratio | `tokensCacheRead5h / (tokensIn5h + tokensCacheRead5h) × 100` |
+
+When `claudeStatus.pricing.useModelPricing` is on (default), the manual rates above
+don't apply to most entries, so the per-type rows show token counts only and a
+**By model (5h)** list shows `usage.costByModel5h` (model id shortened, e.g.
+`claude-sonnet-4-5-20250929` → `sonnet-4-5`), sorted by cost. Models not priced from the
+built-in table are flagged from `usage.pricingByModel5h`: `≈` = estimated (newer than the
+table), `*` = manual rates or a `modelOverrides` entry; the label's tooltip explains which. The Pricing & Settings
+card notes that the manual rates apply only to unrecognized models.
 
 The breakdown re-renders on every `update` message if the toggle is open.
 

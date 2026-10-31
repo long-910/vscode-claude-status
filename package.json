@@ -6,7 +6,7 @@
   "version": "0.7.0",
   "publisher": "long-kudo",
   "engines": {
-    "vscode": "^1.73.0"
+    "vscode": "^1.82.0"
   },
   "categories": [
     "Visualization"
@@ -58,8 +58,29 @@
       {
         "command": "vscode-claude-status.setBudget",
         "title": "%cmd.setBudget%"
+      },
+      {
+        "command": "vscode-claude-status.exportUsage",
+        "title": "%cmd.exportUsage%"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "claude-status",
+          "title": "%view.container.title%",
+          "icon": "images/activitybar.svg"
+        }
+      ]
+    },
+    "views": {
+      "claude-status": [
+        {
+          "id": "claudeStatus.overview",
+          "name": "%view.overview.title%"
+        }
+      ]
+    },
     "keybindings": [
       {
         "command": "vscode-claude-status.toggleDisplayMode",
@@ -101,6 +122,16 @@
           "default": null,
           "description": "%config.statusBar.format.desc%"
         },
+        "claudeStatus.statusBar.showSparkline": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.statusBar.showSparkline.desc%"
+        },
+        "claudeStatus.payAsYouGo.showTimeWindows": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.payAsYouGo.showTimeWindows.desc%"
+        },
         "claudeStatus.cache.ttlSeconds": {
           "type": "number",
           "default": 300,
@@ -135,6 +166,15 @@
           "default": null,
           "minimum": 0,
           "description": "%config.budget.weeklyUsd.desc%"
+        },
+        "claudeStatus.budget.monthlyUsd": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "default": null,
+          "minimum": 0,
+          "description": "%config.budget.monthlyUsd.desc%"
         },
         "claudeStatus.budget.alertThresholdPercent": {
           "type": "number",
@@ -190,12 +230,14 @@
           "enum": [
             "auto",
             "claude-ai",
+            "claude-ai-usage",
             "aws-bedrock",
             "api-key"
           ],
           "enumDescriptions": [
             "%config.claudeProvider.auto%",
             "%config.claudeProvider.claudeAi%",
+            "%config.claudeProvider.claudeAiUsage%",
             "%config.claudeProvider.awsBedrock%",
             "%config.claudeProvider.apiKey%"
           ],
@@ -225,6 +267,26 @@
           "default": 3.75,
           "minimum": 0,
           "description": "%config.pricing.cacheCreatePerMillion.desc%"
+        },
+        "claudeStatus.pricing.useModelPricing": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.pricing.useModelPricing.desc%"
+        },
+        "claudeStatus.pricing.modelOverrides": {
+          "type": "object",
+          "default": {},
+          "markdownDescription": "%config.pricing.modelOverrides.desc%",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["inputPerMillion", "outputPerMillion"],
+            "properties": {
+              "inputPerMillion": { "type": "number", "minimum": 0 },
+              "outputPerMillion": { "type": "number", "minimum": 0 },
+              "cacheReadPerMillion": { "type": "number", "minimum": 0 },
+              "cacheCreatePerMillion": { "type": "number", "minimum": 0 }
+            }
+          }
         }
       }
     }
@@ -241,7 +303,7 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.73.0",
+    "@types/vscode": "^1.82.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
     "@typescript-eslint/eslint-plugin": "^8.31.1",

@@ -3,6 +3,15 @@ import * as path from 'path';
 import * as readline from 'readline';
 import { getClaudeHome } from './claudeHome';
 import { readUsageRecords } from './usageIndex';
+import { usageCost, pricingSource, normalizeModelId, CostOptions, DEFAULT_COST_OPTIONS, PricingSource } from './pricing';
+import { startOfMonth } from './localTime';
+
+// Pricing lives in ./pricing; re-exported here for existing importers
+export {
+  calculateCost, usageCost, resolveModelPricing, parseModelId, normalizeModelId, pricingSource,
+  DEFAULT_PRICING, DEFAULT_COST_OPTIONS,
+} from './pricing';
+export type { TokenPricing, CostOptions, ModelPricingOverrides, PricingSource } from './pricing';
 
 export interface CacheCreationBreakdown {
   ephemeral_5m_input_tokens?: number
@@ -15,65 +24,29 @@ export interface TokenUsage {
   cache_read_input_tokens: number
   cache_creation_input_tokens: number
   cache_creation?: CacheCreationBreakdown
+  speed?: string           // "fast" when the request ran in fast mode
+  inference_geo?: string   // "us" when US-only inference was requested
 }
 
-// Actual Claude Code JSONL structure (verified against real data):
-// - type: 'assistant' entries contain usage data
-// - usage is at entry.message.usage (NOT entry.usage)
-// - costUSD field does not exist; always calculate from tokens
+// Claude Code JSONL facts (verified against real data) — parsing lives in
+// parseUsageLine() (usageIndex.ts):
+// - only type: 'assistant' entries carry usage, at entry.message.usage
+// - there is no costUSD field; cost is always calculated from tokens
 // - cwd is at the top level of every entry
-interface JsonlEntry {
-  type: string
-  timestamp: string
-  cwd?: string
-  requestId?: string
-  message?: {
-    id?: string
-    usage?: TokenUsage
-  }
-}
 
 export interface AggregatedUsage {
   cost5h: number
   costDay: number
   cost7d: number
+  costMonth: number   // since local midnight on the 1st of this month
   tokensIn5h: number
   tokensOut5h: number
   tokensCacheRead5h: number
   tokensCacheCreate5h: number
-}
-
-export interface TokenPricing {
-  inputPerMillion: number
-  outputPerMillion: number
-  cacheReadPerMillion: number
-  cacheCreatePerMillion: number
-}
-
-export const DEFAULT_PRICING: TokenPricing = {
-  inputPerMillion: 3.00,
-  outputPerMillion: 15.00,
-  cacheReadPerMillion: 0.30,
-  cacheCreatePerMillion: 3.75,
-};
-
-const ONE_HOUR_CACHE_WRITE_MULTIPLIER = 2;
-
-export function calculateCost(usage: TokenUsage, pricing: TokenPricing = DEFAULT_PRICING): number {
-  const cacheCreateTotal = usage.cache_creation_input_tokens || 0;
-  const cacheCreate1h = Math.min(
-    Math.max(usage.cache_creation?.ephemeral_1h_input_tokens || 0, 0),
-    cacheCreateTotal
-  );
-  const cacheCreate5m = cacheCreateTotal - cacheCreate1h;
-
-  return (
-    ((usage.input_tokens || 0) / 1_000_000) * pricing.inputPerMillion +
-    ((usage.output_tokens || 0) / 1_000_000) * pricing.outputPerMillion +
-    ((usage.cache_read_input_tokens || 0) / 1_000_000) * pricing.cacheReadPerMillion +
-    (cacheCreate5m / 1_000_000) * pricing.cacheCreatePerMillion +
-    (cacheCreate1h / 1_000_000) * pricing.inputPerMillion * ONE_HOUR_CACHE_WRITE_MULTIPLIER
-  );
+  // Keyed by normalized model id ("claude-opus-5-5"), so provider-prefixed and
+  // dated ids of the same model share one row
+  costByModel5h: Record<string, number>            // model → cost in the 5h window
+  pricingByModel5h: Record<string, PricingSource>  // model → how it was priced
 }
 
 export function getClaudeProjectsDir(): string {
@@ -149,51 +122,7 @@ export async function findAllJsonlFiles(modifiedSinceMs?: number): Promise<strin
   return files;
 }
 
-export async function readJsonlFile(filePath: string): Promise<JsonlEntry[]> {
-  const entries: JsonlEntry[] = [];
-  // Claude Code writes one JSONL entry per content block in a streaming response,
-  // all sharing the same requestId and usage counts. Deduplicate to count each
-  // API call exactly once.
-  const seenRequestIds = new Set<string>();
-  try {
-    await forEachJsonlLine(filePath, trimmed => {
-      try {
-        const obj = JSON.parse(trimmed) as Record<string, unknown>;
-        // Only 'assistant' entries have usage data in message.usage
-        if (
-          obj.type === 'assistant' &&
-          typeof obj.timestamp === 'string' &&
-          obj.message !== undefined
-        ) {
-          const dedupeKey =
-            (typeof obj.requestId === 'string' && obj.requestId) ||
-            (typeof (obj.message as Record<string, unknown>)?.id === 'string' &&
-              (obj.message as Record<string, unknown>).id as string) ||
-            null;
-          if (dedupeKey) {
-            if (seenRequestIds.has(dedupeKey)) { return; }
-            seenRequestIds.add(dedupeKey);
-          }
-          // Keep only the fields callers use — message content can be large
-          const message = obj.message as JsonlEntry['message'];
-          entries.push({
-            type: obj.type,
-            timestamp: obj.timestamp,
-            requestId: typeof obj.requestId === 'string' ? obj.requestId : undefined,
-            message: { id: message?.id, usage: message?.usage },
-          });
-        }
-      } catch {
-        // skip malformed lines
-      }
-    });
-  } catch {
-    // skip unreadable files
-  }
-  return entries;
-}
-
-export async function readAllUsage(pricing: TokenPricing = DEFAULT_PRICING): Promise<AggregatedUsage> {
+export async function readAllUsage(options: CostOptions = DEFAULT_COST_OPTIONS): Promise<AggregatedUsage> {
   const now = Date.now();
   const window5h = 5 * 3600 * 1000;
   const window7d = 7 * 24 * 3600 * 1000;
@@ -204,21 +133,30 @@ export async function readAllUsage(pricing: TokenPricing = DEFAULT_PRICING): Pro
     cost5h: 0,
     costDay: 0,
     cost7d: 0,
+    costMonth: 0,
     tokensIn5h: 0,
     tokensOut5h: 0,
     tokensCacheRead5h: 0,
     tokensCacheCreate5h: 0,
+    costByModel5h: {},
+    pricingByModel5h: {},
   };
 
-  // Files untouched for 7 days cannot contain entries inside any window below
-  const files = await findAllJsonlFiles(now - window7d);
-  const records = await readUsageRecords(files, now - window7d);
-  for (const { timestamp: ts, usage } of records) {
-    const cost = calculateCost(usage, pricing);
+  // Widest window: the last 7 days or the calendar month, whichever starts first.
+  // Files untouched since then cannot contain entries inside any window below.
+  const monthStart = startOfMonth(new Date(now));
+  const since = Math.min(now - window7d, monthStart);
+  const files = await findAllJsonlFiles(since);
+  const records = await readUsageRecords(files, since);
+  for (const { timestamp: ts, usage, model } of records) {
+    const cost = usageCost(usage, model, options);
 
     const age = now - ts;
     if (age <= window7d) {
       result.cost7d += cost;
+    }
+    if (ts >= monthStart) {
+      result.costMonth += cost;
     }
     if (ts >= startOfToday.getTime()) {
       result.costDay += cost;
@@ -229,6 +167,13 @@ export async function readAllUsage(pricing: TokenPricing = DEFAULT_PRICING): Pro
       result.tokensOut5h += usage.output_tokens || 0;
       result.tokensCacheRead5h += usage.cache_read_input_tokens || 0;
       result.tokensCacheCreate5h += usage.cache_creation_input_tokens || 0;
+      if (model) {
+        const key = normalizeModelId(model);
+        result.costByModel5h[key] = (result.costByModel5h[key] || 0) + cost;
+        if (!(key in result.pricingByModel5h)) {
+          result.pricingByModel5h[key] = pricingSource(model, options);
+        }
+      }
     }
   }
 

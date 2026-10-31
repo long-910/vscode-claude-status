@@ -1,5 +1,9 @@
 import * as assert from 'assert';
-import { aggregateByDay, aggregateByHour, EntryForHeatmap } from '../../webview/heatmap';
+import * as fs from 'fs/promises';
+import * as os from 'os';
+import * as path from 'path';
+import { aggregateByDay, aggregateByDowHour, aggregateByHour, getHeatmapData, EntryForHeatmap } from '../../webview/heatmap';
+import { DEFAULT_CLAUDE_HOME, setClaudeHome } from '../../data/claudeHome';
 
 // Helper: create a fake entry at `hoursAgo` hours before now
 function makeEntry(hoursAgo: number, cost = 0.01, hour?: number): EntryForHeatmap {
@@ -25,10 +29,18 @@ suite('Heatmap', () => {
     });
 
     test('aggregates costs for active days', () => {
+      // Anchor to local start-of-today so the test is deterministic at any
+      // time of day (hours-ago offsets cross midnight when run before 03:00)
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const at = (offsetMs: number, cost: number): EntryForHeatmap => {
+        const ts = startOfToday.getTime() + offsetMs;
+        return { timestamp: ts, cost, tokens: 1000, hour: new Date(ts).getHours() };
+      };
       const entries = [
-        makeEntry(2, 0.10),   // 2 hours ago → today
-        makeEntry(3, 0.20),   // 3 hours ago → today
-        makeEntry(25, 0.05),  // 25 hours ago → yesterday
+        at(2 * 3600 * 1000, 0.10),    // today 02:00
+        at(3 * 3600 * 1000, 0.20),    // today 03:00
+        at(-12 * 3600 * 1000, 0.05),  // yesterday 12:00
       ];
       const result = aggregateByDay(entries, 7);
       const today = result[result.length - 1];
@@ -102,4 +114,106 @@ suite('Heatmap', () => {
       assert.strictEqual(result[0].avgCost, 0);
     });
   });
+  suite('getHeatmapData', () => {
+    let tmpHome: string;
+
+    setup(async () => {
+      tmpHome = await fs.mkdtemp(path.join(os.tmpdir(), 'heatmap-test-'));
+      await fs.mkdir(path.join(tmpHome, 'projects', '-proj'), { recursive: true });
+      setClaudeHome(tmpHome);
+    });
+
+    teardown(async () => {
+      setClaudeHome(DEFAULT_CLAUDE_HOME);
+      await fs.rm(tmpHome, { recursive: true, force: true });
+    });
+
+    test('counts streaming duplicates (shared requestId) once', async () => {
+      const line = (requestId: string) => JSON.stringify({
+        type: 'assistant',
+        timestamp: new Date().toISOString(),
+        requestId,
+        message: { id: `msg_${requestId}`, model: 'claude-sonnet-4-5', usage: { input_tokens: 1_000_000, output_tokens: 0 } },
+      });
+      // One API call written as three content-block lines, plus a second call
+      await fs.writeFile(path.join(tmpHome, 'projects', '-proj', 's.jsonl'),
+        [line('r1'), line('r1'), line('r1'), line('r2')].join('\n') + '\n');
+
+      const data = await getHeatmapData(7);
+      const today = data.daily[data.daily.length - 1];
+      assert.strictEqual(today.sessionCount, 2);
+      assert.ok(Math.abs(today.cost - 6.00) < 1e-9, `expected $6.00, got ${today.cost}`);
+    });
+
+    test('regression: reads a transcript appended today in a project dir untouched for 100 days', async () => {
+      const dir = path.join(tmpHome, 'projects', '-proj');
+      await fs.writeFile(path.join(dir, 's.jsonl'), JSON.stringify({
+        type: 'assistant', timestamp: new Date().toISOString(), requestId: 'r',
+        message: { model: 'claude-sonnet-4-5', usage: { input_tokens: 1_000_000, output_tokens: 0 } },
+      }) + '\n');
+      // Appending to a file does not change its directory's mtime
+      const old = (Date.now() - 100 * 24 * 3600e3) / 1000;
+      await fs.utimes(dir, old, old);
+      const total = (await getHeatmapData(90)).daily.reduce((s, d) => s + d.cost, 0);
+      assert.ok(Math.abs(total - 3) < 1e-9, `expected $3, got ${total}`);
+    });
+
+    test('applies pricing modifiers recorded on usage (fast mode = 2x)', async () => {
+      const entry = (requestId: string, speed?: string) => JSON.stringify({
+        type: 'assistant', timestamp: new Date().toISOString(), requestId,
+        message: { model: 'claude-opus-5-5', usage: { input_tokens: 1_000_000, output_tokens: 0, ...(speed ? { speed } : {}) } },
+      });
+      await fs.writeFile(path.join(tmpHome, 'projects', '-proj', 's.jsonl'),
+        [entry('standard'), entry('fast', 'fast')].join('\n') + '\n');
+      const total = (await getHeatmapData(7)).daily.reduce((s, d) => s + d.cost, 0);
+      assert.ok(Math.abs(total - (4 + 8)) < 1e-9, `expected $12, got ${total}`);
+    });
+  });
+
+  suite('aggregateByDowHour', () => {
+    // Build an entry at a fixed local weekday/hour within the last week
+    function entryAt(dow: number, hour: number, cost: number): EntryForHeatmap {
+      const d = new Date();
+      d.setHours(hour, 30, 0, 0);
+      // Walk back to the requested day of week (0-6 days ago -> within window)
+      const diff = (d.getDay() - dow + 7) % 7;
+      d.setDate(d.getDate() - diff);
+      if (d.getTime() > Date.now()) { d.setDate(d.getDate() - 7); }
+      return { timestamp: d.getTime(), cost, tokens: 100, hour: d.getHours() };
+    }
+
+    test('returns a 7x24 grid of zeroes for no entries', () => {
+      const grid = aggregateByDowHour([], 30);
+      assert.strictEqual(grid.length, 7);
+      for (const row of grid) {
+        assert.strictEqual(row.length, 24);
+        assert.ok(row.every(c => c === 0));
+      }
+    });
+
+    test('accumulates cost into the correct weekday/hour cell', () => {
+      const entries = [
+        entryAt(1, 9, 0.10),   // Monday 09:xx
+        entryAt(1, 9, 0.20),   // Monday 09:xx
+        entryAt(5, 22, 0.05),  // Friday 22:xx
+      ];
+      const grid = aggregateByDowHour(entries, 30);
+      assert.ok(Math.abs(grid[1][9] - 0.30) < 1e-9, `Mon 9h should be 0.30, got ${grid[1][9]}`);
+      assert.ok(Math.abs(grid[5][22] - 0.05) < 1e-9, `Fri 22h should be 0.05, got ${grid[5][22]}`);
+      const total = grid.flat().reduce((s, c) => s + c, 0);
+      assert.ok(Math.abs(total - 0.35) < 1e-9, 'no cost should leak into other cells');
+    });
+
+    test('ignores entries outside the days window', () => {
+      const old: EntryForHeatmap = {
+        timestamp: Date.now() - 31 * 24 * 3600 * 1000,
+        cost: 99,
+        tokens: 100,
+        hour: 0,
+      };
+      const grid = aggregateByDowHour([old], 30);
+      assert.ok(grid.flat().every(c => c === 0));
+    });
+  });
 });
+

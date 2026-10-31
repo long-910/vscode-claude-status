@@ -9,6 +9,101 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+**Pricing** — see [docs/PRICING.md](docs/PRICING.md)
+
+- **Model-aware pricing** (`claudeStatus.pricing.useModelPricing`, default `true`). Each entry is
+  priced by its model with built-in rates checked against Anthropic's official price list
+  (2026-10-31): Fable / Mythos 5 – 5.1, Opus 3 – 5.5, Sonnet 3 – 5.5, Haiku 3 – 5.5 (including
+  the Haiku 5.5 rate card for prompts over 100K tokens), with model-specific cache-hit rates.
+  - Bedrock / Vertex ids and snapshot dates are recognized.
+  - A model newer than the table is priced at its family's latest rate and marked `≈`.
+  - Unknown models keep the manual `claudeStatus.pricing.*` rates.
+- **`claudeStatus.pricing.modelOverrides`** — exact per-model rates for new models or price
+  changes, without waiting for an extension update.
+- **Pricing modifiers** recorded in the transcript are applied: fast mode (2x) and US-only
+  inference (1.1x on Claude 4.6+).
+- **Per-model cost breakdown** for the 5-hour window in the dashboard.
+
+**Plans** — see [docs/PLANS.md](docs/PLANS.md)
+
+- **Usage-based Claude.ai plans** (e.g. usage-based Enterprise: seat fee plus all usage at API
+  rates, no per-seat 5-hour / weekly limits) are detected from Claude Code's account info
+  (`oauthAccount.billingType: "usage_based"` in `~/.claude.json`) as the new provider
+  `claude-ai-usage`. They show cost only and never call the rate-limit API — previously they
+  showed a meaningless `5h:0%`. Selectable manually via `claudeStatus.claudeProvider`.
+- **`claudeStatus.payAsYouGo.showTimeWindows`** (default `true`) — on pay-as-you-go plans (API
+  key, Bedrock, usage-based Claude.ai), turn off the 5-hour / 7-day figures and show today's
+  cost instead in the status bar, sidebar and dashboard.
+
+**Rate limits**
+
+- **`claudeStatus.realtime.enabled` now works.** The setting existed since 0.1.0 but had no effect.
+  When on, the rate-limit % (Claude.ai subscriptions) is also refreshed while Claude Code is
+  idle — every `cache.ttlSeconds`, but never more often than every 5 minutes (≈ 12 small API
+  calls per idle hour). Off by default; behaviour with it off is unchanged.
+
+**Budgets**
+
+- **Monthly budget** (`claudeStatus.budget.monthlyUsd`) and **this month's cost**, shown in the
+  dashboard, sidebar and tooltip, with a progress bar and a once-a-month warning — e.g. for an
+  Enterprise spend limit. Custom status bar formats gain `${costMonth}`.
+
+**New views and commands**
+
+- **Sidebar** — an Activity Bar *Usage Overview* with rate-limit windows, costs (5h / today /
+  7d / this month), per-project costs and quick actions. Adds no file reads or API calls.
+- **Status bar meter** (`claudeStatus.statusBar.showSparkline`) — `▰▰▰▱▱` next to the 5h
+  percentage; custom formats gain `${bar5h}` / `${bar7d}`.
+- **Export Usage Data** command — the daily history (date, cost, messages, tokens) as CSV or
+  JSON.
+- **Punch card** — weekday × hour cost matrix (last 30 days) in the Usage History card.
+
+**Documentation**
+
+- New [docs/README.md](docs/README.md) index, [PLANS.md](docs/PLANS.md) and
+  [PRICING.md](docs/PRICING.md); `docs/SETTINGS.md` is now a grouped reference generated from
+  `package.json`; the READMEs group settings by topic. A test keeps settings, commands and doc
+  links in sync.
+
+### Changed
+
+- **Minimum VS Code version raised from 1.73 to 1.82.** The rate-limit % is fetched with the
+  global `fetch` API, which the extension host only provides from VS Code 1.82 (Electron 25 /
+  Node.js 18). On 1.73 – 1.81 (Node.js 16) it was never available: subscribers saw
+  `Not logged in` or an old cached % instead of their usage. Users of VS Code 1.81 or older
+  can stay on 0.7.0.
+- **Displayed costs change** for anyone using models other than Sonnet 4.x — they become more
+  accurate. Set `claudeStatus.pricing.useModelPricing: false` to get the previous flat rates.
+- Burn-rate prediction and the heatmap now honour the pricing settings (they always used the
+  Sonnet defaults before).
+- Changing a `claudeStatus.pricing.*` setting recomputes costs immediately (a normal refresh,
+  under the usual API-call rules).
+- Setting descriptions updated: `rateLimitApi.enabled` (cached % stays visible when off), the
+  manual pricing rates (now a fallback), `statusBar.format` (all placeholders), `realtime.enabled`.
+- Development dependencies updated (minor / patch); release workflow uses
+  `softprops/action-gh-release@v3`.
+
+### Fixed
+
+- **Heatmap over-counted streaming responses** 2–4× in agentic sessions — it was the last
+  reader without `requestId` / `message.id` deduplication. All readers now share one parser.
+- The heatmap skipped a whole project when a transcript older than the heatmap window was
+  still being appended to (it filtered by the directory's mtime).
+- A failed rate-limit request without rate-limit headers (e.g. an expired token) was shown as
+  live `0%`; the cached value is now kept.
+- The daily budget warning never re-armed for pay-as-you-go users after the first day of a VS
+  Code session (it waited for a 5-hour window reset); it now re-arms every calendar day.
+- Tooltip and sidebar countdowns showed `60m` / `24h` (e.g. `2d 24h` is now `3d`).
+- The heatmap unit test failed when run between 00:00 and 03:00 local time.
+- The status bar format field's example placeholder was untranslated in Japanese / Chinese.
+- The dashboard's **Month (est.)** was today's cost × 30, so one busy day could project far more
+  than the month's actual cost (e.g. $2,255 on the 31st with $177 spent). It now spreads this
+  month's cost so far over the days elapsed.
+- The usage history heading read `Usage History (90 7 days)`; it now reads
+  `Usage History (90 days)`.
+
 ---
 
 ## [0.7.0] — 2026-10-26

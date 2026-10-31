@@ -11,10 +11,14 @@ import type { TokenUsage } from './jsonlReader';
 export interface UsageRecord {
   timestamp: number  // ms
   usage: TokenUsage
+  model?: string     // e.g. "claude-sonnet-5-5"; used for model-aware pricing
 }
 
-/** Oldest entry kept in memory — the widest window any caller aggregates (project cost: 30 days). */
-export const INDEX_RETENTION_MS = 30 * 24 * 3600 * 1000;
+/**
+ * Oldest entry kept in memory — the widest window any caller aggregates: the
+ * calendar month (up to 31 days, plus a day of margin for DST / clock skew).
+ */
+export const INDEX_RETENTION_MS = 32 * 24 * 3600 * 1000;
 
 const CHUNK_SIZE = 1024 * 1024;
 const NEWLINE = 0x0a;
@@ -27,6 +31,17 @@ interface FileState {
   seenKeys: Set<string>         // requestId / message.id dedupe keys seen in this file
 }
 
+/**
+ * Claude Code writes one JSONL entry per content block of a streaming
+ * response, all sharing the same requestId and usage. Every reader dedupes on
+ * this key so each API call is counted once. Returns null when absent.
+ */
+export function usageDedupeKey(obj: Record<string, unknown>): string | null {
+  if (typeof obj.requestId === 'string' && obj.requestId) { return obj.requestId; }
+  const id = (obj.message as Record<string, unknown> | undefined)?.id;
+  return typeof id === 'string' && id ? id : null;
+}
+
 const files = new Map<string, FileState>();
 const syncing = new Map<string, Promise<void>>();
 
@@ -34,48 +49,75 @@ function newState(ino: number, mtimeMs: number): FileState {
   return { ino, mtimeMs, offset: 0, records: [], seenKeys: new Set() };
 }
 
-// Same filtering and dedupe rules as readJsonlFile(): Claude Code writes one
-// entry per content block of a streaming response, all sharing the same
-// requestId and usage, so each API call is counted once.
-function ingestLine(state: FileState, line: string, retainSince: number): void {
+export interface ParsedUsageLine {
+  dedupeKey: string | null
+  record: UsageRecord | null   // null: no usage or an invalid timestamp
+}
+
+/**
+ * Parse one transcript line. The single place that decides which lines carry
+ * usage and how usage is normalized — shared by the index and the heatmap.
+ * Returns null for anything that is not an assistant message (or not JSON).
+ * Callers dedupe on `dedupeKey` before looking at `record`: Claude Code writes
+ * one entry per content block of a streaming response, all sharing the same
+ * requestId and usage, so each API call is counted once.
+ */
+export function parseUsageLine(line: string): ParsedUsageLine | null {
   const trimmed = line.trim();
-  if (!trimmed) { return; }
+  if (!trimmed) { return null; }
   let obj: Record<string, unknown>;
   try {
     obj = JSON.parse(trimmed) as Record<string, unknown>;
   } catch {
-    return; // skip malformed lines
+    return null; // skip malformed lines
   }
-  if (obj.type !== 'assistant' || typeof obj.timestamp !== 'string') { return; }
-  const message = obj.message as { id?: unknown; usage?: Partial<TokenUsage> } | undefined;
-  if (!message) { return; }
+  if (obj.type !== 'assistant' || typeof obj.timestamp !== 'string') { return null; }
+  const message = obj.message as { model?: unknown; usage?: Partial<TokenUsage> } | undefined;
+  if (!message) { return null; }
 
-  const dedupeKey =
-    (typeof obj.requestId === 'string' && obj.requestId) ||
-    (typeof message.id === 'string' && message.id) ||
-    null;
-  if (dedupeKey) {
-    if (state.seenKeys.has(dedupeKey)) { return; }
-    state.seenKeys.add(dedupeKey);
-  }
-
+  const dedupeKey = usageDedupeKey(obj);
   const u = message.usage;
-  if (!u) { return; }
   const timestamp = new Date(obj.timestamp).getTime();
-  if (isNaN(timestamp) || timestamp < retainSince) { return; }
+  if (!u || isNaN(timestamp)) { return { dedupeKey, record: null }; }
 
-  state.records.push({
-    timestamp,
-    usage: {
-      input_tokens: u.input_tokens || 0,
-      output_tokens: u.output_tokens || 0,
-      cache_read_input_tokens: u.cache_read_input_tokens || 0,
-      cache_creation_input_tokens: u.cache_creation_input_tokens || 0,
-      cache_creation: u.cache_creation
-        ? { ephemeral_1h_input_tokens: u.cache_creation.ephemeral_1h_input_tokens }
-        : undefined,
+  return {
+    dedupeKey,
+    record: {
+      timestamp,
+      usage: {
+        input_tokens: u.input_tokens || 0,
+        output_tokens: u.output_tokens || 0,
+        cache_read_input_tokens: u.cache_read_input_tokens || 0,
+        cache_creation_input_tokens: u.cache_creation_input_tokens || 0,
+        cache_creation: u.cache_creation
+          ? { ephemeral_1h_input_tokens: u.cache_creation.ephemeral_1h_input_tokens }
+          : undefined,
+        // Pricing modifiers; kept only when set so records stay slim
+        ...(typeof u.speed === 'string' ? { speed: u.speed } : {}),
+        ...(typeof u.inference_geo === 'string' ? { inference_geo: u.inference_geo } : {}),
+      },
+      model: typeof message.model === 'string' ? message.model : undefined,
     },
-  });
+  };
+}
+
+/**
+ * Per-reader dedupe: true the first time a key is seen (and for lines with no
+ * key, which cannot be deduplicated).
+ */
+export function firstSeen(seen: Set<string>, key: string | null): boolean {
+  if (!key) { return true; }
+  if (seen.has(key)) { return false; }
+  seen.add(key);
+  return true;
+}
+
+function ingestLine(state: FileState, line: string, retainSince: number): void {
+  const parsed = parseUsageLine(line);
+  if (!parsed || !firstSeen(state.seenKeys, parsed.dedupeKey)) { return; }
+  if (parsed.record && parsed.record.timestamp >= retainSince) {
+    state.records.push(parsed.record);
+  }
 }
 
 function isCompleteJson(line: string): boolean {
@@ -183,6 +225,11 @@ export async function readUsageRecords(filePaths: string[], sinceMs: number): Pr
     }
   }
   return result;
+}
+
+/** Number of transcripts currently held in the index (tests). */
+export function indexedFileCount(): number {
+  return files.size;
 }
 
 /** Drop all cached state (tests). */

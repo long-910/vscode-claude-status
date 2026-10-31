@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { calculateCost, forEachJsonlLine, TokenPricing, DEFAULT_PRICING, getClaudeProjectsDir } from './jsonlReader';
+import { usageCost, forEachJsonlLine, CostOptions, DEFAULT_COST_OPTIONS, getClaudeProjectsDir } from './jsonlReader';
 import { readUsageRecords } from './usageIndex';
 
 export interface ProjectCostData {
@@ -78,7 +78,7 @@ export async function workspacePathToProjectDir(workspacePath: string): Promise<
   return null;
 }
 
-async function getProjectCostForDir(projectDir: string, projectName: string, pricing: TokenPricing = DEFAULT_PRICING): Promise<ProjectCostData> {
+async function getProjectCostForDir(projectDir: string, projectName: string, options: CostOptions = DEFAULT_COST_OPTIONS): Promise<ProjectCostData> {
   const now = Date.now();
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -116,8 +116,8 @@ async function getProjectCostForDir(projectDir: string, projectName: string, pri
       recentFiles.push(filePath);
     }
 
-    for (const { timestamp: tsMs, usage } of await readUsageRecords(recentFiles, now - w30d)) {
-      const cost = calculateCost(usage, pricing);
+    for (const { timestamp: tsMs, usage, model } of await readUsageRecords(recentFiles, now - w30d)) {
+      const cost = usageCost(usage, model, options);
       const ageMs = now - tsMs;
 
       if (ageMs < w30d) { cost30d += cost; }
@@ -144,7 +144,7 @@ async function getProjectCostForDir(projectDir: string, projectName: string, pri
   };
 }
 
-export async function getAllProjectCosts(pricing: TokenPricing = DEFAULT_PRICING): Promise<ProjectCostData[]> {
+export async function getAllProjectCosts(options: CostOptions = DEFAULT_COST_OPTIONS): Promise<ProjectCostData[]> {
   const folders = vscode.workspace.workspaceFolders ?? [];
   if (folders.length === 0) { return []; }
 
@@ -154,7 +154,7 @@ export async function getAllProjectCosts(pricing: TokenPricing = DEFAULT_PRICING
       const projectDir = await workspacePathToProjectDir(workspacePath);
       if (!projectDir) { return null; }
       const projectName = path.basename(workspacePath);
-      return getProjectCostForDir(projectDir, projectName, pricing);
+      return getProjectCostForDir(projectDir, projectName, options);
     })
   );
 

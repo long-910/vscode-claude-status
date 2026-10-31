@@ -27,29 +27,22 @@ Reference implementation: [claude-tmux-status](https://github.com/long-910/claud
 
 ---
 
-## Architecture
+## Documentation
 
-Read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) before writing any code.
+Start at [`docs/README.md`](docs/README.md) — it says which document covers what. Each topic
+lives in exactly one document; link to it rather than repeating it.
 
-## Feature Specifications
+| Before you change… | Read |
+|---|---|
+| anything | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — module map and data flow |
+| reading transcripts, the API probe, the cache | [`docs/DATA.md`](docs/DATA.md) |
+| cost calculation or the price table | [`docs/PRICING.md`](docs/PRICING.md) |
+| plan / provider behaviour, when the API is called | [`docs/PLANS.md`](docs/PLANS.md) |
+| a setting or command | [`docs/SETTINGS.md`](docs/SETTINGS.md) |
+| a UI surface | the matching spec in [`docs/features/`](docs/README.md#feature-specifications) (01 status bar … 06 sidebar) |
 
-Read all files under `docs/features/` before implementing each feature:
-
-| File | Feature |
-|------|---------|
-| [`docs/features/01-statusbar.md`](docs/features/01-statusbar.md) | Status bar display |
-| [`docs/features/02-webview.md`](docs/features/02-webview.md) | WebView dashboard panel |
-| [`docs/features/03-project-cost.md`](docs/features/03-project-cost.md) | Project-level cost tracking |
-| [`docs/features/04-prediction.md`](docs/features/04-prediction.md) | Usage prediction & budget alerts |
-| [`docs/features/05-heatmap.md`](docs/features/05-heatmap.md) | Session history heatmap |
-
-## Data Layer
-
-Read [`docs/DATA.md`](docs/DATA.md) for JSONL parsing, API calls, and caching logic.
-
-## Settings
-
-Read [`docs/SETTINGS.md`](docs/SETTINGS.md) for all configuration keys.
+When adding a setting or command, document it in `docs/SETTINGS.md` and in all three READMEs —
+`src/test/suite/docs.test.ts` enforces this and checks every relative link and `#anchor`.
 
 ---
 
@@ -98,27 +91,31 @@ Implement in this order to keep the extension usable at every step:
 ```
 vscode-claude-status/
 ├── src/
-│   ├── extension.ts          # Entry point — activate/deactivate
+│   ├── extension.ts          # Entry point — activate/deactivate, commands
+│   ├── config.ts             # Typed accessors for claudeStatus.* settings
 │   ├── statusBar.ts          # Status bar item management
+│   ├── treeView.ts           # Activity Bar "Usage Overview" tree view
 │   ├── data/
-│   │   ├── jsonlReader.ts    # ~/.claude/projects/**/*.jsonl parser
+│   │   ├── dataManager.ts    # Singleton orchestrating readers, API, cache, refresh
+│   │   ├── jsonlReader.ts    # JSONL streaming, file discovery, usage totals
+│   │   ├── pricing.ts        # Token pricing: manual, per-model table, overrides
+│   │   ├── usageIndex.ts     # Incremental per-file usage index + dedupe
 │   │   ├── apiClient.ts      # Anthropic rate-limit header fetcher
 │   │   ├── cache.ts          # Disk-backed cache (~/.claude/vscode-claude-status-cache.json)
+│   │   ├── claudeHome.ts     # claudeStatus.claudeHome resolution
 │   │   ├── projectCost.ts    # Workspace path → project JSONL mapping
-│   │   └── prediction.ts     # Rate-of-use prediction engine
+│   │   ├── accountInfo.ts    # Claude Code account info (usage-based plan detection)
+│   │   ├── prediction.ts     # Rate-of-use prediction engine
+│   │   ├── budget.ts         # Budget thresholds, once-per-period alert tracking
+│   │   ├── localTime.ts      # Local calendar helpers (date keys, month start)
+│   │   └── exportUsage.ts    # CSV / JSON serializers for Export Usage Data
 │   ├── webview/
-│   │   ├── panel.ts          # WebView panel lifecycle
-│   │   ├── heatmap.ts        # Heatmap data aggregation
-│   │   └── html/
-│   │       └── dashboard.html # WebView HTML template
+│   │   ├── panel.ts          # WebView panel lifecycle + dashboard HTML
+│   │   ├── heatmap.ts        # Heatmap / hourly / punch card aggregation
+│   │   └── formatDuration.ts # Duration formatting shared with the WebView
 │   └── test/
-│       ├── runTest.ts
-│       └── suite/
-│           ├── jsonlReader.test.ts
-│           ├── projectCost.test.ts
-│           ├── prediction.test.ts
-│           └── cache.test.ts
-├── docs/                     # Detailed specs (read before implementing)
+│       └── suite/            # Mocha suites (*.test.ts), run by @vscode/test-cli
+├── docs/                     # Specs — index in docs/README.md
 ├── CLAUDE.md                 # This file
 ├── CHANGELOG.md
 ├── package.json

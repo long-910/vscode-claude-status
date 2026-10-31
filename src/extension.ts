@@ -1,24 +1,47 @@
 import * as vscode from 'vscode';
+import * as os from 'os';
+import * as path from 'path';
 import { DataManager, ClaudeUsageData, PredictionData } from './data/dataManager';
+import { dailyUsageToCsv, dailyUsageToJson, exportFileName } from './data/exportUsage';
 import { StatusBarManager } from './statusBar';
+import { ClaudeStatusTreeProvider } from './treeView';
 import { config } from './config';
 import { setClaudeHome } from './data/claudeHome';
+import { BudgetAlertTracker, budgetThresholdReached } from './data/budget';
 
 // --- Notification system ---
-// Deduplication: keys are cleared when the 5h rate-limit window resets
+// Deduplication: rate-limit keys are cleared when the 5h rate-limit window resets
 const notifiedKeys = new Set<string>();
+// Budget alerts: once per calendar day / month. The daily one is also re-armed
+// on a window reset, as before; the monthly one is not.
+const budgetAlerts = new BudgetAlertTracker();
 let prevResetIn5h = 0;
 
 function checkWindowReset(resetIn5h: number): void {
   // If resetIn5h increased by more than 1 hour, the window has reset
   if (resetIn5h > prevResetIn5h + 3600) {
     notifiedKeys.clear();
+    budgetAlerts.rearm('day');
   }
   prevResetIn5h = resetIn5h;
 }
 
 async function checkAndNotify(data: ClaudeUsageData, prediction: PredictionData | null): Promise<void> {
   checkWindowReset(data.resetIn5h);
+
+  // Monthly budget — from the usage totals, independent of the prediction
+  const monthlyBudget = config.monthlyBudget;
+  if (
+    config.budgetWarning &&
+    budgetThresholdReached(data.costMonth, monthlyBudget, config.budgetAlertThreshold) &&
+    budgetAlerts.shouldShow('month')
+  ) {
+    vscode.window.showWarningMessage(
+      vscode.l10n.t('Claude Code: Monthly budget {0}% used (${1} / ${2})',
+        Math.round((data.costMonth / (monthlyBudget as number)) * 100), data.costMonth.toFixed(2), monthlyBudget as number)
+    );
+  }
+
   if (!prediction) { return; }
 
   const { estimatedExhaustionIn } = prediction;
@@ -49,8 +72,7 @@ async function checkAndNotify(data: ClaudeUsageData, prediction: PredictionData 
   // Budget warning
   if (config.budgetWarning && prediction.budgetRemaining !== null && config.dailyBudget !== null) {
     const remainingPct = (prediction.budgetRemaining / config.dailyBudget) * 100;
-    if (remainingPct <= (100 - config.budgetAlertThreshold) && !notifiedKeys.has('budget')) {
-      notifiedKeys.add('budget');
+    if (remainingPct <= (100 - config.budgetAlertThreshold) && budgetAlerts.shouldShow('day')) {
       const used = (config.dailyBudget - prediction.budgetRemaining).toFixed(2);
       vscode.window.showWarningMessage(
         vscode.l10n.t('Claude Code: Daily budget {0}% used (${1} / ${2})', config.budgetAlertThreshold, used, config.dailyBudget)
@@ -63,6 +85,13 @@ export function activate(context: vscode.ExtensionContext) {
   setClaudeHome(config.claudeHome);
   const dataManager = DataManager.getInstance();
   const statusBar = new StatusBarManager();
+
+  // Sidebar tree view (refreshes itself on dataManager updates)
+  const treeProvider = new ClaudeStatusTreeProvider(dataManager);
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider('claudeStatus.overview', treeProvider),
+    treeProvider,
+  );
 
   // Helper: update status bar with latest usage + project costs
   function updateStatusBar(): void {
@@ -109,6 +138,50 @@ export function activate(context: vscode.ExtensionContext) {
           : vscode.l10n.t('Daily budget set to ${0}.', value.toFixed(2))
       );
     }),
+    vscode.commands.registerCommand('vscode-claude-status.exportUsage', async () => {
+      type FormatPick = vscode.QuickPickItem & { format: 'csv' | 'json' };
+      const picks: FormatPick[] = [
+        {
+          label: 'CSV',
+          description: vscode.l10n.t('Spreadsheet-friendly (date, cost, messages, tokens)'),
+          format: 'csv',
+        },
+        {
+          label: 'JSON',
+          description: vscode.l10n.t('Machine-readable with export metadata'),
+          format: 'json',
+        },
+      ];
+      const pick = await vscode.window.showQuickPick(picks, {
+        placeHolder: vscode.l10n.t('Select export format'),
+      });
+      if (!pick) { return; } // cancelled
+
+      const heatmap = await dataManager.getHeatmapData();
+      const daily = heatmap?.daily ?? [];
+      if (daily.every(d => d.sessionCount === 0)) {
+        vscode.window.showWarningMessage(vscode.l10n.t('No usage history to export yet.'));
+        return;
+      }
+
+      const uri = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file(path.join(os.homedir(), exportFileName(pick.format, new Date()))),
+        filters: pick.format === 'csv' ? { CSV: ['csv'] } : { JSON: ['json'] },
+      });
+      if (!uri) { return; } // cancelled
+
+      const content = pick.format === 'csv' ? dailyUsageToCsv(daily) : dailyUsageToJson(daily);
+      try {
+        await vscode.workspace.fs.writeFile(uri, Buffer.from(content, 'utf8'));
+        vscode.window.showInformationMessage(
+          vscode.l10n.t('Usage history exported to {0}', uri.fsPath)
+        );
+      } catch (err) {
+        vscode.window.showErrorMessage(
+          vscode.l10n.t('Failed to export usage history: {0}', String(err))
+        );
+      }
+    }),
   );
 
   // React to data updates (usage + project costs are refreshed together)
@@ -128,6 +201,15 @@ export function activate(context: vscode.ExtensionContext) {
         setClaudeHome(config.claudeHome);
         dataManager.restartWatching();
         dataManager.refresh().catch(() => {});
+      }
+      if (e.affectsConfiguration('claudeStatus.pricing')) {
+        // Costs are computed at read time — recompute with the new rates. A normal
+        // refresh: the API is only called under the usual cache / activity rules
+        dataManager.invalidateHeatmap();
+        dataManager.refresh().catch(() => {});
+      } else if (e.affectsConfiguration('claudeStatus.payAsYouGo')) {
+        // Display-only: re-render status bar, sidebar and dashboard, no I/O
+        dataManager.republish();
       }
       if (e.affectsConfiguration('claudeStatus')) {
         updateStatusBar();
@@ -155,10 +237,18 @@ export function activate(context: vscode.ExtensionContext) {
     // graceful degradation: status bar stays in "loading..." state
   });
 
-  // Timer: re-render every 60 seconds from cache
+  // Timer: re-render every 60 seconds from cache. This is also when an idle
+  // realtime poll (claudeStatus.realtime.enabled) fetches new rate limits
   const timer = setInterval(() => {
     dataManager.getUsageData()
-      .then(data => statusBar.update(data, dataManager.getLastProjectCosts()))
+      .then(data => {
+        if (data.dataSource === 'api') {
+          dataManager.republish();   // fresh rate limits: update every surface + notifications
+        } else {
+          statusBar.update(data, dataManager.getLastProjectCosts());
+        }
+        treeProvider.refresh(); // keep "resets in" countdowns current
+      })
       .catch(() => {});
   }, 60_000);
 

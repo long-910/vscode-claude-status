@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { readAllUsage, wasJsonlUpdatedRecently, getClaudeProjectsDir } from './jsonlReader';
+import type { PricingSource } from './pricing';
 import { clearUsageIndex } from './usageIndex';
 import { fetchRateLimitData, detectProvider, RateLimitData, ClaudeProvider } from './apiClient';
 import { readCache, writeCache, isCacheValid, getCacheAge } from './cache';
@@ -22,10 +23,13 @@ export interface ClaudeUsageData {
   cost5h: number
   costDay: number
   cost7d: number
+  costMonth: number
   tokensIn5h: number
   tokensOut5h: number
   tokensCacheRead5h: number
   tokensCacheCreate5h: number
+  costByModel5h: Record<string, number>
+  pricingByModel5h: Record<string, PricingSource>
 
   // Rate limit metadata
   has7dLimit: boolean      // false for plans without a 7d window or non-Claude.ai providers
@@ -38,6 +42,30 @@ export interface ClaudeUsageData {
 }
 
 export { ProjectCostData };
+
+/** Never call the rate-limit API more often than this while Claude Code is idle (CLAUDE.md rule). */
+export const IDLE_MIN_API_INTERVAL_SEC = 300;
+
+/**
+ * Whether the rate-limit cache should be refreshed from the API.
+ * - No cache yet → yes.
+ * - Cache younger than `ttlSec` → no.
+ * - Claude Code active (a transcript changed in the last 5 min) → yes.
+ * - Idle → only with claudeStatus.realtime.enabled, and never more often than
+ *   every IDLE_MIN_API_INTERVAL_SEC, whatever cache.ttlSeconds says.
+ */
+export function rateLimitCallDue(opts: {
+  cacheAgeSec: number | null
+  ttlSec: number
+  activeRecently: boolean
+  realtime: boolean
+}): boolean {
+  const { cacheAgeSec, ttlSec, activeRecently, realtime } = opts;
+  if (cacheAgeSec === null) { return true; }
+  if (cacheAgeSec < ttlSec) { return false; }
+  if (activeRecently) { return true; }
+  return realtime && cacheAgeSec >= Math.max(ttlSec, IDLE_MIN_API_INTERVAL_SEC);
+}
 
 export class DataManager {
   private static instance: DataManager;
@@ -72,7 +100,7 @@ export class DataManager {
   }
 
   async getUsageData(forceRefresh = false): Promise<ClaudeUsageData> {
-    const [localUsage, cache] = await Promise.all([readAllUsage(config.tokenPricing), readCache()]);
+    const [localUsage, cache] = await Promise.all([readAllUsage(config.costOptions), readCache()]);
 
     // Determine provider type (user config or auto-detection)
     const configuredProvider = config.claudeProvider;
@@ -107,6 +135,9 @@ export class DataManager {
       // API disabled by user but cache exists — show stale rate limit data with age indicator
       rateLimitData = this.cacheToRateLimitData(cache.usageData);
       dataSource = 'stale';
+    } else if (providerType === 'claude-ai-usage') {
+      // Signed in, but billed at API rates: no windows to fetch, never call the API
+      dataSource = 'local-only';
     } else {
       // Non-claude-ai provider, or no cache — cost only from local JSONL
       const hasCostData = localUsage.cost7d > 0 || localUsage.cost5h > 0;
@@ -154,15 +185,18 @@ export class DataManager {
 
   private async shouldCallApi(cache: Awaited<ReturnType<typeof readCache>>): Promise<boolean> {
     if (!cache) { return true; }
-    if (!isCacheValid(cache, config.cacheTtlSeconds)) {
-      return await wasJsonlUpdatedRecently(300);
-    }
-    return false;
+    if (isCacheValid(cache, config.cacheTtlSeconds)) { return false; }
+    return rateLimitCallDue({
+      cacheAgeSec: getCacheAge(cache),
+      ttlSec: config.cacheTtlSeconds,
+      activeRecently: await wasJsonlUpdatedRecently(IDLE_MIN_API_INTERVAL_SEC),
+      realtime: config.realtimeEnabled,
+    });
   }
 
   async refreshProjectCosts(): Promise<void> {
     try {
-      this.lastProjectCosts = await getAllProjectCosts(config.tokenPricing);
+      this.lastProjectCosts = await getAllProjectCosts(config.costOptions);
     } catch {
       this.lastProjectCosts = [];
     }
@@ -224,6 +258,16 @@ export class DataManager {
     }
   }
 
+  /** Re-send the last data to every listener (display settings changed; no I/O). */
+  republish(): void {
+    if (this.lastData) { this._onDidUpdate.fire(this.lastData); }
+  }
+
+  /** Force the next heatmap access to recompute (e.g. after pricing changes). */
+  invalidateHeatmap(): void {
+    this.heatmapComputedAt = 0;
+  }
+
   setDashboardOpen(open: boolean): void {
     this.dashboardOpen = open;
   }
@@ -276,6 +320,7 @@ export class DataManager {
         this.lastData.cost5h,
         this.lastData.costDay,
         config.dailyBudget,
+        config.costOptions,
       );
       this.lastPrediction = prediction;
       return prediction;
@@ -295,7 +340,7 @@ export class DataManager {
     }
     const projectsDir = getClaudeProjectsDir();
     try {
-      const data = await computeHeatmapData(config.heatmapDays);
+      const data = await computeHeatmapData(config.heatmapDays, config.costOptions);
       // The data directory changed mid-computation — recompute from the new one
       if (projectsDir !== getClaudeProjectsDir()) { return this.getHeatmapData(); }
       this.lastHeatmapData = data;

@@ -46,20 +46,18 @@ interface HeatmapData {
 ### Main Entry Point
 
 ```typescript
-export async function getHeatmapData(days = 90): Promise<HeatmapData> {
-  // Reads ALL project directories (global view, not per-project)
-  // Filters directories AND files by mtime >= cutoff (performance optimization)
-  // Reads qualifying JSONL files in parallel with Promise.all
-  // Aggregates entries where type === 'assistant' AND message.usage exists
-}
+export async function getHeatmapData(days = 90, options: CostOptions): Promise<HeatmapData>
 ```
 
-**Performance optimizations (implemented):**
-1. Skip project directories with `mtime < cutoff` (skips dirs with no recent activity)
-2. Skip individual JSONL files with `mtime < cutoff`
-3. Read all qualifying files in parallel with `Promise.all`
-4. In-memory TTL cache in DataManager: 5-minute TTL (`heatmapTtlMs = 5 * 60 * 1000`)
-5. Heatmap computed in background after initial data update, fires second `onDidUpdate`
+- Global view across all projects; `options` are the same cost options as every other view.
+- Files: `findAllJsonlFiles(cutoff)` — the shared discovery with a per-file mtime filter.
+  (A directory's mtime is not used: appending to an old transcript does not change it.)
+- Lines: `parseUsageLine()` + `firstSeen()` — the same parsing and streaming dedupe as the
+  usage index ([DATA.md](../DATA.md#line-parsing-and-streaming-deduplication-all-readers)).
+- At most 4 files are read at a time (`READ_CONCURRENCY`) to keep memory flat on large histories.
+- Computed only while the dashboard is open, cached in `DataManager` for 5 minutes
+  (`heatmapTtlMs`), in the background after the main update; a second `onDidUpdate` fires when
+  it is ready. Pricing setting changes invalidate the cache.
 
 ### Aggregation Functions
 
@@ -213,10 +211,35 @@ cell.addEventListener('mouseleave', () => {
 
 Heatmap and hourly data are read from JSONL only (no API call).
 Recalculate on:
-- Extension activation (lazy — computed on first WebView open)
-- JSONL FileWatcher trigger (via `DataManager.refresh()` → background task)
-- User clicks "↻ Refresh" in the dashboard (invalidates in-memory cache)
+- First dashboard open (not at activation — never while the dashboard is closed)
+- JSONL FileWatcher trigger while the dashboard is open, once the 5-minute cache expires
+- User clicks "↻ Refresh" in the dashboard, or a `claudeStatus.pricing.*` setting changes
+  (both invalidate the cache)
 
 The heatmap is computed in a background `Promise` to avoid blocking the main update.
 `DataManager` fires a second `onDidUpdate` event when the background computation completes.
 The WebView re-renders the heatmap section when it receives this second update.
+
+---
+
+## Punch Card (Weekday × Hour)
+
+Below the legend, a 7 × 24 matrix ("punch card") shows **where in the week**
+cost is spent, computed over the last 30 days in local time:
+
+```
+        0  1  2  3 … 21 22 23
+Sun     ·  ·  ·  ·    ·  ·  ·
+Mon     ·  ·  ·  ·    ▪  ▪  ·
+…
+Sat     ·  ·  ·  ·    ·  ·  ·
+```
+
+- Aggregation: `aggregateByDowHour(entries, days)` returns a `number[7][24]`
+  grid of **total USD** per (day-of-week, hour) cell — row 0 = Sunday.
+- Rendering reuses the heatmap intensity levels (`getCostLevel`, `hm-cell l0–l4`)
+  so the two visualizations share one color scale semantics (relative to the
+  grid's own max cell).
+- Row labels are localized short weekday names (`toLocaleString`); column
+  labels every 3 hours; cell tooltip shows `Ddd HH:00 — $X.XXX`.
+- Hidden automatically when `HeatmapData.dowHour` is absent (no data).

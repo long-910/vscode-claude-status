@@ -241,7 +241,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | `claudeStatus.credentials.path` | `null` | 認証情報ファイルのカスタムパス。ユーザー設定のみ |
 | `claudeStatus.rateLimitApi.enabled` | `true` | レート制限 % を取得（サブスク）。オフ: API を呼ばず、最後にキャッシュした % を `[Xm ago]` 付きで表示 |
 | `claudeStatus.cache.ttlSeconds` | `300` | レート制限キャッシュの TTL（60–3600 秒） |
-| `claudeStatus.realtime.enabled` | `false` | 未実装 — 効果はありません |
+| `claudeStatus.realtime.enabled` | `false` | Claude Code がアイドルの間もレート制限 % を更新（最短5分間隔、アイドル1時間あたり約12回の小さな API 呼び出し） |
 
 ### 予算・通知
 

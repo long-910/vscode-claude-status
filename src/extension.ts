@@ -237,11 +237,16 @@ export function activate(context: vscode.ExtensionContext) {
     // graceful degradation: status bar stays in "loading..." state
   });
 
-  // Timer: re-render every 60 seconds from cache
+  // Timer: re-render every 60 seconds from cache. This is also when an idle
+  // realtime poll (claudeStatus.realtime.enabled) fetches new rate limits
   const timer = setInterval(() => {
     dataManager.getUsageData()
       .then(data => {
-        statusBar.update(data, dataManager.getLastProjectCosts());
+        if (data.dataSource === 'api') {
+          dataManager.republish();   // fresh rate limits: update every surface + notifications
+        } else {
+          statusBar.update(data, dataManager.getLastProjectCosts());
+        }
         treeProvider.refresh(); // keep "resets in" countdowns current
       })
       .catch(() => {});

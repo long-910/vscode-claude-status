@@ -14,7 +14,7 @@
   "config.statusBar.showSparkline.desc": "Show a compact utilization meter (▰▰▰▱▱) next to the 5h percentage in the status bar (percent mode, Claude.ai only). Custom formats can use the ${bar5h} / ${bar7d} placeholders instead.",
   "config.cache.ttlSeconds.desc": "Cache TTL in seconds. API is not called more often than this when Claude Code is idle.",
   "config.rateLimitApi.enabled.desc": "Enable fetching rate-limit utilization (5h/7d %) from the Anthropic API (Claude.ai subscriptions only). When disabled, no new API calls are made: the last cached percentages are still shown with an age suffix (e.g. [10m ago]); without a cache only local token cost is shown. Default: true — API consumption is negligible because calls are made only while Claude Code is actively running.",
-  "config.realtime.enabled.desc": "Not implemented — currently has no effect. (Reserved for polling the rate-limit API regardless of Claude Code activity.)",
+  "config.realtime.enabled.desc": "Also refresh the rate-limit % while Claude Code is idle (Claude.ai subscriptions; requires rateLimitApi.enabled). Idle polling happens every cache.ttlSeconds but never more often than every 5 minutes — about 12 small API calls per idle hour.",
   "config.budget.dailyUsd.desc": "Daily budget in USD. Set to null to disable.",
   "config.budget.weeklyUsd.desc": "Weekly budget in USD. Set to null to disable.",
   "config.budget.alertThresholdPercent.desc": "Show budget warning when usage exceeds this percentage of the budget.",

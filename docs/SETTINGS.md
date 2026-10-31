@@ -36,7 +36,7 @@ Contents: [Settings](#all-settings) · [Custom status bar format](#custom-status
 | `credentials.path` | string \| null | `null` | Custom path to the Claude credentials file. Leave null to use <claudeHome>/.credentials.json (macOS falls back to the Keychain). *(user settings only)* |
 | `rateLimitApi.enabled` | boolean | `true` | Enable fetching rate-limit utilization (5h/7d %) from the Anthropic API (Claude.ai subscriptions only). When disabled, no new API calls are made: the last cached percentages are still shown with an age suffix (e.g. [10m ago]); without a cache only local token cost is shown. Default: true — API consumption is negligible because calls are made only while Claude Code is actively running. |
 | `cache.ttlSeconds` | number (60–3600) | `300` | Cache TTL in seconds. API is not called more often than this when Claude Code is idle. |
-| `realtime.enabled` | boolean | `false` | Not implemented — currently has no effect. (Reserved for polling the rate-limit API regardless of Claude Code activity.) |
+| `realtime.enabled` | boolean | `false` | Also refresh the rate-limit % while Claude Code is idle (Claude.ai subscriptions; requires rateLimitApi.enabled). Idle polling happens every cache.ttlSeconds but never more often than every 5 minutes — about 12 small API calls per idle hour. |
 
 ### Budgets & notifications
 

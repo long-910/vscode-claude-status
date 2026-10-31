@@ -14,7 +14,7 @@
   "config.statusBar.showSparkline.desc": "在状态栏 5h 百分比旁显示紧凑的利用率仪表（▰▰▰▱▱）（percent 模式，仅 Claude.ai）。自定义格式可改用 ${bar5h} / ${bar7d} 占位符。",
   "config.cache.ttlSeconds.desc": "缓存有效期（秒）。Claude Code 空闲时，API 调用频率不会超过此间隔。",
   "config.rateLimitApi.enabled.desc": "启用从 Anthropic API 获取速率限制利用率（5h/7d %）（仅 Claude.ai 订阅）。禁用后不再发起新的 API 调用：仍显示上次缓存的百分比并附带时长（例如 [10m ago]）；没有缓存时仅显示本地令牌费用。默认值：true — 仅在 Claude Code 运行时调用，消耗可忽略不计。",
-  "config.realtime.enabled.desc": "尚未实现 — 当前无任何效果。（预留给无论 Claude Code 是否活动都轮询速率限制 API 的功能。）",
+  "config.realtime.enabled.desc": "在 Claude Code 空闲时也刷新速率限制 %（Claude.ai 订阅，需要 rateLimitApi.enabled）。空闲时每隔 cache.ttlSeconds 获取一次，但不会比每 5 分钟一次更频繁 — 每空闲小时约 12 次小型 API 调用。",
   "config.budget.dailyUsd.desc": "每日预算（USD）。设为 null 可禁用。",
   "config.budget.weeklyUsd.desc": "每周预算（USD）。设为 null 可禁用。",
   "config.budget.alertThresholdPercent.desc": "用量超过预算此百分比时显示警告。",

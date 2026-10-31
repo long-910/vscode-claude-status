@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import { DataManager } from '../../data/dataManager';
+import { DataManager, rateLimitCallDue, IDLE_MIN_API_INTERVAL_SEC } from '../../data/dataManager';
 import * as vscode from 'vscode';
 import { setClaudeHome } from '../../data/claudeHome';
 import { config } from '../../config';
@@ -176,5 +176,77 @@ suite('DataManager', () => {
       await cfg.update('claudeProvider', prev.provider, vscode.ConfigurationTarget.Global);
       await cfg.update('rateLimitApi.enabled', prev.api, vscode.ConfigurationTarget.Global);
     }
+  });
+
+  // ---- claudeStatus.realtime.enabled -------------------------------------------
+  suite('rate-limit API scheduling', () => {
+    const due = (cacheAgeSec: number | null, activeRecently: boolean, realtime: boolean, ttlSec = 300) =>
+      rateLimitCallDue({ cacheAgeSec, ttlSec, activeRecently, realtime });
+
+    test('regression: unchanged without realtime — call only when stale and Claude Code is active', () => {
+      assert.strictEqual(due(null, false, false), true, 'no cache yet');
+      assert.strictEqual(due(100, true, false), false, 'cache fresh');
+      assert.strictEqual(due(400, true, false), true, 'stale + active');
+      assert.strictEqual(due(4000, false, false), false, 'stale + idle → never');
+    });
+
+    test('realtime polls while idle, but never more often than every 5 minutes', () => {
+      assert.strictEqual(IDLE_MIN_API_INTERVAL_SEC, 300);
+      assert.strictEqual(due(400, false, true), true, 'idle, 400 s old');
+      assert.strictEqual(due(90, false, true, 60), false, 'ttl 60 s does not lower the idle floor');
+      assert.strictEqual(due(299, false, true, 60), false);
+      assert.strictEqual(due(300, false, true, 60), true);
+      assert.strictEqual(due(700, false, true, 600), true, 'a longer ttl is respected');
+      assert.strictEqual(due(500, false, true, 600), false);
+    });
+
+    test('DataManager: idle + realtime calls the API once the cache is 5 min old; idle without realtime never does', async () => {
+      const cfg = vscode.workspace.getConfiguration('claudeStatus');
+      const keys = ['claudeProvider', 'realtime.enabled', 'credentials.path', 'cache.ttlSeconds'];
+      const prev = Object.fromEntries(keys.map(k => [k, cfg.inspect(k)?.globalValue]));
+      const credPath = path.join(homeA, '.credentials.json');
+      await fs.writeFile(credPath, JSON.stringify({ claudeAiOauth: { accessToken: 't', expiresAt: Date.now() + 3600e3 } }));
+      // Claude Code idle: no transcript changed in the last 5 minutes
+      const tenMinAgo = (Date.now() - 600e3) / 1000;
+      await fs.utimes(path.join(homeA, 'projects', '-tmp-project', 'session.jsonl'), tenMinAgo, tenMinAgo);
+      const writeCacheAged = (ageSec: number) => fs.writeFile(path.join(homeA, 'vscode-claude-status-cache.json'), JSON.stringify({
+        version: 2, updatedAt: new Date(Date.now() - ageSec * 1000).toISOString(),
+        usageData: { utilization5h: 0.3, utilization7d: 0, reset5hAt: Date.now() / 1000 + 3600, reset7dAt: 0, limitStatus: 'allowed' },
+      }));
+      const realFetch = globalThis.fetch;
+      let calls = 0;
+      globalThis.fetch = (async () => {
+        calls++;
+        return new Response('{}', { status: 200, headers: { 'anthropic-ratelimit-unified-5h-utilization': '0.5', 'anthropic-ratelimit-unified-5h-status': 'allowed' } });
+      }) as typeof fetch;
+      try {
+        setClaudeHome(homeA);
+        await cfg.update('claudeProvider', 'claude-ai', vscode.ConfigurationTarget.Global);
+        await cfg.update('credentials.path', credPath, vscode.ConfigurationTarget.Global);
+        await cfg.update('cache.ttlSeconds', 60, vscode.ConfigurationTarget.Global);
+        const dm = DataManager.getInstance();
+
+        await cfg.update('realtime.enabled', false, vscode.ConfigurationTarget.Global);
+        await writeCacheAged(400);
+        assert.strictEqual((await dm.getUsageData()).dataSource, 'stale');
+        assert.strictEqual(calls, 0, 'idle without realtime: no call');
+
+        await cfg.update('realtime.enabled', true, vscode.ConfigurationTarget.Global);
+        await writeCacheAged(120);
+        await dm.getUsageData();
+        assert.strictEqual(calls, 0, 'cache 2 min old: below the 5-minute idle floor');
+
+        await writeCacheAged(400);
+        const data = await dm.getUsageData();
+        assert.strictEqual(calls, 1, 'cache 400 s old: one call');
+        assert.strictEqual(data.dataSource, 'api');
+        assert.strictEqual(data.utilization5h, 0.5);
+        await dm.getUsageData();
+        assert.strictEqual(calls, 1, 'the fresh cache is used right after');
+      } finally {
+        globalThis.fetch = realFetch;
+        for (const k of keys) { await cfg.update(k, prev[k], vscode.ConfigurationTarget.Global); }
+      }
+    });
   });
 });

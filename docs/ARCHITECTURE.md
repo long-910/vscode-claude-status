@@ -113,10 +113,12 @@ FileWatcher detects JSONL change
 ### When Claude Code is idle:
 
 ```
-StatusBar timer tick (every 60s)
+Timer tick (every 60 s, extension.ts)
   → DataManager.getUsageData()
-    → Cache.read()            [no API call]
-    → onDidUpdate.fire() if data changed
+    → Cache.read()                 [no API call]
+    → with realtime.enabled: 1 API call once the cache is ≥ max(cache.ttlSeconds, 5 min) old
+  → StatusBar.update() / TreeView.refresh()
+    (after a fresh API result: DataManager.republish() → every surface + notifications)
 ```
 
 ### Which provider calls the API

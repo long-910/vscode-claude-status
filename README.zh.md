@@ -234,7 +234,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | `claudeStatus.credentials.path` | `null` | 自定义凭证文件路径。仅用户设置 |
 | `claudeStatus.rateLimitApi.enabled` | `true` | 获取速率限制 %（订阅）。关闭后不调用 API，继续显示上次缓存的 % 并附 `[Xm ago]` |
 | `claudeStatus.cache.ttlSeconds` | `300` | 速率限制缓存 TTL（60–3600 秒） |
-| `claudeStatus.realtime.enabled` | `false` | 尚未实现 — 无任何效果 |
+| `claudeStatus.realtime.enabled` | `false` | Claude Code 空闲时也保持速率限制 % 最新（最多每 5 分钟一次，每空闲小时约 12 次小型 API 调用） |
 
 ### 预算与通知
 

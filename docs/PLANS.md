@@ -85,6 +85,7 @@ read the `anthropic-ratelimit-unified-*` response headers. It is cached in
 |---|---|
 | Claude Code active (a transcript changed in the last 5 min) and cache older than `cache.ttlSeconds` | 1, then cached |
 | Cache fresh, or Claude Code idle | 0 — cached values, with an age suffix once stale |
+| Claude Code idle, `realtime.enabled: true` | 1 every `cache.ttlSeconds`, **never more often than every 5 min** (≈ 12 per idle hour) |
 | `rateLimitApi.enabled: false` | 0 |
 | Dashboard **↻ Refresh** / *Refresh Now* | 1 |
 | Extension activation | 0 (reads the cache first) |
@@ -92,8 +93,6 @@ read the `anthropic-ratelimit-unified-*` response headers. It is cached in
 
 An error response without rate-limit headers (e.g. an expired token) is not shown as
 `0%`; the cached value is kept.
-
-> `claudeStatus.realtime.enabled` is declared but **not implemented** — it has no effect.
 
 ---
 
@@ -104,6 +103,7 @@ An error response without rate-limit headers (e.g. an expired token) is not show
 | Live % on a subscription | defaults (`rateLimitApi.enabled: true`, `displayMode: "percent"`) |
 | Cost instead of % on a subscription | `displayMode: "cost"` (or `Ctrl+Shift+Alt+C`) |
 | No outbound HTTPS / offline | `rateLimitApi.enabled: false` — cached % stays visible |
+| % kept current even while Claude Code is idle | `realtime.enabled: true` (≈ 12 small API calls per idle hour) |
 | Pay-as-you-go without 5h / 7d figures | `payAsYouGo.showTimeWindows: false` |
 | Track a spend limit | `budget.monthlyUsd` (and / or `budget.dailyUsd`, `budget.weeklyUsd`) |
 | A model newer than the built-in prices | `pricing.modelOverrides` — see [PRICING.md](PRICING.md) |

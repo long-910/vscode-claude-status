@@ -43,6 +43,30 @@ export interface ClaudeUsageData {
 
 export { ProjectCostData };
 
+/** Never call the rate-limit API more often than this while Claude Code is idle (CLAUDE.md rule). */
+export const IDLE_MIN_API_INTERVAL_SEC = 300;
+
+/**
+ * Whether the rate-limit cache should be refreshed from the API.
+ * - No cache yet → yes.
+ * - Cache younger than `ttlSec` → no.
+ * - Claude Code active (a transcript changed in the last 5 min) → yes.
+ * - Idle → only with claudeStatus.realtime.enabled, and never more often than
+ *   every IDLE_MIN_API_INTERVAL_SEC, whatever cache.ttlSeconds says.
+ */
+export function rateLimitCallDue(opts: {
+  cacheAgeSec: number | null
+  ttlSec: number
+  activeRecently: boolean
+  realtime: boolean
+}): boolean {
+  const { cacheAgeSec, ttlSec, activeRecently, realtime } = opts;
+  if (cacheAgeSec === null) { return true; }
+  if (cacheAgeSec < ttlSec) { return false; }
+  if (activeRecently) { return true; }
+  return realtime && cacheAgeSec >= Math.max(ttlSec, IDLE_MIN_API_INTERVAL_SEC);
+}
+
 export class DataManager {
   private static instance: DataManager;
   private readonly _onDidUpdate = new vscode.EventEmitter<ClaudeUsageData>();
@@ -161,10 +185,13 @@ export class DataManager {
 
   private async shouldCallApi(cache: Awaited<ReturnType<typeof readCache>>): Promise<boolean> {
     if (!cache) { return true; }
-    if (!isCacheValid(cache, config.cacheTtlSeconds)) {
-      return await wasJsonlUpdatedRecently(300);
-    }
-    return false;
+    if (isCacheValid(cache, config.cacheTtlSeconds)) { return false; }
+    return rateLimitCallDue({
+      cacheAgeSec: getCacheAge(cache),
+      ttlSec: config.cacheTtlSeconds,
+      activeRecently: await wasJsonlUpdatedRecently(IDLE_MIN_API_INTERVAL_SEC),
+      realtime: config.realtimeEnabled,
+    });
   }
 
   async refreshProjectCosts(): Promise<void> {

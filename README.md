@@ -260,7 +260,7 @@ All settings are under the `claudeStatus` namespace in VS Code Settings. Full re
 | `claudeStatus.credentials.path` | `null` | Custom credentials file. User settings only |
 | `claudeStatus.rateLimitApi.enabled` | `true` | Fetch rate-limit % (subscriptions). Off: no API calls; the last cached % stays visible with `[Xm ago]` |
 | `claudeStatus.cache.ttlSeconds` | `300` | Rate-limit cache TTL (60–3600 s) |
-| `claudeStatus.realtime.enabled` | `false` | Not implemented — has no effect |
+| `claudeStatus.realtime.enabled` | `false` | Keep the rate-limit % fresh while Claude Code is idle too (at most every 5 min, ≈ 12 small API calls per idle hour) |
 
 ### Budgets & notifications
 

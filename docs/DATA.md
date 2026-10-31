@@ -134,7 +134,8 @@ or its totals will be inflated 2–4× in agentic sessions.
 
 Only for the `claude-ai` provider — see [PLANS.md](PLANS.md#rate-limit-api-calls-claude-ai-only)
 for the full table. `claudeStatus.rateLimitApi.enabled` is the master switch.
-(`claudeStatus.realtime.enabled` is declared but not implemented.)
+`claudeStatus.realtime.enabled` adds polling while Claude Code is idle, never more often than
+every 5 minutes (`rateLimitCallDue()` in `dataManager.ts`).
 
 **Default flow:**
 

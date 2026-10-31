@@ -14,7 +14,7 @@
   "config.statusBar.showSparkline.desc": "ステータスバーの 5h パーセンテージの横にコンパクトな利用率メーター（▰▰▰▱▱）を表示します（percent モード、Claude.ai のみ）。カスタム書式では代わりに ${bar5h} / ${bar7d} プレースホルダを使用できます。",
   "config.cache.ttlSeconds.desc": "キャッシュの有効期間（秒）。Claude Code がアイドル中はこの間隔より頻繁に API を呼び出しません。",
   "config.rateLimitApi.enabled.desc": "Anthropic API からレート制限の利用率（5h/7d %）を取得する（Claude.ai サブスクリプションのみ）。無効にすると新たな API 呼び出しは行わず、最後にキャッシュした割合を経過時間付き（例: [10m ago]）で表示します。キャッシュがない場合はローカルのトークンコストのみ表示します。デフォルト: true — Claude Code の実行中にのみ呼び出すため消費は無視できる程度です。",
-  "config.realtime.enabled.desc": "未実装 — 現在は効果がありません。（Claude Code の利用状況に関係なくレート制限 API をポーリングするための予約設定です。）",
+  "config.realtime.enabled.desc": "Claude Code がアイドルの間もレート制限 % を更新します（Claude.ai サブスクリプション、rateLimitApi.enabled が必要）。アイドル時の取得は cache.ttlSeconds ごとですが、5分に1回より頻繁にはなりません（アイドル1時間あたり約12回の小さな API 呼び出し）。",
   "config.budget.dailyUsd.desc": "1日の予算（USD）。null で無効にします。",
   "config.budget.weeklyUsd.desc": "週の予算（USD）。null で無効にします。",
   "config.budget.alertThresholdPercent.desc": "使用量が予算のこの割合を超えたときに警告を表示します。",

@@ -37,6 +37,13 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   key, Bedrock, usage-based Claude.ai), turn off the 5-hour / 7-day figures and show today's
   cost instead in the status bar, sidebar and dashboard.
 
+**Rate limits**
+
+- **`claudeStatus.realtime.enabled` now works.** The setting existed since 0.1.0 but had no effect.
+  When on, the rate-limit % (Claude.ai subscriptions) is also refreshed while Claude Code is
+  idle — every `cache.ttlSeconds`, but never more often than every 5 minutes (≈ 12 small API
+  calls per idle hour). Off by default; behaviour with it off is unchanged.
+
 **Budgets**
 
 - **Monthly budget** (`claudeStatus.budget.monthlyUsd`) and **this month's cost**, shown in the
@@ -74,8 +81,7 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Changing a `claudeStatus.pricing.*` setting recomputes costs immediately (a normal refresh,
   under the usual API-call rules).
 - Setting descriptions updated: `rateLimitApi.enabled` (cached % stays visible when off), the
-  manual pricing rates (now a fallback), `statusBar.format` (all placeholders), and
-  `realtime.enabled`, which was never implemented and now says so.
+  manual pricing rates (now a fallback), `statusBar.format` (all placeholders), `realtime.enabled`.
 - Development dependencies updated (minor / patch); release workflow uses
   `softprops/action-gh-release@v3`.
 

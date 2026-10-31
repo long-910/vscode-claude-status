@@ -103,4 +103,16 @@ suite('UsageIndex', () => {
     const [record] = await readUsageRecords([tmpFile], since());
     assert.strictEqual(record.model, 'claude-opus-5-5');
   });
+
+  test('keeps pricing modifiers (speed, inference_geo) only when present', async () => {
+    const rec = (requestId: string, extra: Record<string, unknown>) => JSON.stringify({
+      type: 'assistant', timestamp: new Date().toISOString(), requestId,
+      message: { model: 'claude-opus-5-5', usage: { input_tokens: 1, output_tokens: 1, ...extra } },
+    }) + '\n';
+    await fs.writeFile(tmpFile, rec('a', { speed: 'fast', inference_geo: 'us' }) + rec('b', {}));
+    const [a, b] = await readUsageRecords([tmpFile], since());
+    assert.strictEqual(a.usage.speed, 'fast');
+    assert.strictEqual(a.usage.inference_geo, 'us');
+    assert.ok(!('speed' in b.usage) && !('inference_geo' in b.usage));
+  });
 });

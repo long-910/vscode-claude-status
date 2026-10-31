@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import {
-  calculateCost, normalizeModelId, parseModelId, pricingSource, resolveModelPricing, usageCost,
+  calculateCost, normalizeModelId, parseModelId, pricingMultiplier, pricingSource, resolveModelPricing, usageCost,
   DEFAULT_PRICING, CostOptions,
 } from '../../data/pricing';
 import type { TokenUsage } from '../../data/jsonlReader';
@@ -49,7 +49,7 @@ suite('Pricing', () => {
       assert.deepStrictEqual(rates('claude-fable-5-1'), [10, 50, 0.25]);
       assert.deepStrictEqual(rates('claude-mythos-5-1'), [10, 50, 0.25]);
       assert.deepStrictEqual(rates('claude-opus-5-5'), [4, 20, 0.20]);
-      assert.deepStrictEqual(rates('claude-sonnet-5-5'), [2, 10, 0.20]);
+      assert.deepStrictEqual(rates('claude-sonnet-5-5'), [2, 10, 0.10]);   // 0.05x cache read
       assert.deepStrictEqual(rates('claude-haiku-5-5'), [0.10, 0.50, 0.01]);
     });
 
@@ -167,6 +167,75 @@ suite('Pricing', () => {
     test('1-hour cache writes are 2x the model input rate', () => {
       const write1h = tokens({ cache_creation_input_tokens: 1_000_000, cache_creation: { ephemeral_1h_input_tokens: 1_000_000 } });
       assert.strictEqual(usageCost(write1h, 'claude-opus-5-5'), 8);
+    });
+  });
+
+  suite('published price list (platform.claude.com/docs/en/about-claude/pricing, 2026-10-31)', () => {
+    // [model, input, 5m write, 1h write, cache hit, output] — copied from the official table
+    const PUBLISHED: Array<[string, number, number, number, number, number]> = [
+      ['claude-fable-5-1', 10, 12.50, 20, 0.25, 50],
+      ['claude-mythos-5-1', 10, 12.50, 20, 0.25, 50],
+      ['claude-fable-5', 10, 12.50, 20, 1, 50],
+      ['claude-mythos-5', 10, 12.50, 20, 1, 50],
+      ['claude-opus-5-5', 4, 5, 8, 0.20, 20],
+      ['claude-opus-5', 5, 6.25, 10, 0.50, 25],
+      ['claude-opus-4-8', 5, 6.25, 10, 0.50, 25],
+      ['claude-opus-4-7', 5, 6.25, 10, 0.50, 25],
+      ['claude-opus-4-6', 5, 6.25, 10, 0.50, 25],
+      ['claude-opus-4-5', 5, 6.25, 10, 0.50, 25],
+      ['claude-opus-4-1', 15, 18.75, 30, 1.50, 75],
+      ['claude-opus-4-20250514', 15, 18.75, 30, 1.50, 75],
+      ['claude-sonnet-5-5', 2, 2.50, 4, 0.10, 10],
+      ['claude-sonnet-5', 2, 2.50, 4, 0.20, 10],
+      ['claude-sonnet-4-6', 3, 3.75, 6, 0.30, 15],
+      ['claude-sonnet-4-5', 3, 3.75, 6, 0.30, 15],
+      ['claude-sonnet-4-20250514', 3, 3.75, 6, 0.30, 15],
+      ['claude-haiku-5-5', 0.10, 0.125, 0.20, 0.01, 0.50],
+      ['claude-haiku-4-5', 1, 1.25, 2, 0.10, 5],
+      ['claude-3-5-haiku-20241022', 0.80, 1, 1.60, 0.08, 4],
+    ];
+    // 100K tokens per category: at the Haiku 5.5 threshold, not over it
+    const M = 100_000;
+    for (const [model, input, write5m, write1h, hit, output] of PUBLISHED) {
+      test(model, () => {
+        const near = (actual: number, perMTok: number, what: string) =>
+          assert.ok(Math.abs(actual - perMTok / 10) < 1e-9, `${model} ${what}: ${actual * 10} != ${perMTok} / MTok`);
+        near(usageCost(tokens({ input_tokens: M }), model), input, 'input');
+        near(usageCost(tokens({ output_tokens: M }), model), output, 'output');
+        near(usageCost(tokens({ cache_read_input_tokens: M }), model), hit, 'cache hit');
+        near(usageCost(tokens({ cache_creation_input_tokens: M }), model), write5m, '5m write');
+        near(usageCost(tokens({ cache_creation_input_tokens: M, cache_creation: { ephemeral_1h_input_tokens: M } }), model), write1h, '1h write');
+      });
+    }
+
+    test('Haiku 5.5 over 100K prompt tokens', () => {
+      // 150K prompt: 50K input + 100K cache read, all at the long-prompt card
+      const cost = usageCost(tokens({ input_tokens: 50_000, cache_read_input_tokens: 100_000, output_tokens: 1_000_000 }), 'claude-haiku-5-5');
+      assert.ok(Math.abs(cost - (0.05 * 0.50 + 0.1 * 0.05 + 2.50)) < 1e-9, String(cost));
+    });
+  });
+
+  suite('pricing modifiers', () => {
+    const M = 1_000_000;
+    test('fast mode doubles every category (Opus 5.5: $8 / $40)', () => {
+      assert.strictEqual(usageCost(tokens({ input_tokens: M, output_tokens: M, speed: 'fast' }), 'claude-opus-5-5'), 48);
+      assert.strictEqual(usageCost(tokens({ input_tokens: M, output_tokens: M, speed: 'fast' }), 'claude-opus-4-8'), 60);
+    });
+
+    test('US-only inference is 1.1x on Claude 4.6+ only', () => {
+      const us = tokens({ input_tokens: M, inference_geo: 'us' });
+      assert.ok(Math.abs(usageCost(us, 'claude-opus-4-6') - 5.5) < 1e-9);
+      const usHaiku = tokens({ input_tokens: 100_000, inference_geo: 'us' });
+      assert.ok(Math.abs(usageCost(usHaiku, 'claude-haiku-5-5') - 0.011) < 1e-9);
+      assert.strictEqual(usageCost(us, 'claude-opus-4-5'), 5);
+      assert.strictEqual(usageCost(tokens({ input_tokens: M, inference_geo: 'global' }), 'claude-opus-4-6'), 5);
+    });
+
+    test('modifiers never apply to manual rates or overrides', () => {
+      const fast = tokens({ input_tokens: M, speed: 'fast', inference_geo: 'us' });
+      assert.strictEqual(pricingMultiplier(fast, 'claude-opus-5-5', 'manual'), 1);
+      assert.strictEqual(pricingMultiplier(fast, 'claude-opus-5-5', 'override'), 1);
+      assert.strictEqual(usageCost(fast, 'claude-opus-5-5', { pricing: MANUAL, useModelPricing: false }), 7);
     });
   });
 });

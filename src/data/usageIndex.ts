@@ -83,6 +83,9 @@ function ingestLine(state: FileState, line: string, retainSince: number): void {
       cache_creation: u.cache_creation
         ? { ephemeral_1h_input_tokens: u.cache_creation.ephemeral_1h_input_tokens }
         : undefined,
+      // Pricing modifiers; kept only when set so records stay slim
+      ...(typeof u.speed === 'string' ? { speed: u.speed } : {}),
+      ...(typeof u.inference_geo === 'string' ? { inference_geo: u.inference_geo } : {}),
     },
     model: typeof message.model === 'string' ? message.model : undefined,
   });

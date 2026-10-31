@@ -70,6 +70,8 @@ async function readJsonlForHeatmap(
           cache_read_input_tokens: u.cache_read_input_tokens ?? 0,
           cache_creation_input_tokens: u.cache_creation_input_tokens ?? 0,
           cache_creation: u.cache_creation,
+          speed: u.speed,
+          inference_geo: u.inference_geo,
         }, typeof msg.model === 'string' ? msg.model : undefined, options);
         result.push({
           timestamp: ts,

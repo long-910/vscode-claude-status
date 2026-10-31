@@ -54,8 +54,10 @@ interface ModelRateEntry {
   longPrompt?: { threshold: number; pricing: TokenPricing }
 }
 
-// Anthropic's published first-party rates, USD per 1M tokens (as of 2026-10).
-// Cache read is 0.1x input unless noted; 1-hour cache writes are 2x input.
+// Anthropic's published first-party rates, USD per 1M tokens, checked against
+// https://platform.claude.com/docs/en/about-claude/pricing on 2026-10-31.
+// Cache read is 0.1x input unless noted (0.025x Fable / Mythos 5.1, 0.05x
+// Opus 5.5 and Sonnet 5.5); 1-hour cache writes are 2x input.
 // Every released model has its own row (even when its price equals the row
 // before), so it resolves as `builtin`. To support a new model, add a row —
 // until then, versions newer than a family's last row are `estimated`.
@@ -77,7 +79,7 @@ const MODEL_RATES: Readonly<Record<Family, ReadonlyArray<ModelRateEntry>>> = {
   sonnet: [
     { version: [3, 0], pricing: modelRate(3.00, 15.00) },   // 3.x – 4.x
     { version: [5, 0], pricing: modelRate(2.00, 10.00) },
-    { version: [5, 5], pricing: modelRate(2.00, 10.00, 0.20) },
+    { version: [5, 5], pricing: modelRate(2.00, 10.00, 0.10) },
   ],
   haiku: [
     { version: [3, 0], pricing: modelRate(0.25, 1.25, 0.03, 0.30) },
@@ -233,14 +235,37 @@ export function pricingSource(model: string | undefined, options: CostOptions = 
   return resolveModelPricing(model, options.pricing, undefined, options.modelOverrides).source;
 }
 
+// Fast mode (Opus 5.5 / 5 / 4.8) is billed at 2x every token category
+const FAST_MODE_MULTIPLIER = 2;
+// US-only inference (inference_geo: "us") is billed at 1.1x on Claude 4.6+
+const US_INFERENCE_MULTIPLIER = 1.1;
+
+/**
+ * Multiplier for pricing modifiers recorded on the usage object. Applies only
+ * with model pricing, and never on top of a user override (overrides are
+ * taken as the exact rate the user pays).
+ */
+export function pricingMultiplier(usage: TokenUsage, model: string | undefined, source: PricingSource): number {
+  if (source !== 'builtin' && source !== 'estimated') { return 1; }
+  let m = 1;
+  if (usage.speed === 'fast') { m *= FAST_MODE_MULTIPLIER; }
+  if (usage.inference_geo === 'us' && model) {
+    const { version, family } = parseModelId(model);
+    // Fable / Mythos are all 5.x; a missing version means a current alias
+    if (family === 'fable' || !version || versionKey(version) >= versionKey([4, 6])) {
+      m *= US_INFERENCE_MULTIPLIER;
+    }
+  }
+  return m;
+}
+
 /** Cost of one usage entry, priced by its model when model pricing is enabled. */
 export function usageCost(
   usage: TokenUsage,
   model: string | undefined,
   options: CostOptions = DEFAULT_COST_OPTIONS,
 ): number {
-  const pricing = options.useModelPricing
-    ? resolveModelPricing(model, options.pricing, usage, options.modelOverrides).pricing
-    : options.pricing;
-  return calculateCost(usage, pricing);
+  if (!options.useModelPricing) { return calculateCost(usage, options.pricing); }
+  const { pricing, source } = resolveModelPricing(model, options.pricing, usage, options.modelOverrides);
+  return calculateCost(usage, pricing) * pricingMultiplier(usage, model, source);
 }

@@ -23,6 +23,8 @@ export interface TokenUsage {
   cache_read_input_tokens: number
   cache_creation_input_tokens: number
   cache_creation?: CacheCreationBreakdown
+  speed?: string           // "fast" when the request ran in fast mode
+  inference_geo?: string   // "us" when US-only inference was requested
 }
 
 // Actual Claude Code JSONL structure (verified against real data):

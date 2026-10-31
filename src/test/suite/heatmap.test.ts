@@ -144,6 +144,17 @@ suite('Heatmap', () => {
       assert.strictEqual(today.sessionCount, 2);
       assert.ok(Math.abs(today.cost - 6.00) < 1e-9, `expected $6.00, got ${today.cost}`);
     });
+
+    test('applies pricing modifiers recorded on usage (fast mode = 2x)', async () => {
+      const entry = (requestId: string, speed?: string) => JSON.stringify({
+        type: 'assistant', timestamp: new Date().toISOString(), requestId,
+        message: { model: 'claude-opus-5-5', usage: { input_tokens: 1_000_000, output_tokens: 0, ...(speed ? { speed } : {}) } },
+      });
+      await fs.writeFile(path.join(tmpHome, 'projects', '-proj', 's.jsonl'),
+        [entry('standard'), entry('fast', 'fast')].join('\n') + '\n');
+      const total = (await getHeatmapData(7)).daily.reduce((s, d) => s + d.cost, 0);
+      assert.ok(Math.abs(total - (4 + 8)) < 1e-9, `expected $12, got ${total}`);
+    });
   });
 
   suite('aggregateByDowHour', () => {

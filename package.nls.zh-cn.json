@@ -10,7 +10,7 @@
   "config.displayMode.desc": "状态栏显示模式：利用率百分比或 USD 费用。",
   "config.statusBar.alignment.desc": "状态栏项目的位置。",
   "config.statusBar.showProjectCost.desc": "在状态栏中显示当前项目费用。",
-  "config.statusBar.format.desc": "状态栏自定义格式字符串。占位符：${usage5h} / ${usage7d}（利用率 0-100）、${bar5h} / ${bar7d}（▰▰▱▱▱ 进度条）、${cost5h}、${cost7d}、${costDay}、${costMonth}（USD，例如 1.23）、${reset5h} / ${reset7d}（距 5h / 7d 窗口重置的剩余时间，例如 1h 23m）。设为 null 使用默认格式。",
+  "config.statusBar.format.desc": "状态栏自定义格式字符串。占位符：${usage5h} / ${usage7d}（利用率 0-100）、${bar5h} / ${bar7d}（▰▰▱▱▱ 进度条）、${cost5h}、${cost7d}、${costDay}、${costMonth}（USD，例如 1.23）。设为 null 使用默认格式。",
   "config.statusBar.showSparkline.desc": "在状态栏 5h 百分比旁显示紧凑的利用率仪表（▰▰▰▱▱）（percent 模式，仅 Claude.ai）。自定义格式可改用 ${bar5h} / ${bar7d} 占位符。",
   "config.cache.ttlSeconds.desc": "缓存有效期（秒）。Claude Code 空闲时，API 调用频率不会超过此间隔。",
   "config.rateLimitApi.enabled.desc": "启用从 Anthropic API 获取速率限制利用率（5h/7d %）（仅 Claude.ai 订阅）。禁用后不再发起新的 API 调用：仍显示上次缓存的百分比并附带时长（例如 [10m ago]）；没有缓存时仅显示本地令牌费用。默认值：true — 仅在 Claude Code 运行时调用，消耗可忽略不计。",

@@ -220,7 +220,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | `claudeStatus.displayMode` | `"percent"` | 状态栏显示 `"percent"`（%）或 `"cost"`（$） |
 | `claudeStatus.statusBar.alignment` | `"left"` | `"left"` 或 `"right"` |
 | `claudeStatus.statusBar.showProjectCost` | `true` | 在状态栏显示当前项目费用 |
-| `claudeStatus.statusBar.format` | `null` | 自定义标签，例如 `"${usage5h}% \| $${costDay}"`。占位符：`${usage5h}`, `${usage7d}`, `${bar5h}`, `${bar7d}`, `${cost5h}`, `${cost7d}`, `${costDay}`, `${costMonth}` |
+| `claudeStatus.statusBar.format` | `null` | 自定义标签，例如 `"${usage5h}% \| $${costDay}"`。占位符：`${usage5h}`, `${usage7d}`, `${bar5h}`, `${bar7d}`, `${cost5h}`, `${cost7d}`, `${costDay}`, `${costMonth}`, `${reset5h}`, `${reset7d}` |
 | `claudeStatus.statusBar.showSparkline` | `false` | 在百分比旁显示紧凑的 5h 进度条（▰▰▰▱▱） |
 | `claudeStatus.payAsYouGo.showTimeWindows` | `true` | 按量付费方案设为 `false` 时显示今日费用代替 5h / 7d（不影响订阅） |
 | `claudeStatus.heatmap.days` | `90` | 使用历史热力图天数（30 / 60 / 90） |

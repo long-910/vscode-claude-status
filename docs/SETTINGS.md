@@ -22,7 +22,7 @@ Contents: [Settings](#all-settings) · [Custom status bar format](#custom-status
 | `displayMode` | `"percent"` \| `"cost"` | `"percent"` | Status bar display mode: utilization percentage or USD cost. |
 | `statusBar.alignment` | `"left"` \| `"right"` | `"left"` | Position of the status bar item. |
 | `statusBar.showProjectCost` | boolean | `true` | Show current project cost in the status bar. |
-| `statusBar.format` | string \| null | `null` | Custom status bar format string. Placeholders: ${usage5h} / ${usage7d} (utilization 0-100), ${bar5h} / ${bar7d} (▰▰▱▱▱ meters), ${cost5h}, ${cost7d}, ${costDay}, ${costMonth} (USD, e.g. 1.23). Set to null to use the default format. |
+| `statusBar.format` | string \| null | `null` | Custom status bar format string. Placeholders: ${usage5h} / ${usage7d} (utilization 0-100), ${bar5h} / ${bar7d} (▰▰▱▱▱ meters), ${cost5h}, ${cost7d}, ${costDay}, ${costMonth} (USD, e.g. 1.23), ${reset5h} / ${reset7d} (time until the 5h / 7d window resets, e.g. 1h 23m). Set to null to use the default format. |
 | `statusBar.showSparkline` | boolean | `false` | Show a compact utilization meter (▰▰▰▱▱) next to the 5h percentage in the status bar (percent mode, Claude.ai only). Custom formats can use the ${bar5h} / ${bar7d} placeholders instead. |
 | `payAsYouGo.showTimeWindows` | boolean | `true` | Show 5-hour / 7-day window figures for pay-as-you-go usage (API key, AWS Bedrock, other non-subscription providers). These windows are Claude.ai subscription rate limits; turn this off to show today's cost instead. Has no effect on Claude.ai subscriptions. |
 | `heatmap.days` | `30` \| `60` \| `90` | `90` | Number of days shown in the usage heatmap. |
@@ -90,6 +90,8 @@ Set `claudeStatus.statusBar.format` to a template string to replace the default 
 | `${cost7d}` | decimal string | `5.67` | Local token cost in the last 7 days (USD, 2 decimal places). |
 | `${costDay}` | decimal string | `2.34` | Local token cost today (USD, 2 decimal places). |
 | `${costMonth}` | decimal string | `45.10` | Local token cost this calendar month (USD, 2 decimal places). |
+| `${reset5h}` | duration | `1h 23m` | Time until the 5h rate-limit window resets. |
+| `${reset7d}` | duration | `2d 4h` | Time until the 7d rate-limit window resets. |
 
 ### Examples
 

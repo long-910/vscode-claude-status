@@ -71,7 +71,9 @@ function applyFormat(format: string, data: ClaudeUsageData): string {
     .replace(/\$\{cost5h\}/g, cost5h.toFixed(2))
     .replace(/\$\{cost7d\}/g, cost7d.toFixed(2))
     .replace(/\$\{costDay\}/g, costDay.toFixed(2))
-    .replace(/\$\{costMonth\}/g, data.costMonth.toFixed(2));
+    .replace(/\$\{costMonth\}/g, data.costMonth.toFixed(2))
+    .replace(/\$\{reset5h\}/g, formatDuration(data.resetIn5h))
+    .replace(/\$\{reset7d\}/g, formatDuration(data.resetIn7d));
 }
 
 /**

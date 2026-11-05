@@ -246,7 +246,7 @@ All settings are under the `claudeStatus` namespace in VS Code Settings. Full re
 | `claudeStatus.displayMode` | `"percent"` | `"percent"` or `"cost"` in the status bar |
 | `claudeStatus.statusBar.alignment` | `"left"` | `"left"` or `"right"` |
 | `claudeStatus.statusBar.showProjectCost` | `true` | Show the current project's cost in the status bar |
-| `claudeStatus.statusBar.format` | `null` | Custom label, e.g. `"${usage5h}% \| $${costDay}"`. Placeholders: `${usage5h}`, `${usage7d}`, `${bar5h}`, `${bar7d}`, `${cost5h}`, `${cost7d}`, `${costDay}`, `${costMonth}` |
+| `claudeStatus.statusBar.format` | `null` | Custom label, e.g. `"${usage5h}% \| $${costDay}"`. Placeholders: `${usage5h}`, `${usage7d}`, `${bar5h}`, `${bar7d}`, `${cost5h}`, `${cost7d}`, `${costDay}`, `${costMonth}`, `${reset5h}`, `${reset7d}` |
 | `claudeStatus.statusBar.showSparkline` | `false` | Compact 5h meter (▰▰▰▱▱) next to the percentage |
 | `claudeStatus.payAsYouGo.showTimeWindows` | `true` | Pay-as-you-go plans: `false` shows today's cost instead of 5h / 7d figures (subscriptions unaffected) |
 | `claudeStatus.heatmap.days` | `90` | Days in the usage heatmap (30 / 60 / 90) |

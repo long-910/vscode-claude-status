@@ -43,6 +43,8 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   When on, the rate-limit % (Claude.ai subscriptions) is also refreshed while Claude Code is
   idle — every `cache.ttlSeconds`, but never more often than every 5 minutes (≈ 12 small API
   calls per idle hour). Off by default; behaviour with it off is unchanged.
+- **Reset countdowns in custom formats** — `claudeStatus.statusBar.format` gains `${reset5h}` /
+  `${reset7d}`: the time until the 5h / 7d window resets (e.g. `1h 23m`), as in the tooltip.
 
 **Budgets**
 

@@ -227,7 +227,7 @@ npm run package       # → vscode-claude-status-*.vsix
 | `claudeStatus.displayMode` | `"percent"` | ステータスバーを `"percent"`（%）か `"cost"`（$）で表示 |
 | `claudeStatus.statusBar.alignment` | `"left"` | `"left"` または `"right"` |
 | `claudeStatus.statusBar.showProjectCost` | `true` | ステータスバーに現在のプロジェクトのコストを表示 |
-| `claudeStatus.statusBar.format` | `null` | カスタムラベル（例: `"${usage5h}% \| $${costDay}"`）。プレースホルダー: `${usage5h}`, `${usage7d}`, `${bar5h}`, `${bar7d}`, `${cost5h}`, `${cost7d}`, `${costDay}`, `${costMonth}` |
+| `claudeStatus.statusBar.format` | `null` | カスタムラベル（例: `"${usage5h}% \| $${costDay}"`）。プレースホルダー: `${usage5h}`, `${usage7d}`, `${bar5h}`, `${bar7d}`, `${cost5h}`, `${cost7d}`, `${costDay}`, `${costMonth}`, `${reset5h}`, `${reset7d}` |
 | `claudeStatus.statusBar.showSparkline` | `false` | % の横にコンパクトな 5h メーター（▰▰▰▱▱）を表示 |
 | `claudeStatus.payAsYouGo.showTimeWindows` | `true` | 従量課金のプランで `false` にすると、5h / 7d の代わりに今日のコストを表示（サブスクには影響なし） |
 | `claudeStatus.heatmap.days` | `90` | 使用履歴ヒートマップの日数（30 / 60 / 90） |

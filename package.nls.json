@@ -10,7 +10,7 @@
   "config.displayMode.desc": "Status bar display mode: utilization percentage or USD cost.",
   "config.statusBar.alignment.desc": "Position of the status bar item.",
   "config.statusBar.showProjectCost.desc": "Show current project cost in the status bar.",
-  "config.statusBar.format.desc": "Custom status bar format string. Placeholders: ${usage5h} / ${usage7d} (utilization 0-100), ${bar5h} / ${bar7d} (▰▰▱▱▱ meters), ${cost5h}, ${cost7d}, ${costDay}, ${costMonth} (USD, e.g. 1.23). Set to null to use the default format.",
+  "config.statusBar.format.desc": "Custom status bar format string. Placeholders: ${usage5h} / ${usage7d} (utilization 0-100), ${bar5h} / ${bar7d} (▰▰▱▱▱ meters), ${cost5h}, ${cost7d}, ${costDay}, ${costMonth} (USD, e.g. 1.23), ${reset5h} / ${reset7d} (time until the 5h / 7d window resets, e.g. 1h 23m). Set to null to use the default format.",
   "config.statusBar.showSparkline.desc": "Show a compact utilization meter (▰▰▰▱▱) next to the 5h percentage in the status bar (percent mode, Claude.ai only). Custom formats can use the ${bar5h} / ${bar7d} placeholders instead.",
   "config.cache.ttlSeconds.desc": "Cache TTL in seconds. API is not called more often than this when Claude Code is idle.",
   "config.rateLimitApi.enabled.desc": "Enable fetching rate-limit utilization (5h/7d %) from the Anthropic API (Claude.ai subscriptions only). When disabled, no new API calls are made: the last cached percentages are still shown with an age suffix (e.g. [10m ago]); without a cache only local token cost is shown. Default: true — API consumption is negligible because calls are made only while Claude Code is actively running.",

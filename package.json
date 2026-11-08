@@ -309,10 +309,10 @@
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
     "eslint": "^9.25.1",
-    "typescript": "^5.8.3",
+    "typescript": "^7.0.2",
     "ts-loader": "^9.5.2",
     "webpack": "^5.105.3",
-    "webpack-cli": "^6.0.1",
+    "webpack-cli": "^7.3.1",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^3.1.0"
   }

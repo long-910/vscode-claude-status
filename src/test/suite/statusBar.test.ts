@@ -239,6 +239,20 @@ suite('StatusBar', () => {
     }
   });
 
+  test('custom format supports ${reset5h} and ${reset7d}', async () => {
+    const cfg = vscode.workspace.getConfiguration('claudeStatus');
+    await cfg.update('statusBar.format', '${usage5h}% (${reset5h}) | ${reset7d}', vscode.ConfigurationTarget.Global);
+    try {
+      const data = makeData({ dataSource: 'cache' });
+      assert.strictEqual(
+        buildLabel(data),
+        `50% (${formatDuration(data.resetIn5h)}) | ${formatDuration(data.resetIn7d)}`,
+      );
+    } finally {
+      await cfg.update('statusBar.format', undefined, vscode.ConfigurationTarget.Global);
+    }
+  });
+
   test('regression: the default status bar label is unchanged by the month total', () => {
     assert.strictEqual(buildLabel(makeData({ dataSource: 'cache' })), '🤖 5h:50% 7d:30%');
   });

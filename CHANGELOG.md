@@ -97,6 +97,7 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   manual pricing rates (now a fallback), `statusBar.format` (all placeholders), `realtime.enabled`.
 - Development dependencies updated (minor / patch); release workflow uses
   `softprops/action-gh-release@v3`.
+- Test timeout raised to 10 s: tests that write settings timed out on CI macOS runners.
 - The `.vsix` no longer ships repository-only files (`.github/`, `CLAUDE.md`, local
   `.claude/` settings).
 

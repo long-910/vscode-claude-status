@@ -139,7 +139,7 @@ Claude Status: Set Budget...
 - **VS Code** 1.82 以降
 
 > [!IMPORTANT]
-> **対応する VS Code の最低バージョンを 1.73 から 1.82 に引き上げました。** レート制限の %
+> **0.9.0 から、対応する VS Code の最低バージョンを 1.73 から 1.82 に引き上げました。** レート制限の %
 > （Claude.ai サブスクリプション）は global の `fetch` API で取得していますが、拡張機能ホストで
 > これが使えるのは VS Code 1.82（Electron 25 / Node.js 18）からです。VS Code 1.73 〜 1.81
 > （Node.js 16）では一度も使えず、サブスクリプションの方には使用率の代わりに `🤖 Not logged in`
@@ -193,7 +193,7 @@ code --install-extension long-kudo.vscode-claude-status
 git clone https://github.com/long-910/vscode-claude-status.git
 cd vscode-claude-status
 npm install
-npm run package       # → vscode-claude-status-*.vsix
+npx @vscode/vsce package   # → vscode-claude-status-<version>.vsix
 ```
 
 ---
@@ -292,9 +292,9 @@ npm run package       # → vscode-claude-status-*.vsix
 | i18n — 英語 / 日本語 / 中国語 | ✅ v0.4.1 |
 | macOS キーチェーン認証情報フォールバック（Claude Code v2.x+） | ✅ v0.6.0 |
 | データディレクトリの設定、OOM 修正（差分読み込み） | ✅ v0.7.0 |
-| モデル別料金（公式価格表と照合）、モデル別内訳、単価の上書き設定 | ✅ Unreleased |
-| 従量課金のエンタープライズ対応、従量課金向け表示、月次予算 | ✅ Unreleased |
-| サイドバーツリービュー、ステータスバーメーター、使用データのエクスポート（CSV / JSON）、パンチカード | ✅ Unreleased |
+| モデル別料金（公式価格表と照合）、モデル別内訳、単価の上書き設定 | ✅ v0.9.0 |
+| 従量課金のエンタープライズ対応、従量課金向け表示、月次予算 | ✅ v0.9.0 |
+| サイドバーツリービュー、ステータスバーメーター、使用データのエクスポート（CSV / JSON）、パンチカード | ✅ v0.9.0 |
 
 ---
 

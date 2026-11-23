@@ -3,35 +3,30 @@
 ## Overview
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        VSCode Extension Host                 │
-│                                                             │
-│  ┌──────────────┐    ┌──────────────┐    ┌───────────────┐ │
-│  │  StatusBar   │    │  WebView     │    │  FileWatcher  │ │
-│  │  (always on) │    │  Panel       │    │  (JSONL)      │ │
-│  └──────┬───────┘    └──────┬───────┘    └──────┬────────┘ │
-│         │                   │                    │          │
-│         └───────────────────┴────────────────────┘          │
-│                             │                               │
-│                    ┌────────▼────────┐                      │
-│                    │  DataManager    │                      │
-│                    │  (singleton)    │                      │
-│                    └────────┬────────┘                      │
-│                             │                               │
-│         ┌───────────────────┼───────────────────┐           │
-│         │                   │                   │           │
-│  ┌──────▼──────┐  ┌─────────▼──────┐  ┌────────▼──────┐   │
-│  │ JsonlReader │  │   ApiClient    │  │    Cache      │   │
-│  │ (local)     │  │ (rate headers) │  │ (disk-backed) │   │
-│  └─────────────┘  └────────────────┘  └───────────────┘   │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-                             │
-                    ┌────────▼────────┐
-                    │  ~/.claude/     │
-                    │  projects/      │
-                    │  **/*.jsonl     │
-                    └─────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                     VS Code Extension Host                    │
+│                                                               │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌───────────┐   │
+│  │ StatusBar  │ │ Sidebar    │ │ WebView    │ │FileWatcher│   │
+│  │ (always on)│ │ (TreeView) │ │ Panel      │ │ (JSONL)   │   │
+│  └─────┬──────┘ └─────┬──────┘ └─────┬──────┘ └─────┬─────┘   │
+│        └──────────────┴───────┬──────┴──────────────┘         │
+│                      ┌────────▼────────┐                      │
+│                      │  DataManager    │                      │
+│                      │  (singleton)    │                      │
+│                      └────────┬────────┘                      │
+│            ┌──────────────────┼───────────────────┐           │
+│     ┌──────▼──────┐  ┌────────▼───────┐  ┌────────▼──────┐    │
+│     │ JsonlReader │  │   ApiClient    │  │    Cache      │    │
+│     │ (local)     │  │ (rate headers) │  │ (disk-backed) │    │
+│     └──────┬──────┘  └────────────────┘  └───────────────┘    │
+│            │                                                  │
+└────────────┼──────────────────────────────────────────────────┘
+      ┌──────▼──────────┐
+      │  ~/.claude/     │
+      │  projects/      │
+      │  **/*.jsonl     │
+      └─────────────────┘
 ```
 
 ---
@@ -40,10 +35,10 @@
 
 The extension is split into two webpack chunks to minimise startup parse time:
 
-| File | Size | When loaded |
+| File | Size (production build) | When loaded |
 |------|------|-------------|
-| `dist/extension.js` | ~120 KiB | Always — at extension activation |
-| `dist/panel.js` | ~60 KiB | On demand — first time the dashboard is opened |
+| `dist/extension.js` | ~55 KiB | Always — at extension activation |
+| `dist/panel.js` | ~55 KiB | On demand — first time the dashboard is opened |
 
 `src/webview/panel.ts` is loaded via dynamic `import()` inside the `openDashboard`
 command handler and is never parsed during the critical activation path.

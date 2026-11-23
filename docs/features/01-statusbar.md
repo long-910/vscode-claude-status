@@ -201,13 +201,17 @@ Build with `\n`-separated string. VSCode renders tooltip as plain text.
 |-------|--------|
 | Extension activation | Read cache → update immediately |
 | JSONL file change (FileWatcher) | `DataManager.refresh()` → update |
-| Timer (every 60 seconds) | Re-render from cache (no API call) |
+| Timer (every 60 seconds) | `getUsageData()` — re-render from cache; an API call only when one is due (see [PLANS.md](../PLANS.md#rate-limit-api-calls-claude-ai-only)) |
 | User clicks "↻ Refresh" in WebView | `DataManager.forceRefresh()` → update |
 
-Timer implementation:
+Timer implementation (`src/extension.ts`, simplified):
 ```typescript
 const timer = setInterval(() => {
-  dataManager.refresh().catch(() => {})
+  dataManager.getUsageData().then(data => {
+    if (data.dataSource === 'api') dataManager.republish()  // fresh rate limits → every surface
+    else statusBar.update(data, dataManager.getLastProjectCosts())
+    treeProvider.refresh()                                   // keep "resets in" countdowns current
+  })
 }, 60_000)
 context.subscriptions.push({ dispose: () => clearInterval(timer) })
 ```

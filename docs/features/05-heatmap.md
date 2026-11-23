@@ -3,11 +3,12 @@
 ## Purpose
 
 **VSCode-exclusive feature** — visualize Claude Code usage patterns over time.
-Two views: a GitHub Contributions-style daily heatmap (configurable days), and an
-hourly usage pattern bar chart (last 30 days, average activity by hour of day).
+Three views: a GitHub Contributions-style daily heatmap (configurable days), an
+hourly usage pattern bar chart (last 30 days, average activity by hour of day), and a
+weekday × hour punch card (last 30 days).
 
-Both views use **Chart.js** loaded from CDN — no npm dependency needed in the
-extension itself, keeping the package size small.
+The heatmap and punch card are plain HTML/CSS; the hourly chart uses **Chart.js** loaded
+from CDN — no npm dependency needed in the extension itself, keeping the package size small.
 
 ---
 
@@ -39,6 +40,7 @@ interface HourlyUsage {
 interface HeatmapData {
   daily: DailyUsage[]    // N days (configurable, default 90)
   hourly: HourlyUsage[]  // last 30 days by hour (fixed window)
+  dowHour: number[][]    // 7 rows (0=Sun … 6=Sat) × 24 cols, total USD, last 30 days
   generatedAt: Date
 }
 ```

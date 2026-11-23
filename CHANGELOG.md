@@ -9,6 +9,12 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [0.9.0] — 2026-11-23
+
+> 0.8.0 was never published; its changes ship in 0.9.0 (upgrading from 0.7.0).
+
 ### Added
 
 **Pricing** — see [docs/PRICING.md](docs/PRICING.md)
@@ -44,7 +50,8 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   idle — every `cache.ttlSeconds`, but never more often than every 5 minutes (≈ 12 small API
   calls per idle hour). Off by default; behaviour with it off is unchanged.
 - **Reset countdowns in custom formats** — `claudeStatus.statusBar.format` gains `${reset5h}` /
-  `${reset7d}`: the time until the 5h / 7d window resets (e.g. `1h 23m`), as in the tooltip.
+  `${reset7d}`: the time until the 5h / 7d window resets (e.g. `1h 23m`), as in the tooltip
+  ([#58](https://github.com/long-910/vscode-claude-status/pull/58)).
 
 **Budgets**
 
@@ -68,6 +75,10 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   [PRICING.md](docs/PRICING.md); `docs/SETTINGS.md` is now a grouped reference generated from
   `package.json`; the READMEs group settings by topic. A test keeps settings, commands and doc
   links in sync.
+- Docs pass for the release: architecture diagram includes the sidebar, specs updated for the
+  API-call rule (`rateLimitCallDue()`), the dashboard message protocol (`monthEstimate`,
+  `setFormat`) and the punch card; CONTRIBUTING describes the PR-based release flow and Open VSX
+  publishing; *Build from Source* now uses `npx @vscode/vsce package`.
 
 ### Changed
 
@@ -86,6 +97,8 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   manual pricing rates (now a fallback), `statusBar.format` (all placeholders), `realtime.enabled`.
 - Development dependencies updated (minor / patch); release workflow uses
   `softprops/action-gh-release@v3`.
+- The `.vsix` no longer ships repository-only files (`.github/`, `CLAUDE.md`, local
+  `.claude/` settings).
 
 ### Fixed
 
@@ -103,6 +116,8 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The dashboard's **Month (est.)** was today's cost × 30, so one busy day could project far more
   than the month's actual cost (e.g. $2,255 on the 31st with $177 spent). It now spreads this
   month's cost so far over the days elapsed.
+- The `claudeStatus.statusBar.format` setting description in Japanese / Chinese did not list
+  `${reset5h}` / `${reset7d}`.
 - The usage history heading read `Usage History (90 7 days)`; it now reads
   `Usage History (90 days)`.
 
@@ -652,7 +667,11 @@ and project-level cost tracking.
 
 ---
 
+[Unreleased]: https://github.com/long-910/vscode-claude-status/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/long-910/vscode-claude-status/compare/v0.7.0...v0.9.0
 [0.7.0]: https://github.com/long-910/vscode-claude-status/compare/v0.6.3...v0.7.0
+[0.6.3]: https://github.com/long-910/vscode-claude-status/compare/v0.6.2...v0.6.3
+[0.6.2]: https://github.com/long-910/vscode-claude-status/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/long-910/vscode-claude-status/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/long-910/vscode-claude-status/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/long-910/vscode-claude-status/compare/v0.5.0...v0.5.1

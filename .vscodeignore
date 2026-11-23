@@ -13,3 +13,8 @@ vsc-extension-quickstart.md
 **/*.ts
 **/.vscode-test.*
 docs/**
+.github/**
+.claude/**
+CLAUDE.md
+**/*.vsix
+**/.DS_Store

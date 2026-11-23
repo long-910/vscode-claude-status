@@ -54,7 +54,8 @@ npm run compile      # TypeScript build
 npm run watch        # Watch mode
 npm run lint         # ESLint
 npm test             # Full test suite
-npm run package      # Production build (vsce package)
+npm run package      # Production webpack bundle (dist/)
+npx @vscode/vsce package  # Build the installable .vsix
 ```
 
 Press **F5** in VSCode to launch Extension Development Host.

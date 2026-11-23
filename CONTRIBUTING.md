@@ -45,7 +45,8 @@ npm run watch          # watch mode
 npm run compile-tests  # compile test files to out/
 npm run lint           # ESLint
 npm test               # full test suite
-npm run package        # production .vsix
+npm run package        # production webpack bundle (dist/)
+npx @vscode/vsce package  # installable .vsix (runs `npm run package` first)
 ```
 
 ### Project Structure & How It Works
@@ -86,7 +87,7 @@ All three platforms must pass before a PR can be merged.
 ### Release (`release.yml`) — Package & Publish
 
 Triggered when a **version tag** (`v*`) is pushed
-(e.g. `git tag v0.3.0 && git push --tags`).
+(e.g. `git tag v0.9.0 && git push origin v0.9.0`).
 
 ```
 push tag v*
@@ -97,7 +98,8 @@ push tag v*
   ├── vsce package  →  *.vsix
   ├── Extract release notes from CHANGELOG.md
   ├── Create GitHub Release  (attaches .vsix, marks pre-release if tag contains "-")
-  └── Publish to VS Marketplace  (requires VSCE_PAT secret)
+  ├── Publish to VS Marketplace  (requires VSCE_PAT secret)
+  └── Publish to Open VSX        (requires OVSX_PAT secret)
 ```
 
 #### Required Secrets
@@ -105,25 +107,33 @@ push tag v*
 | Secret | Description |
 |--------|-------------|
 | `VSCE_PAT` | Personal Access Token for [VS Marketplace](https://marketplace.visualstudio.com/) publishing |
+| `OVSX_PAT` | Access token for [Open VSX](https://open-vsx.org/) publishing |
 
 `GITHUB_TOKEN` is provided automatically by GitHub Actions and needs no configuration.
 
 #### Release Flow (step by step)
 
 1. Merge all changes to `main` and make sure CI is green.
-2. Update `CHANGELOG.md` — move `[Unreleased]` content into a new `## [X.Y.Z]`
-   section, then restore an empty `## [Unreleased]` above it.
-3. Bump `"version"` in `package.json` to match.
-4. Commit: `git commit -m "chore: release vX.Y.Z"`
-5. Tag and push:
+2. On a release branch (`chore/release-vX.Y.Z`):
+   - Update `CHANGELOG.md` — move `[Unreleased]` content into a new
+     `## [X.Y.Z] — YYYY-MM-DD` section, restore an empty `## [Unreleased]` above it, and add
+     the `[X.Y.Z]` compare link at the bottom.
+   - Bump `"version"` in `package.json` and `package-lock.json`
+     (`npm version X.Y.Z --no-git-tag-version`).
+   - Move the README Roadmap rows (EN / JA / ZH) from *Unreleased* to `vX.Y.Z`.
+   - Optionally check the package locally: `npx @vscode/vsce package` → `vscode-claude-status-X.Y.Z.vsix`.
+3. Open a PR `chore: release vX.Y.Z` and merge it once CI is green.
+4. Tag the merged commit on `main` and push the tag:
    ```bash
+   git checkout main && git pull
    git tag vX.Y.Z
-   git push origin main --tags
+   git push origin vX.Y.Z
    ```
-6. The Release workflow runs automatically — GitHub Release is created and the
-   extension is published to the Marketplace within a few minutes.
+5. The Release workflow runs automatically — the GitHub Release is created (with the
+   `.vsix` attached) and the extension is published to the Marketplace and Open VSX within
+   a few minutes.
 
-> **Pre-release**: Tags containing `-` (e.g. `v0.3.0-beta.1`) are automatically
+> **Pre-release**: Tags containing `-` (e.g. `v0.9.0-beta.1`) are automatically
 > marked as pre-release on GitHub and published with `--pre-release` to the Marketplace.
 
 ---

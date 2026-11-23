@@ -179,12 +179,12 @@ const response = await fetch('https://api.anthropic.com/v1/messages', {
 anthropic-ratelimit-unified-5h-utilization  → util5h  (float, e.g. "0.78")
 anthropic-ratelimit-unified-5h-reset        → Unix timestamp SECONDS (not ISO string)
 anthropic-ratelimit-unified-5h-status       → "allowed" or "denied"
-anthropic-ratelimit-unified-7d-utilization  → util7d  (absent on non-Max plans)
-anthropic-ratelimit-unified-7d-reset        → Unix timestamp SECONDS (absent on non-Max plans)
+anthropic-ratelimit-unified-7d-utilization  → util7d  (absent when the plan has no weekly window)
+anthropic-ratelimit-unified-7d-reset        → Unix timestamp SECONDS (absent when the plan has no weekly window)
 ```
 
 > **Important:** Reset headers are **Unix timestamps in seconds**, not ISO date strings.
-> The 7d headers are only present on Claude.ai Max plans; their absence means `has7dLimit = false`.
+> The 7d headers are only present when the plan has a weekly window; their absence means `has7dLimit = false`.
 
 ```typescript
 const nowSec = Date.now() / 1000
@@ -276,7 +276,7 @@ interface CacheFile {
     utilization5h: number
     utilization7d: number
     reset5hAt: number         // absolute Unix timestamp (seconds) — NOT relative seconds
-    reset7dAt: number         // 0 if no 7d limit (non-Max plan)
+    reset7dAt: number         // 0 if the plan has no 7d window
     limitStatus: string
   }
 }
@@ -304,16 +304,18 @@ function getCacheAge(cache: CacheFile): number {
 
 ### When to Call the API
 
+`DataManager.shouldCallApi()` delegates to the pure `rateLimitCallDue()` (`dataManager.ts`,
+unit-tested):
+
 ```typescript
-async function shouldCallApi(cache): Promise<boolean> {
-  if (!cache) return true                          // no cache yet
-  if (!isCacheValid(cache, config.cacheTtl)) {
-    const jsonlUpdatedRecently = await wasJsonlUpdatedRecently(300) // 5 min
-    return jsonlUpdatedRecently                    // only call if Claude was active
-  }
-  return false                                     // cache is fresh
+export function rateLimitCallDue({ cacheAgeSec, ttlSec, activeRecently, realtime }): boolean {
+  if (cacheAgeSec === null) return true            // no cache yet
+  if (cacheAgeSec < ttlSec) return false           // cache is fresh
+  if (activeRecently) return true                  // Claude Code is active
+  return realtime && cacheAgeSec >= Math.max(ttlSec, 300)  // idle: realtime only, ≥ 5 min
 }
 ```
 
-`wasJsonlUpdatedRecently(seconds)`: check if any `.jsonl` file under
-`<claudeHome>/projects/` has an `mtime` within the last `seconds` seconds.
+`activeRecently` is `wasJsonlUpdatedRecently(300)`: any `.jsonl` file under
+`<claudeHome>/projects/` has an `mtime` within the last 5 minutes. *Refresh Now* bypasses
+this check (`forceRefresh`).

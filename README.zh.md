@@ -135,7 +135,7 @@ Claude Status: Set Budget...
 - **VS Code** 1.82 或更高版本
 
 > [!IMPORTANT]
-> **最低 VS Code 版本已从 1.73 提高到 1.82。** 速率限制 %（Claude.ai 订阅）通过全局 `fetch` API
+> **自 0.9.0 起，最低 VS Code 版本已从 1.73 提高到 1.82。** 速率限制 %（Claude.ai 订阅）通过全局 `fetch` API
 > 获取，而扩展宿主从 VS Code 1.82（Electron 25 / Node.js 18）起才提供该 API。在 VS Code 1.73 – 1.81
 > （Node.js 16）上它从未可用，订阅用户看到的是 `🤖 Not logged in`（或旧的缓存 %）而不是用量 —
 > 现在的最低版本反映了真实要求。
@@ -186,7 +186,7 @@ code --install-extension long-kudo.vscode-claude-status
 git clone https://github.com/long-910/vscode-claude-status.git
 cd vscode-claude-status
 npm install
-npm run package       # → vscode-claude-status-*.vsix
+npx @vscode/vsce package   # → vscode-claude-status-<version>.vsix
 ```
 
 ---
@@ -285,9 +285,9 @@ npm run package       # → vscode-claude-status-*.vsix
 | i18n — 英语 / 日语 / 中文 | ✅ v0.4.1 |
 | macOS 钥匙串凭证回退（Claude Code v2.x+） | ✅ v0.6.0 |
 | 可配置数据目录、OOM 修复（增量读取） | ✅ v0.7.0 |
-| 按模型计价（已与官方价格表核对）、按模型费用明细、费率覆盖设置 | ✅ Unreleased |
-| 按量付费 Enterprise 支持、按量付费视图、月预算 | ✅ Unreleased |
-| 侧边栏树视图、状态栏进度条、使用数据导出（CSV / JSON）、打卡图 | ✅ Unreleased |
+| 按模型计价（已与官方价格表核对）、按模型费用明细、费率覆盖设置 | ✅ v0.9.0 |
+| 按量付费 Enterprise 支持、按量付费视图、月预算 | ✅ v0.9.0 |
+| 侧边栏树视图、状态栏进度条、使用数据导出（CSV / JSON）、打卡图 | ✅ v0.9.0 |
 
 ---
 

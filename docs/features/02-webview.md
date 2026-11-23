@@ -61,7 +61,8 @@ All inline `<script>` tags must include `nonce="${nonce}"`.
 │  │ 5h:  $14.21    │  │ Today:  $3.21                ││
 │  │ day: $14.21    │  │ 7 days: $18.45               ││
 │  │ 7d:  $53.17    │  │ 30 days: $62.10              ││
-│  │ Month: $426    │  └──────────────────────────────┘│
+│  │ Month: $121    │  └──────────────────────────────┘│
+│  │ Month (est.)   │                                  │
 │  │ ▶ Token breakdown (5h)                           ││
 │  └────────────────┘                                  │
 │    ↳ expanded:                                       │
@@ -93,6 +94,7 @@ All inline `<script>` tags must include `nonce="${nonce}"`.
 │  │  Cache create $3.75  / 1M tokens               │ │
 │  │  [Claude.ai] [API enabled] [Cache TTL: 5m]     │ │
 │  │  ⚙ Edit pricing & settings                     │ │
+│  │  Status bar format: (default)   [Configure]     │ │
 │  └─────────────────────────────────────────────────┘ │
 │                                                      │
 │  ┌─────────────────────────────────────────────────┐ │
@@ -101,6 +103,9 @@ All inline `<script>` tags must include `nonce="${nonce}"`.
 │  │                                                 │ │
 │  │  HOURLY PATTERN (avg by hour of day)            │ │
 │  │  [Bar chart 0–23h]                              │ │
+│  │                                                 │ │
+│  │  PUNCH CARD (weekday × hour, last 30 days)      │ │
+│  │  [7 × 24 grid]                                  │ │
 │  └─────────────────────────────────────────────────┘ │
 │                                                      │
 │  Last updated: just now                              │
@@ -173,6 +178,7 @@ panel.webview.postMessage({
     projectCosts: ProjectCostData[],   // array (multi-root aware)
     prediction: PredictionData | null,
     heatmap: HeatmapData | null,
+    monthEstimate: number | null,      // projectMonthCost(costMonth): month-to-date pace × days in month
     pricing: TokenPricing,             // manual claudeStatus.pricing.* rates
     settings: {
       provider: string,                // detected/configured provider type
@@ -202,7 +208,8 @@ panel.webview.postMessage({
 vscode.postMessage({ type: 'ready' })           // sent on DOMContentLoaded
 vscode.postMessage({ type: 'refresh' })          // user clicks ↻ Refresh
 vscode.postMessage({ type: 'toggleMode' })       // user clicks $ / %
-vscode.postMessage({ type: 'setBudget', amount: 50.0 })  // user saves budget
+vscode.postMessage({ type: 'setBudget', amount: 50.0 })  // user saves daily budget (null = clear)
+vscode.postMessage({ type: 'setFormat', format: '…' })   // user saves status bar format (null = default)
 vscode.postMessage({ type: 'openSettings' })     // user clicks ⚙
 
 // In extension handler:
@@ -224,6 +231,9 @@ panel.webview.onDidReceiveMessage(msg => {
     }
     case 'setBudget':
       config.setDailyBudget(msg.amount).then(() => dataManager.forceRefresh())
+      break
+    case 'setFormat':
+      config.setStatusBarFormat(msg.format || null).then(() => dataManager.refresh())
       break
     case 'openSettings':
       vscode.commands.executeCommand('workbench.action.openSettings', 'claudeStatus')
@@ -363,10 +373,13 @@ The breakdown re-renders on every `update` message if the toggle is open.
 
 Always-visible card (default expanded, toggle with `▲ Hide` / `▼ Show`) showing:
 
-- **Pricing grid** — current `claudeStatus.pricing.*` values for all four token types
+- **Pricing grid** — current `claudeStatus.pricing.*` values for all four token types; with
+  `pricing.useModelPricing` on, a note says they apply only to unrecognized models
 - **Status badges** — provider type, `rateLimitApi.enabled` state, cache TTL in minutes
 - **Settings link** — button that posts `{ type: 'openSettings' }` to open VS Code
   settings filtered to `claudeStatus`
+- **Status bar format** — the current `statusBar.format` (or *default*) with an inline editor
+  that posts `{ type: 'setFormat' }`
 
 The card content is re-rendered on every `update` message regardless of open/closed state,
 so it always reflects live settings without requiring a panel reload.

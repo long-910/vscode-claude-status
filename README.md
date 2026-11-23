@@ -158,12 +158,12 @@ Number of days is configurable via `claudeStatus.heatmap.days` (30 / 60 / 90).
 - **VS Code** 1.82 or newer
 
 > [!IMPORTANT]
-> **Minimum VS Code version raised from 1.73 to 1.82.** The rate-limit % (Claude.ai
+> **Since 0.9.0 the minimum VS Code version is 1.82 (was 1.73).** The rate-limit % (Claude.ai
 > subscriptions) is fetched with the global `fetch` API, which the extension host only
 > provides from VS Code 1.82 (Electron 25 / Node.js 18). On VS Code 1.73 – 1.81 (Node.js 16)
 > it was never available, so subscribers saw `🤖 Not logged in` (or an old cached %) instead of
-> their usage — the floor now states the real requirement. On VS Code 1.81 or older, keep extension version 0.7.0, or update
-> VS Code.
+> their usage — the floor now states the real requirement. On VS Code 1.81 or older, keep
+> extension version 0.7.0, or update VS Code.
 - **Claude Code** with at least one session — the extension reads
   `~/.claude/projects/**/*.jsonl` (or `claudeStatus.claudeHome`) for token cost
 
@@ -212,7 +212,7 @@ code --install-extension long-kudo.vscode-claude-status
 git clone https://github.com/long-910/vscode-claude-status.git
 cd vscode-claude-status
 npm install
-npm run package       # → vscode-claude-status-*.vsix
+npx @vscode/vsce package   # → vscode-claude-status-<version>.vsix
 ```
 
 ---
@@ -311,9 +311,9 @@ All settings are under the `claudeStatus` namespace in VS Code Settings. Full re
 | i18n — English / Japanese / Chinese | ✅ v0.4.1 |
 | macOS Keychain credential fallback (Claude Code v2.x+) | ✅ v0.6.0 |
 | Configurable data directory, OOM fix (incremental reads) | ✅ v0.7.0 |
-| Model-aware pricing (checked against the official price list), per-model breakdown, model overrides | ✅ Unreleased |
-| Usage-based Enterprise support, pay-as-you-go view, monthly budget | ✅ Unreleased |
-| Sidebar tree view, status bar meter, usage export (CSV / JSON), punch card | ✅ Unreleased |
+| Model-aware pricing (checked against the official price list), per-model breakdown, model overrides | ✅ v0.9.0 |
+| Usage-based Enterprise support, pay-as-you-go view, monthly budget | ✅ v0.9.0 |
+| Sidebar tree view, status bar meter, usage export (CSV / JSON), punch card | ✅ v0.9.0 |
 
 ---
 

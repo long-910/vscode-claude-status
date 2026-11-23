@@ -40,6 +40,7 @@ export async function computePrediction(
   cost5h: number,           // USD spent in current 5h window
   costToday: number,        // USD spent today (for budget)
   dailyBudget: number | null,
+  costOptions: CostOptions,  // same pricing as every other view (PRICING.md)
 ): Promise<PredictionData>
 ```
 

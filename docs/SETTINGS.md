@@ -24,7 +24,7 @@ Contents: [Settings](#all-settings) · [Custom status bar format](#custom-status
 | `statusBar.showProjectCost` | boolean | `true` | Show current project cost in the status bar. |
 | `statusBar.format` | string \| null | `null` | Custom status bar format string. Placeholders: ${usage5h} / ${usage7d} (utilization 0-100), ${bar5h} / ${bar7d} (▰▰▱▱▱ meters), ${cost5h}, ${cost7d}, ${costDay}, ${costMonth} (USD, e.g. 1.23), ${reset5h} / ${reset7d} (time until the 5h / 7d window resets, e.g. 1h 23m). Set to null to use the default format. |
 | `statusBar.showSparkline` | boolean | `false` | Show a compact utilization meter (▰▰▰▱▱) next to the 5h percentage in the status bar (percent mode, Claude.ai only). Custom formats can use the ${bar5h} / ${bar7d} placeholders instead. |
-| `payAsYouGo.showTimeWindows` | boolean | `true` | Show 5-hour / 7-day window figures for pay-as-you-go usage (API key, AWS Bedrock, other non-subscription providers). These windows are Claude.ai subscription rate limits; turn this off to show today's cost instead. Has no effect on Claude.ai subscriptions. |
+| `payAsYouGo.showTimeWindows` | boolean | `true` | Show 5-hour / 7-day window figures for pay-as-you-go usage (usage-based Claude.ai plans, API key, AWS Bedrock). These windows are Claude.ai subscription rate limits; turn this off to show today's cost instead. Has no effect on Claude.ai Pro / Max / seat-based subscriptions. |
 | `heatmap.days` | `30` \| `60` \| `90` | `90` | Number of days shown in the usage heatmap. |
 
 ### Plan, data source & API
@@ -96,7 +96,7 @@ Set `claudeStatus.statusBar.format` to a template string to replace the default 
 ### Examples
 
 ```json
-// Match the issue request — percent utilization only
+// Percent utilization only
 "claudeStatus.statusBar.format": "Claude Usage 5h:${usage5h}% 7d:${usage7d}%"
 // → Claude Usage 5h:35% 7d:72%
 

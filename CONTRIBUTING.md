@@ -65,6 +65,21 @@ Tests live in `src/test/suite/` and run inside VS Code via `npm test`. Pure modu
 budgets, export, heatmap aggregation) have no `vscode` dependency. `docs.test.ts` checks that
 every setting and command is documented and that doc links resolve.
 
+### Screenshots
+
+The images in [docs/screenshots/](docs/screenshots/) are generated, not captured by hand.
+`scripts/screenshots.js` loads the compiled dashboard, status bar and sidebar code with a stubbed
+`vscode` module, feeds it fixed sample data, and renders it with Playwright in the VS Code
+Dark Modern colours — so the pictures always match the current UI, in every README language.
+
+```bash
+npm install --no-save playwright && npx playwright install chromium   # once
+npm run screenshots   # → docs/screenshots/{overview,dashboard}{,.ja,.zh}.png
+```
+
+Regenerate them whenever a UI surface or a translation changes. The sample data lives at the
+top of the script.
+
 ---
 
 ## CI / CD

@@ -3,6 +3,8 @@
 A dedicated Activity Bar container with a native TreeView that surfaces the
 extension's key numbers and quick actions without opening the dashboard panel.
 
+![The Usage Overview tree view](../screenshots/overview.png)
+
 ---
 
 ## Contribution Points (`package.json`)

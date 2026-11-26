@@ -5,6 +5,8 @@
 Always-visible Claude Code usage summary in the VSCode status bar (bottom bar).
 Lightweight, non-blocking, updates automatically.
 
+![Status bar item with its tooltip](../screenshots/overview.png)
+
 ---
 
 ## Display Format

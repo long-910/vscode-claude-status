@@ -15,6 +15,7 @@ documents link to it instead of repeating it.
 | Transcript format, incremental reading, dedupe, API probe, cache | [DATA.md](DATA.md) |
 | What changed in each release | [CHANGELOG.md](../CHANGELOG.md) |
 | Development setup, tests, release procedure | [CONTRIBUTING.md](../CONTRIBUTING.md) |
+| Regenerating the screenshots in [screenshots/](screenshots/) | [CONTRIBUTING.md](../CONTRIBUTING.md#screenshots) |
 
 ## Feature specifications
 

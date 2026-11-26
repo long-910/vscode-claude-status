@@ -6,6 +6,8 @@ Rich visual dashboard that opens when the user clicks the status bar item.
 Shows all usage data in a single scrollable panel. VSCode-native look and feel
 using CSS variables from the active theme.
 
+<img width="480" alt="The dashboard panel" src="../screenshots/dashboard.png" />
+
 ---
 
 ## Panel Specification

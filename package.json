@@ -300,6 +300,7 @@
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "lint": "eslint src",
+    "screenshots": "npm run compile-tests && node scripts/screenshots.js",
     "test": "vscode-test"
   },
   "devDependencies": {

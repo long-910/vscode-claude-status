@@ -9,6 +9,19 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **README (English / 日本語 / 中文) reorganized** — highlights and a quick start up front, a
+  dashboard card table, a *Privacy & Network Usage* section, examples, and troubleshooting.
+  New screenshots of the status bar, tooltip, sidebar and dashboard, localized for each README.
+- **Screenshots are generated** by `npm run screenshots` from the extension's own UI code — see
+  [CONTRIBUTING.md](CONTRIBUTING.md#screenshots).
+
+### Fixed
+
+- **Japanese / Chinese dashboard showed a doubled bracket** in the 5h limit prediction
+  (`約1時間35分 (（ 15:55)`); it now reads `(到達予定 15:55)` / `(预计于 15:55)`.
+
 ---
 
 ## [0.9.0] — 2026-11-23

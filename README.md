@@ -106,7 +106,8 @@ before it happens.
 - **Burn rate** in $/hour and **time until the 5 h limit** (capped at the next reset)
 - A hint such as *"Safe to start heavy tasks"* when more than 30 minutes remain
 - Optional **daily**, **weekly** and **monthly** USD budgets with progress bars — the monthly one is handy for an
-  Enterprise spend limit
+  Enterprise spend limit. Alerts fire at `claudeStatus.budget.alertThresholdPercent` (default 80 %) of the daily /
+  monthly budget
 - **Notifications**: a warning at ≤ 30 min, an error with *Open Dashboard* at ≤ 10 min; budget alerts at most once
   per day / month
 
@@ -143,13 +144,19 @@ set `claudeStatus.claudeProvider`. Details: [docs/PLANS.md](docs/PLANS.md).
 
 ## Privacy & Network Usage
 
-- **Token cost is computed locally** from `~/.claude/projects/**/*.jsonl` (or `claudeStatus.claudeHome`).
-  Nothing is uploaded.
-- **The rate-limit % needs one tiny API call** (Claude.ai subscriptions only): ≈ 9 tokens of `claude-haiku-4-5`
-  (≈ $0.00013), at most once per 5 minutes and **only while Claude Code is active**. Typical cost:
-  **< $0.01 / month**. Pay-as-you-go plans never call the API.
-- Set `claudeStatus.rateLimitApi.enabled: false` to stop all API calls. The last cached % stays visible with
-  a `[Xm ago]` suffix; without a cache the status bar shows cost only.
+**Token cost is computed locally** from `~/.claude/projects/**/*.jsonl` (or `claudeStatus.claudeHome`).
+Nothing is uploaded. Only the rate-limit % of Claude.ai subscriptions needs the network; pay-as-you-go plans
+never call the API.
+
+> [!NOTE]
+> **API calls are minimal and only happen while Claude Code is active.**
+> The rate-limit API call fires only when a transcript (JSONL) was recently updated — when you stop using
+> Claude Code, the extension stops calling the API entirely (unless you turn on `claudeStatus.realtime.enabled`).
+> Each call uses ≈ 9 tokens of `claude-haiku-4-5` (≈ $0.00013), at most once per 5 minutes.
+> Typical cost with default settings: **< $0.01 / month**.
+> Set `claudeStatus.rateLimitApi.enabled: false` to stop all new API calls. If a prior cache exists, the
+> last-fetched % is still shown with a `[Xm ago]` staleness indicator; without any cache, the display falls back
+> to cost only.
 
 > [!WARNING]
 > **Cost figures are estimates** at Anthropic's list API prices (checked 2026-10-31). Negotiated discounts,
@@ -165,9 +172,10 @@ set `claudeStatus.claudeProvider`. Details: [docs/PLANS.md](docs/PLANS.md).
 - **Claude Code** with at least one session
 
 > [!IMPORTANT]
-> Since 0.9.0 the minimum is VS Code **1.82** (was 1.73): the rate-limit % uses the global `fetch` API, which
-> the extension host only provides from 1.82 (Node.js 18). On VS Code 1.81 or older, keep extension 0.7.0 or
-> update VS Code.
+> **Since 0.9.0 the minimum VS Code version is 1.82 (was 1.73).** The rate-limit % uses the global `fetch` API,
+> which the extension host only provides from VS Code 1.82 (Electron 25 / Node.js 18). On VS Code 1.73 – 1.81 it
+> was never available, so subscribers saw `🤖 Not logged in` (or an old cached %) instead of their usage. On VS Code
+> 1.81 or older, keep extension version 0.7.0, or update VS Code.
 
 ## Installation
 
@@ -289,7 +297,7 @@ All settings live under `claudeStatus` in VS Code Settings. Full reference: [doc
 
 | Symptom | What to check |
 |---|---|
-| `🤖 Not logged in` | Run `claude login`. If your credentials file is elsewhere, set `claudeStatus.credentials.path`. |
+| `🤖 Not logged in` | Run `claude login`. If your credentials file is elsewhere, set `claudeStatus.credentials.path`. On VS Code older than 1.82, update VS Code ([Requirements](#requirements)). |
 | No % shown on a Claude.ai plan | Is `claudeStatus.rateLimitApi.enabled` on? On VS Code older than 1.82 the % cannot be fetched — see [Requirements](#requirements). |
 | Wrong plan detected | Set `claudeStatus.claudeProvider` explicitly ([docs/PLANS.md](docs/PLANS.md)). |
 | Cost stays at $0.00 | Claude Code's data is not in `~/.claude` — point `claudeStatus.claudeHome` at it. |

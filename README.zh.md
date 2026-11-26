@@ -101,7 +101,8 @@
 
 - **消耗速率**（$/小时）与**距 5 小时限额的剩余时间**（以下次重置时间为上限）
 - 剩余超过 30 分钟时给出"可安全启动繁重任务"等建议
-- 可选的**每日**、**每周**、**每月** USD 预算及进度条 — 每月预算适合管理 Enterprise 的支出限额
+- 可选的**每日**、**每周**、**每月** USD 预算及进度条 — 每月预算适合管理 Enterprise 的支出限额。
+  达到每日 / 每月预算的 `claudeStatus.budget.alertThresholdPercent`（默认 80%）时提醒
 - **通知**：剩余 ≤ 30 分钟时警告，≤ 10 分钟时弹出带"打开仪表板"的错误提示；预算提醒每天 / 每月最多一次
 
 每日预算可通过 **Claude Status: 设置预算...** 设置，其他预算在设置中配置。
@@ -137,11 +138,16 @@
 
 ## 隐私与网络
 
-- **令牌费用在本地计算**，只读取 `~/.claude/projects/**/*.jsonl`（或 `claudeStatus.claudeHome`），不会上传任何内容。
-- **仅速率限制 % 需要一次极小的 API 调用**（仅 Claude.ai 订阅）：每次约 9 个 `claude-haiku-4-5` 令牌（≈ $0.00013），
-  最多每 5 分钟一次，且**仅在使用 Claude Code 时**。月均费用约 **< $0.01**。按量付费方案从不调用 API。
-- 设置 `claudeStatus.rateLimitApi.enabled: false` 可完全停止 API 调用。上次缓存的 % 会附带 `[Xm ago]` 继续显示；
-  无缓存时仅显示费用。
+**令牌费用在本地计算**，只读取 `~/.claude/projects/**/*.jsonl`（或 `claudeStatus.claudeHome`），不会上传任何内容。
+只有 Claude.ai 订阅的速率限制 % 需要联网；按量付费方案从不调用 API。
+
+> [!NOTE]
+> **API 调用极少，且仅在 Claude Code 活跃期间发生。**
+> 速率限制 API 调用仅在会话记录（JSONL）最近更新时触发（即 Claude Code 使用中）。
+> 停止使用 Claude Code 后，扩展将完全停止 API 调用（开启 `claudeStatus.realtime.enabled` 时除外）。
+> 每次调用约消耗 9 个 `claude-haiku-4-5` 令牌（≈ $0.00013），最多每 5 分钟一次。默认设置下月均费用：**< $0.01**。
+> 设置 `claudeStatus.rateLimitApi.enabled: false` 可停止所有新的 API 调用。若存在缓存，将继续显示上次获取的 % 并附带
+> `[Xm ago]` 过期提示；无缓存时仅显示费用。
 
 > [!WARNING]
 > **费用为估算值**，按 Anthropic 的 API 标价（2026-10-31 核对）计算。不含协议折扣、席位费以及合作平台（Bedrock / Vertex）
@@ -156,8 +162,9 @@
 - **Claude Code** 至少有一个会话
 
 > [!IMPORTANT]
-> 自 0.9.0 起最低版本为 VS Code **1.82**（此前为 1.73）：速率限制 % 使用全局 `fetch` API，扩展宿主从 1.82（Node.js 18）
-> 起才提供。使用 VS Code 1.81 或更早版本时，请继续使用扩展 0.7.0，或更新 VS Code。
+> **自 0.9.0 起，最低 VS Code 版本已从 1.73 提高到 1.82。** 速率限制 % 通过全局 `fetch` API 获取，而扩展宿主从
+> VS Code 1.82（Electron 25 / Node.js 18）起才提供该 API。在 VS Code 1.73 – 1.81 上它从未可用，订阅用户看到的是
+> `🤖 Not logged in`（或旧的缓存 %）而不是用量。如果使用 VS Code 1.81 或更早版本，请继续使用扩展 0.7.0，或更新 VS Code。
 
 ## 安装
 
@@ -279,7 +286,7 @@ npx @vscode/vsce package   # → vscode-claude-status-<version>.vsix
 
 | 现象 | 检查项 |
 |---|---|
-| 显示 `🤖 Not logged in` | 运行 `claude login`。凭证文件在其他位置时，设置 `claudeStatus.credentials.path` |
+| 显示 `🤖 Not logged in` | 运行 `claude login`。凭证文件在其他位置时，设置 `claudeStatus.credentials.path`。VS Code 低于 1.82 时请更新 VS Code（见[系统要求](#系统要求)） |
 | Claude.ai 方案却不显示 % | 确认 `claudeStatus.rateLimitApi.enabled` 已开启。VS Code 低于 1.82 时无法获取（见[系统要求](#系统要求)） |
 | 方案识别错误 | 显式设置 `claudeStatus.claudeProvider`（[docs/PLANS.md](docs/PLANS.md)） |
 | 费用一直是 $0.00 | Claude Code 的数据不在 `~/.claude` — 用 `claudeStatus.claudeHome` 指定其位置 |

@@ -103,7 +103,8 @@ VS Code のライト・ダーク・ハイコントラストテーマに追従し
 
 - **消費レート**（$/時間）と **5時間制限までの残り時間**（次のリセット時刻が上限）
 - 残り30分以上なら「重いタスクを開始しても安全です」などのアドバイス
-- 任意の **日次・週次・月次** USD 予算とプログレスバー — 月次予算はエンタープライズの利用上限（spend limit）の管理に便利
+- 任意の **日次・週次・月次** USD 予算とプログレスバー — 月次予算はエンタープライズの利用上限（spend limit）の管理に便利。
+  日次 / 月次予算の `claudeStatus.budget.alertThresholdPercent`（デフォルト 80%）に達するとアラート
 - **通知**: 残り30分以下で警告、10分以下で「ダッシュボードを開く」付きのエラー。予算アラートは1日 / 1か月に最大1回
 
 日次予算は **Claude Status: 予算を設定...** から、その他は設定画面から指定します。
@@ -139,13 +140,17 @@ VS Code のライト・ダーク・ハイコントラストテーマに追従し
 
 ## プライバシーと通信
 
-- **トークンコストはローカルで計算**します。読み取るのは `~/.claude/projects/**/*.jsonl`（または `claudeStatus.claudeHome`）
-  だけで、何もアップロードしません。
-- **レート制限 % の取得にだけ、ごく小さな API 呼び出し**を使います（Claude.ai サブスクリプションのみ）。1回あたり
-  `claude-haiku-4-5` で約9トークン（≈ $0.00013）、最大5分に1回、**Claude Code の使用中のみ**。月間の目安は **$0.01 未満**です。
-  従量課金のプランでは API を一切呼びません。
-- `claudeStatus.rateLimitApi.enabled: false` で API 呼び出しを完全に止められます。最後にキャッシュした % は `[Xm ago]` 付きで
-  表示され続け、キャッシュがなければコストのみの表示になります。
+**トークンコストはローカルで計算**します。読み取るのは `~/.claude/projects/**/*.jsonl`（または `claudeStatus.claudeHome`）
+だけで、何もアップロードしません。通信が必要なのは Claude.ai サブスクリプションのレート制限 % だけで、従量課金のプランでは
+API を一切呼びません。
+
+> [!NOTE]
+> **API コールは微量かつ Claude Code の使用中のみ発生します。**
+> レート制限取得の API コールは、トランスクリプト（JSONL）が最近更新されたとき（= Claude Code 使用中）にのみ発火します。
+> Claude Code を使っていない間は API コールは一切行われません（`claudeStatus.realtime.enabled` をオンにした場合を除く）。
+> 1回あたり `claude-haiku-4-5` で約9トークン（≈ $0.00013）、最大5分に1回。デフォルト設定での月間目安コストは **$0.01 未満**です。
+> `claudeStatus.rateLimitApi.enabled: false` で新規 API コールを停止できます。キャッシュがある場合は最終取得時の % が
+> `[Xm ago]` 付きで表示され続け、キャッシュがない場合はコストのみの表示になります。
 
 > [!WARNING]
 > **コストは概算です。** Anthropic の API 定価（2026-10-31 確認）で計算しています。個別契約の割引・シート料金・
@@ -160,9 +165,10 @@ VS Code のライト・ダーク・ハイコントラストテーマに追従し
 - **Claude Code** のセッションが1つ以上あること
 
 > [!IMPORTANT]
-> 0.9.0 から最低バージョンは VS Code **1.82**（以前は 1.73）です。レート制限 % の取得に使う global の `fetch` API は、
-> 拡張機能ホストでは 1.82（Node.js 18）から利用できるためです。VS Code 1.81 以前では拡張機能 0.7.0 を使うか、
-> VS Code を更新してください。
+> **0.9.0 から、対応する VS Code の最低バージョンを 1.73 から 1.82 に引き上げました。** レート制限 % の取得に使う
+> global の `fetch` API は、拡張機能ホストでは VS Code 1.82（Electron 25 / Node.js 18）から利用できるためです。
+> VS Code 1.73 〜 1.81 では一度も使えず、サブスクリプションの方には使用率の代わりに `🤖 Not logged in`（または古いキャッシュの %）
+> が表示されていました。VS Code 1.81 以前をお使いの場合は、拡張機能を 0.7.0 のまま使うか、VS Code を更新してください。
 
 ## インストール
 
@@ -284,7 +290,7 @@ npx @vscode/vsce package   # → vscode-claude-status-<version>.vsix
 
 | 症状 | 確認すること |
 |---|---|
-| `🤖 Not logged in` と表示される | `claude login` を実行。認証情報ファイルが別の場所なら `claudeStatus.credentials.path` を設定 |
+| `🤖 Not logged in` と表示される | `claude login` を実行。認証情報ファイルが別の場所なら `claudeStatus.credentials.path` を設定。VS Code 1.82 未満なら VS Code を更新（[必要条件](#必要条件)） |
 | Claude.ai プランなのに % が出ない | `claudeStatus.rateLimitApi.enabled` がオンか確認。VS Code 1.82 未満では取得できません（[必要条件](#必要条件)） |
 | プランの判定が違う | `claudeStatus.claudeProvider` を明示的に指定（[docs/PLANS.md](docs/PLANS.md)） |
 | コストが $0.00 のまま | Claude Code のデータが `~/.claude` にない — `claudeStatus.claudeHome` でその場所を指定 |

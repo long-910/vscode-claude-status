@@ -135,7 +135,7 @@ push tag v*
      the `[X.Y.Z]` compare link at the bottom.
    - Bump `"version"` in `package.json` and `package-lock.json`
      (`npm version X.Y.Z --no-git-tag-version`).
-   - Move the README Roadmap rows (EN / JA / ZH) from *Unreleased* to `vX.Y.Z`.
+   - If a UI surface changed, regenerate the screenshots (`npm run screenshots`, see [Screenshots](#screenshots)).
    - Optionally check the package locally: `npx @vscode/vsce package` → `vscode-claude-status-X.Y.Z.vsix`.
 3. Open a PR `chore: release vX.Y.Z` and merge it once CI is green.
 4. Tag the merged commit on `main` and push the tag:

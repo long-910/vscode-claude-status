@@ -1,5 +1,7 @@
 # Feature 06 — Sidebar Tree View
 
+Source: [`src/treeView.ts`](../../src/treeView.ts)
+
 A dedicated Activity Bar container with a native TreeView that surfaces the
 extension's key numbers and quick actions without opening the dashboard panel.
 

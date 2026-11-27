@@ -71,9 +71,10 @@ The images in [docs/screenshots/](docs/screenshots/) are generated, not captured
 `scripts/screenshots.js` loads the compiled dashboard, status bar and sidebar code with a stubbed
 `vscode` module, feeds it fixed sample data, and renders it with Playwright in the VS Code
 Dark Modern colours — so the pictures always match the current UI, in every README language.
+With `sharp` installed the PNGs are palette-compressed to about a quarter of their size.
 
 ```bash
-npm install --no-save playwright && npx playwright install chromium   # once
+npm install --no-save playwright sharp && npx playwright install chromium   # once
 npm run screenshots   # → docs/screenshots/{overview,dashboard}{,.ja,.zh}.png
 ```
 

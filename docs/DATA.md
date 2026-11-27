@@ -65,13 +65,8 @@ JSONL directory: ~/.claude/projects/-home-user-projects-my-app/
 ```
 
 Claude Code converts the workspace path by replacing **every non-alphanumeric character**
-with `-` (not just `/`). Implemented in `projectCost.ts`:
-
-```typescript
-export function workspacePathToHash(workspacePath: string): string {
-  return workspacePath.replace(/[^a-zA-Z0-9]/g, '-')
-}
-```
+with `-` (not just `/`) — `workspacePathToHash()` in `projectCost.ts`:
+`path.replace(/[^a-zA-Z0-9]/g, '-')`.
 
 If that directory does not exist, `workspacePathToProjectDir()` falls back to scanning
 project directories for a transcript whose `cwd` equals the workspace path. See
@@ -79,14 +74,9 @@ project directories for a transcript whose `cwd` equals the workspace path. See
 
 ### FileSystemWatcher
 
-```typescript
-const watcher = vscode.workspace.createFileSystemWatcher(
-  new vscode.RelativePattern(vscode.Uri.file(getClaudeProjectsDir()), '**/*.jsonl')
-)
-// Coalesced: at most one refresh per 5 s while Claude Code is streaming
-watcher.onDidChange(() => dataManager.scheduleRefresh())
-watcher.onDidCreate(() => dataManager.scheduleRefresh())
-```
+`DataManager` watches `**/*.jsonl` under `getClaudeProjectsDir()`. Changes and new files call
+`scheduleRefresh()`, which coalesces bursts to at most one refresh per 5 s while Claude Code is
+streaming. The watcher is recreated when `claudeStatus.claudeHome` changes.
 
 `refresh()` is single-flight: a call made while one is running waits for it and
 triggers exactly one more pass afterwards.
@@ -186,29 +176,12 @@ anthropic-ratelimit-unified-7d-reset        → Unix timestamp SECONDS (absent w
 > **Important:** Reset headers are **Unix timestamps in seconds**, not ISO date strings.
 > The 7d headers are only present when the plan has a weekly window; their absence means `has7dLimit = false`.
 
-```typescript
-const nowSec = Date.now() / 1000
-const reset5hStr = response.headers.get('anthropic-ratelimit-unified-5h-reset')
-const reset7dStr = response.headers.get('anthropic-ratelimit-unified-7d-reset')
-const has7dLimit = reset7dStr !== null
+Derived values:
 
-const resetIn5h = reset5hStr ? Math.max(0, parseInt(reset5hStr, 10) - nowSec) : 0
-const resetIn7d = reset7dStr ? Math.max(0, parseInt(reset7dStr, 10) - nowSec) : 0
-```
-
-`limitStatus` derivation:
-
-```typescript
-let limitStatus: 'allowed' | 'allowed_warning' | 'denied'
-const status5h = response.headers.get('anthropic-ratelimit-unified-5h-status')
-if (status5h === 'denied') {
-  limitStatus = 'denied'
-} else if (util5h >= 0.75 || (has7dLimit && util7d >= 0.75)) {
-  limitStatus = 'allowed_warning'
-} else {
-  limitStatus = 'allowed'
-}
-```
+- `has7dLimit` — the 7d reset header is present.
+- `resetIn5h` / `resetIn7d` — header timestamp − now, in seconds, never below 0 (0 when absent).
+- `limitStatus` — `denied` when the 5h status header says so; otherwise `allowed_warning` when the
+  5h (or, with `has7dLimit`, the 7d) utilization is ≥ 0.75; otherwise `allowed`.
 
 ### Credentials File
 
@@ -223,19 +196,9 @@ Actual structure of `~/.claude/.credentials.json` (verified):
 }
 ```
 
-```typescript
-interface ClaudeCredentials {
-  claudeAiOauth: {
-    accessToken: string
-    expiresAt: number
-  }
-}
-
-const credPath = customPath ?? path.join(getClaudeHome(), '.credentials.json')
-// macOS: no file → Keychain entry "Claude Code-credentials"
-const creds: ClaudeCredentials = JSON.parse(await fs.readFile(credPath, 'utf-8'))
-const token = creds.claudeAiOauth?.accessToken
-```
+The file is `claudeStatus.credentials.path` if set, otherwise `<claudeHome>/.credentials.json`.
+On macOS, when there is no file, the token is read from the Keychain entry
+`Claude Code-credentials`. Only `claudeAiOauth.accessToken` is used.
 
 If the file doesn't exist or the token is missing, set `dataSource: 'no-credentials'`
 and show a status bar message guiding the user to log in with Claude Code.
@@ -291,30 +254,19 @@ and fast). Only the API response values are cached.
 
 ### Cache Validity Logic
 
-```typescript
-function isCacheValid(cache: CacheFile, ttlSeconds: number): boolean {
-  const age = (Date.now() - new Date(cache.updatedAt).getTime()) / 1000
-  return age < ttlSeconds
-}
-
-function getCacheAge(cache: CacheFile): number {
-  return (Date.now() - new Date(cache.updatedAt).getTime()) / 1000
-}
-```
+`getCacheAge()` is the seconds since `updatedAt`; `isCacheValid()` is `age < claudeStatus.cache.ttlSeconds`.
 
 ### When to Call the API
 
 `DataManager.shouldCallApi()` delegates to the pure `rateLimitCallDue()` (`dataManager.ts`,
 unit-tested):
 
-```typescript
-export function rateLimitCallDue({ cacheAgeSec, ttlSec, activeRecently, realtime }): boolean {
-  if (cacheAgeSec === null) return true            // no cache yet
-  if (cacheAgeSec < ttlSec) return false           // cache is fresh
-  if (activeRecently) return true                  // Claude Code is active
-  return realtime && cacheAgeSec >= Math.max(ttlSec, 300)  // idle: realtime only, ≥ 5 min
-}
-```
+| Situation | Call the API? |
+|---|---|
+| No cache yet | yes |
+| Cache younger than `cache.ttlSeconds` | no |
+| Claude Code active | yes |
+| Claude Code idle | only with `realtime.enabled`, and never more often than every 5 minutes |
 
 `activeRecently` is `wasJsonlUpdatedRecently(300)`: any `.jsonl` file under
 `<claudeHome>/projects/` has an `mtime` within the last 5 minutes. *Refresh Now* bypasses

@@ -26,6 +26,11 @@
     "status-bar"
   ],
   "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#1f1f1f",
+    "theme": "dark"
+  },
+  "homepage": "https://github.com/long-910/vscode-claude-status#readme",
   "repository": {
     "type": "git",
     "url": "https://github.com/long-910/vscode-claude-status"

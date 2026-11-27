@@ -3,13 +3,15 @@
  * Regenerates the screenshots in docs/screenshots/ from the extension's own code.
  *
  *   npm run compile-tests          # builds out/ (the script loads the compiled modules)
- *   npm install --no-save playwright && npx playwright install chromium   # once
+ *   npm install --no-save playwright sharp && npx playwright install chromium   # once
  *   node scripts/screenshots.js
  *
  * The dashboard HTML, the status bar label / tooltip and the sidebar tree come from
  * out/webview/panel.js, out/statusBar.js and out/treeView.js with a stubbed `vscode`
  * module and sample data (below), so the images always match the current UI. Each
- * image is rendered once per README language (en / ja / zh-cn).
+ * image is rendered once per README language (en / ja / zh-cn). With `sharp` installed the
+ * PNGs are palette-compressed (about 4x smaller, visually identical); without it they are
+ * written as-is.
  *
  * Offline / proxied environments: set SCREENSHOT_CDN_DIR to a folder laid out like
  * cdn.jsdelivr.net (npm/chart.js@4.4.0/…, npm/@vscode/codicons@0.0.36/…) and requests
@@ -334,10 +336,23 @@ function windowHtml(label, tooltip, rows, sidebarTitle) {
 
 // ---- render -----------------------------------------------------------------
 
+let sharp = null;
+try { sharp = require('sharp'); } catch { /* optional — PNGs are saved uncompressed */ }
+
+/** Writes a screenshot, palette-compressed when `sharp` is available. */
+async function save(png, name) {
+  const file = path.join(OUT_DIR, name);
+  if (sharp) {
+    await sharp(png).png({ palette: true, quality: 90, effort: 10, compressionLevel: 9 }).toFile(file);
+  } else {
+    fs.writeFileSync(file, png);
+  }
+}
+
 async function main() {
   let chromium;
   try { ({ chromium } = require('playwright')); } catch {
-    console.error('playwright not found — run `npm install --no-save playwright` first.');
+    console.error('playwright not found — run `npm install --no-save playwright sharp` first.');
     process.exit(1);
   }
   fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -373,7 +388,7 @@ async function main() {
     await page.mouse.move(0, 0);
     await page.evaluate(() => document.activeElement && document.activeElement.blur());
     await page.waitForTimeout(500);
-    await page.screenshot({ path: path.join(OUT_DIR, `dashboard${loc.suffix}.png`), fullPage: true });
+    await save(await page.screenshot({ fullPage: true }), `dashboard${loc.suffix}.png`);
     await page.close();
 
     // Status bar + tooltip + sidebar
@@ -384,12 +399,13 @@ async function main() {
     await win.setViewportSize({ width: 1102, height: 562 });
     await win.setContent(windowHtml(label, tooltip, treeRows(), nls['view.overview.title']), { waitUntil: 'networkidle' });
     await win.waitForTimeout(200);
-    await win.screenshot({ path: path.join(OUT_DIR, `overview${loc.suffix}.png`) });
+    await save(await win.screenshot(), `overview${loc.suffix}.png`);
     await win.close();
     await context.close();
     console.log(`${loc.id}: ${label}`);
   }
   await browser.close();
+  if (!sharp) { console.warn('sharp not found — PNGs saved uncompressed (`npm install --no-save sharp`).'); }
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

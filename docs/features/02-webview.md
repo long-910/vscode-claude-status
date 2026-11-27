@@ -1,5 +1,7 @@
 # Feature 02: WebView Dashboard Panel
 
+Source: [`src/webview/panel.ts`](../../src/webview/panel.ts)
+
 ## Purpose
 
 Rich visual dashboard that opens when the user clicks the status bar item.
@@ -12,158 +14,62 @@ using CSS variables from the active theme.
 
 ## Panel Specification
 
-```typescript
-const panel = vscode.window.createWebviewPanel(
-  'claudeStatusDashboard',
-  'Claude Code Usage',
-  vscode.ViewColumn.Beside,   // opens to the right of active editor
-  {
-    enableScripts: true,
-    retainContextWhenHidden: true,   // keep state when tab is hidden
-    localResourceRoots: [],          // no local file access needed
-  }
-)
-```
-
-Only one panel instance at a time. If already open, `panel.reveal()`.
+- `createWebviewPanel('claudeStatusDashboard', …, ViewColumn.Beside)` — opens to the right of the
+  active editor.
+- `enableScripts: true`, `retainContextWhenHidden: true` (keeps state while the tab is hidden),
+  `localResourceRoots: []` (no local file access).
+- Only one panel at a time; opening it again calls `panel.reveal()`.
+- While the panel is open, `DataManager.setDashboardOpen(true)` keeps the heatmap fresh.
 
 ---
 
 ## Content Security Policy
 
-```html
-<meta http-equiv="Content-Security-Policy" content="
-  default-src 'none';
-  script-src 'nonce-${nonce}' https://cdn.jsdelivr.net;
-  style-src 'unsafe-inline';
-  img-src data:;
-  connect-src 'none';
-">
+```
+default-src 'none';
+script-src 'nonce-${nonce}' https://cdn.jsdelivr.net;
+style-src 'unsafe-inline';
+img-src data:;
+connect-src 'none';
 ```
 
-`nonce` is a random 16-byte hex string generated per panel creation (`crypto.randomBytes(16).toString('hex')`).
-All inline `<script>` tags must include `nonce="${nonce}"`.
+`nonce` is a random 16-byte hex string generated per panel. Every `<script>` tag carries it;
+Chart.js is loaded from jsDelivr at a pinned version (`chart.js@4.4.0`).
+
+### CSP and event handlers
+
+The CSP blocks inline `onclick="…"` (and every other inline event attribute). **Never** use them:
+attach listeners in the script block, and use document-level delegation for generated elements.
+
+```javascript
+document.addEventListener('click', e => {
+  if (e.target && e.target.id === 'budget-save-btn') { saveBudget(); }
+});
+```
+
+Give dynamically created buttons a unique `id` so the delegation handler can identify them.
 
 ---
 
 ## Layout
 
-```
-┌──────────────────────────────────────────────────────┐
-│  Claude Code Usage    [↻ Refresh] [$ / %] [⚙]       │
-│                                                      │
-│  ┌─────────────────────────────────────────────────┐ │
-│  │  CURRENT USAGE                                  │ │
-│  │  5h: [████████░░] 78%   resets in 2h 47m       │ │
-│  │  7d: [███████░░░] 84%⚠  resets in 4d 8h        │ │
-│  └─────────────────────────────────────────────────┘ │
-│                                                      │
-│  ┌────────────────┐  ┌──────────────────────────────┐│
-│  │ TOKEN COST     │  │ PROJECT: my-app              ││
-│  │ 5h:  $14.21    │  │ Today:  $3.21                ││
-│  │ day: $14.21    │  │ 7 days: $18.45               ││
-│  │ 7d:  $53.17    │  │ 30 days: $62.10              ││
-│  │ Month: $121    │  └──────────────────────────────┘│
-│  │ Month (est.)   │                                  │
-│  │ ▶ Token breakdown (5h)                           ││
-│  └────────────────┘                                  │
-│    ↳ expanded:                                       │
-│      Input:       120k tok = $0.0036                 │
-│      Output:       18k tok = $0.0270                 │
-│      Cache read:  340k tok = $0.0001                 │
-│      Cache create: 12k tok = $0.0000                 │
-│      Cache hit ratio: 74% — Good! Cache is saving…  │
-│                                                      │
-│  ┌─────────────────────────────────────────────────┐ │
-│  │  PREDICTION                                     │ │
-│  │  [Rate Limit Timeline chart]                    │ │
-│  │  100% ┤- - - - - - - - - ✕ (limit)             │ │
-│  │   75% ┤- - - - - ⚠ (warn)                      │ │
-│  │   78% ┤━━━━━━━━━━                               │ │
-│  │      23:00   23:22  00:17                       │ │
-│  │  Burn rate: $4.2/hr                             │ │
-│  │  ⚠ 5h limit in ~45m (at 23:22)                 │ │
-│  │  Daily budget: $12.50 / $20.00 (62%)            │ │
-│  │  Weekly budget: $48.10 / $100 (48%)             │ │
-│  │  💡 Recommendation: finish current task soon    │ │
-│  └─────────────────────────────────────────────────┘ │
-│                                                      │
-│  ┌─────────────────────────────────────────────────┐ │
-│  │  PRICING & SETTINGS                    [▲ Hide] │ │
-│  │  Input        $3.00  / 1M tokens               │ │
-│  │  Output      $15.00  / 1M tokens               │ │
-│  │  Cache read   $0.30  / 1M tokens               │ │
-│  │  Cache create $3.75  / 1M tokens               │ │
-│  │  [Claude.ai] [API enabled] [Cache TTL: 5m]     │ │
-│  │  ⚙ Edit pricing & settings                     │ │
-│  │  Status bar format: (default)   [Configure]     │ │
-│  └─────────────────────────────────────────────────┘ │
-│                                                      │
-│  ┌─────────────────────────────────────────────────┐ │
-│  │  USAGE HISTORY (last 90 days)                   │ │
-│  │  [GitHub-style heatmap grid]                    │ │
-│  │                                                 │ │
-│  │  HOURLY PATTERN (avg by hour of day)            │ │
-│  │  [Bar chart 0–23h]                              │ │
-│  │                                                 │ │
-│  │  PUNCH CARD (weekday × hour, last 30 days)      │ │
-│  │  [7 × 24 grid]                                  │ │
-│  └─────────────────────────────────────────────────┘ │
-│                                                      │
-│  Last updated: just now                              │
-└──────────────────────────────────────────────────────┘
-```
+Cards from top to bottom (see the screenshot above):
 
-### Header Buttons
+| Card | Content |
+|---|---|
+| Header | Title and buttons `↻ Refresh` (force refresh with spinner), `$ / %` (toggle display mode), `⚙` (open settings filtered to `claudeStatus`) |
+| **Current Usage** | 5 h and 7 d progress bars with "resets in" — hidden for pay-as-you-go with `showTimeWindows: false` |
+| **Token Cost** | 5 h / today / 7 d / this month / month estimate, and the collapsible [token breakdown](#token-breakdown-collapsible) |
+| **Project** | One block per workspace folder ([Feature 03](03-project-cost.md)) |
+| **Prediction** | [Rate limit timeline chart](#rate-limit-timeline-chart), burn rate, budgets and recommendation ([Feature 04](04-prediction.md)) |
+| **Pricing & Settings** | See [below](#pricing--settings-card) |
+| **Usage History** | Heatmap, punch card, hourly chart ([Feature 05](05-heatmap.md)) |
+| Footer | `Last updated: just now (live)` — `(stale)` when the rate-limit data is old |
 
-| Button | Action |
-|--------|--------|
-| `↻ Refresh` | Force-refresh data (API + JSONL); shows spinner while loading |
-| `$ / %` | Toggle between cost and percent display mode |
-| `⚙` | Open VSCode settings filtered to `claudeStatus` |
-
----
-
-## Theme Integration
-
-Use VSCode CSS variables so the panel respects Light/Dark/High Contrast themes:
-
-```css
-body {
-  background-color: var(--vscode-editor-background);
-  color: var(--vscode-editor-foreground);
-  font-family: var(--vscode-font-family);
-  font-size: var(--vscode-font-size);
-}
-
-.card {
-  background-color: var(--vscode-sideBar-background);
-  border: 1px solid var(--vscode-panel-border);
-  border-radius: 4px;
-  padding: 12px;
-}
-
-.progress-fill {
-  background-color: var(--vscode-progressBar-background);
-}
-.progress-fill.warning {
-  background-color: var(--vscode-editorWarning-foreground);
-}
-.progress-fill.error {
-  background-color: var(--vscode-editorError-foreground);
-}
-
-button {
-  background-color: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
-  border: none;
-  padding: 4px 12px;
-  cursor: pointer;
-  border-radius: 2px;
-}
-button:hover { background-color: var(--vscode-button-hoverBackground); }
-button:disabled { opacity: 0.5; cursor: default; }
-```
+Progress bars are plain CSS (`.progress-track` / `.progress-fill`, with `.warning` and `.error`
+variants). All colours come from VS Code theme variables (`--vscode-editor-background`,
+`--vscode-progressBar-background`, `--vscode-editorWarning-foreground`, …), so the panel follows
+light, dark and high-contrast themes without extra code.
 
 ---
 
@@ -171,187 +77,75 @@ button:disabled { opacity: 0.5; cursor: default; }
 
 ### Extension → WebView
 
-```typescript
-// Send data update
-panel.webview.postMessage({
-  type: 'update',
-  data: {
-    usage: ClaudeUsageData,
-    projectCosts: ProjectCostData[],   // array (multi-root aware)
-    prediction: PredictionData | null,
-    heatmap: HeatmapData | null,
-    monthEstimate: number | null,      // projectMonthCost(costMonth): month-to-date pace × days in month
-    pricing: TokenPricing,             // manual claudeStatus.pricing.* rates
-    settings: {
-      provider: string,                // detected/configured provider type
-      providerLabel: string,           // display name (statusBar.providerLabel())
-      apiEnabled: boolean,             // claudeStatus.rateLimitApi.enabled
-      cacheTtlSeconds: number,         // claudeStatus.cache.ttlSeconds
-      weeklyBudget: number | null,     // claudeStatus.budget.weeklyUsd
-      monthlyBudget: number | null,    // claudeStatus.budget.monthlyUsd
-      statusBarFormat: string | null,  // claudeStatus.statusBar.format
-      useModelPricing: boolean,        // claudeStatus.pricing.useModelPricing
-      showTimeWindows: boolean,        // false hides 5h / 7d figures (pay-as-you-go only)
-    },
-  }
-})
+| `type` | Payload |
+|---|---|
+| `update` | `data: DashboardMessage` — see below |
+| `setDisplayMode` | `mode: 'cost' \| 'percent'` |
 
-// Send display mode change
-panel.webview.postMessage({
-  type: 'setDisplayMode',
-  mode: 'cost' | 'percent'
-})
-```
+`DashboardMessage` (`panel.ts`):
+
+| Field | Content |
+|---|---|
+| `usage` | `ClaudeUsageData` ([ARCHITECTURE.md](../ARCHITECTURE.md)) |
+| `projectCosts` | `ProjectCostData[]` (multi-root aware) |
+| `prediction` | `PredictionData \| null` |
+| `heatmap` | `HeatmapData \| null` (null until first computed) |
+| `monthEstimate` | `projectMonthCost(costMonth)` — month-to-date pace × days in the month |
+| `pricing` | Manual `claudeStatus.pricing.*` rates |
+| `settings` | Provider and label, `apiEnabled`, `cacheTtlSeconds`, `weeklyBudget`, `monthlyBudget`, `statusBarFormat`, `useModelPricing`, `showTimeWindows` |
 
 ### WebView → Extension
 
-```typescript
-// In WebView JS:
-vscode.postMessage({ type: 'ready' })           // sent on DOMContentLoaded
-vscode.postMessage({ type: 'refresh' })          // user clicks ↻ Refresh
-vscode.postMessage({ type: 'toggleMode' })       // user clicks $ / %
-vscode.postMessage({ type: 'setBudget', amount: 50.0 })  // user saves daily budget (null = clear)
-vscode.postMessage({ type: 'setFormat', format: '…' })   // user saves status bar format (null = default)
-vscode.postMessage({ type: 'openSettings' })     // user clicks ⚙
-
-// In extension handler:
-panel.webview.onDidReceiveMessage(msg => {
-  switch (msg.type) {
-    case 'ready':
-      // send initial data
-      sendUpdate(lastData)
-      break
-    case 'refresh':
-      dataManager.forceRefresh()
-      break
-    case 'toggleMode': {
-      const next = config.displayMode === 'percent' ? 'cost' : 'percent'
-      config.setDisplayMode(next).then(() => {
-        panel.webview.postMessage({ type: 'setDisplayMode', mode: next })
-      })
-      break
-    }
-    case 'setBudget':
-      config.setDailyBudget(msg.amount).then(() => dataManager.forceRefresh())
-      break
-    case 'setFormat':
-      config.setStatusBarFormat(msg.format || null).then(() => dataManager.refresh())
-      break
-    case 'openSettings':
-      vscode.commands.executeCommand('workbench.action.openSettings', 'claudeStatus')
-      break
-  }
-})
-```
-
----
-
-## Progress Bar Component
-
-Pure CSS — no external library needed:
-
-```html
-<div class="progress-row">
-  <div class="progress-labels">
-    <span>5h window</span>
-    <span>78% — resets in 2h 47m</span>
-  </div>
-  <div class="progress-track">
-    <div class="progress-fill warning" style="width: 78%"></div>
-  </div>
-</div>
-```
-
-```css
-.progress-track {
-  height: 8px;
-  background-color: var(--vscode-scrollbarSlider-background);
-  border-radius: 4px;
-  overflow: hidden;
-}
-.progress-fill {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.3s ease;
-}
-```
+| `type` | Sent when | Extension does |
+|---|---|---|
+| `ready` | script loaded | Sends an update at once, then starts the heatmap computation and sends a second update when it finishes |
+| `refresh` | `↻ Refresh` | `DataManager.forceRefresh()` |
+| `toggleMode` | `$ / %` | Flips `claudeStatus.displayMode`, replies with `setDisplayMode` |
+| `setBudget` | budget form saved (`amount`, `null` = off) | Writes `claudeStatus.budget.dailyUsd`, then `forceRefresh()` |
+| `setFormat` | format editor saved (`format`, `null` = default) | Writes `claudeStatus.statusBar.format`, then `refresh()` |
+| `openSettings` | `⚙` / settings links | Opens the Settings UI filtered to `claudeStatus` |
 
 ---
 
 ## Refresh Behavior
 
-When user clicks "↻ Refresh":
-1. Show spinner on button (`<span class="spinning">⟳</span>`, button disabled)
-2. Send `{ type: 'refresh' }` to extension
-3. Extension calls `DataManager.forceRefresh()`
-4. `onDidUpdate` fires → extension posts `{ type: 'update', data: ... }`
-5. WebView receives update → re-renders → removes spinner
+1. `↻ Refresh` shows a spinner and disables the button, then posts `refresh`.
+2. `DataManager.forceRefresh()` runs; `onDidUpdate` fires and the extension posts `update`.
+3. The WebView re-renders and removes the spinner.
 
-The heatmap is computed in background after the initial update fires a second `onDidUpdate`.
-The WebView re-renders heatmap when it receives this second update.
-
----
-
-## Heatmap In-Memory Cache
-
-`DataManager.getHeatmapData()` caches the computed result in memory for 5 minutes
-(`heatmapTtlMs = 5 * 60 * 1000`) to avoid re-reading all JSONL on every refresh.
-`forceRefresh()` invalidates the heatmap cache (`heatmapComputedAt = 0`).
-
----
-
-## CSP and Event Handlers
-
-**Critical:** The CSP `script-src 'nonce-...'` blocks all inline `onclick="fn()"` HTML
-attribute handlers. Only the `<script nonce="...">` tag itself is trusted.
-
-**Rule:** Never use `onclick`, `onchange`, or any other inline event attribute in the
-WebView HTML. Always use one of these patterns instead:
-
-```javascript
-// Static elements — attach in script init block
-document.getElementById('my-btn').addEventListener('click', myHandler);
-
-// Dynamically generated elements — use document-level event delegation
-document.addEventListener('click', e => {
-  if (e.target && e.target.id === 'dynamic-btn-id') { myHandler(); }
-});
-```
-
-Assign unique `id` attributes to dynamically created buttons so the delegation handler
-can identify them. Do not rely on class names alone (multiple elements may share a class).
+The heatmap is computed in the background: the first `update` may carry the cached heatmap (or
+`null`), and a second `update` follows once it is ready. `DataManager.getHeatmapData()` keeps the
+result in memory for 5 minutes; `forceRefresh()` invalidates it.
 
 ---
 
 ## Rate Limit Timeline Chart
 
-The Prediction card includes a Chart.js line chart (`<canvas id="predChart">`) that
-visualises the projected 5 h utilization over the remaining window time.
+A Chart.js line chart (`<canvas id="predChart">`) in the Prediction card shows the projected 5 h
+utilization until the window resets.
 
-**Visibility:** shown only when `providerType === 'claude-ai'` and `utilization5h > 0`.
+**Visibility:** only when `providerType === 'claude-ai'`, `utilization5h > 0` and `resetIn5h > 0`.
 
 **Data construction:**
 
-1. Generate ~8 evenly-spaced time points from now to reset (`resetIn5h` seconds).
-2. If `estimatedExhaustionIn` is set, insert that exact minute as an additional point.
-3. For each point at time `t` (minutes from now):
-   - If `t >= exhaustMin`: y = 100 %
-   - Else: y = `currentPct + (100 − currentPct) × (t / exhaustMin)` (linear)
-   - If no exhaustion predicted: y = `currentPct` (flat)
-4. Reference datasets: flat lines at y = 75 (orange dashed) and y = 100 (red dashed).
+1. About 8 evenly spaced time points from now to the reset (`resetIn5h`).
+2. If `estimatedExhaustionIn` is set, that exact minute is added as a point.
+3. For each point at `t` minutes from now:
+   - `t >= exhaustMin` → 100 %
+   - otherwise `currentPct + (100 − currentPct) × (t / exhaustMin)` (linear)
+   - no exhaustion predicted → `currentPct` (flat)
+4. Reference lines at 75 % (warning, dashed) and 100 % (limit, dashed).
 
-**Chart options:** `animation: false`, y-axis 0–105 %, x-axis shows absolute time labels,
-legend hidden, tooltip only on the projection dataset.
+The line is red from 90 %, amber from 75 %, otherwise the theme's progress-bar colour. Y axis
+0–105 %, absolute time labels, legend hidden, tooltip only on the projection.
 
 ---
 
 ## Token Breakdown (collapsible)
 
-Inside the Token Cost card, a `▶ Token breakdown (5h)` toggle button reveals
-per-type token counts and costs using the `usage` and `pricing` fields from the
-`update` message:
+`▶ Token breakdown (5h)` in the Token Cost card reveals per-type token counts:
 
-| Row | Formula |
+| Row | Formula (manual pricing) |
 |-----|---------|
 | Input | `tokensIn5h / 1M × pricing.inputPerMillion` |
 | Output | `tokensOut5h / 1M × pricing.outputPerMillion` |
@@ -359,29 +153,26 @@ per-type token counts and costs using the `usage` and `pricing` fields from the
 | Cache create | `tokensCacheCreate5h / 1M × pricing.cacheCreatePerMillion` |
 | Cache hit ratio | `tokensCacheRead5h / (tokensIn5h + tokensCacheRead5h) × 100` |
 
-When `claudeStatus.pricing.useModelPricing` is on (default), the manual rates above
-don't apply to most entries, so the per-type rows show token counts only and a
-**By model (5h)** list shows `usage.costByModel5h` (model id shortened, e.g.
-`claude-sonnet-4-5-20250929` → `sonnet-4-5`), sorted by cost. Models not priced from the
-built-in table are flagged from `usage.pricingByModel5h`: `≈` = estimated (newer than the
-table), `*` = manual rates or a `modelOverrides` entry; the label's tooltip explains which. The Pricing & Settings
-card notes that the manual rates apply only to unrecognized models.
+When `claudeStatus.pricing.useModelPricing` is on (default) the manual rates don't apply to most
+entries, so the rows show token counts only and a **By model (5h)** list shows
+`usage.costByModel5h` (model id shortened, e.g. `claude-sonnet-4-5-20250929` → `sonnet-4-5`),
+sorted by cost. Models not priced from the built-in table are flagged from
+`usage.pricingByModel5h`: `≈` = estimated (newer than the table), `*` = manual rates or a
+`modelOverrides` entry; the label's tooltip explains which.
 
-The breakdown re-renders on every `update` message if the toggle is open.
+The breakdown re-renders on every `update` while it is open.
 
 ---
 
 ## Pricing & Settings Card
 
-Always-visible card (default expanded, toggle with `▲ Hide` / `▼ Show`) showing:
+Expanded by default (toggle `▲ Hide` / `▼ Show`):
 
-- **Pricing grid** — current `claudeStatus.pricing.*` values for all four token types; with
-  `pricing.useModelPricing` on, a note says they apply only to unrecognized models
-- **Status badges** — provider type, `rateLimitApi.enabled` state, cache TTL in minutes
-- **Settings link** — button that posts `{ type: 'openSettings' }` to open VS Code
-  settings filtered to `claudeStatus`
-- **Status bar format** — the current `statusBar.format` (or *default*) with an inline editor
-  that posts `{ type: 'setFormat' }`
+- **Pricing grid** — the four `claudeStatus.pricing.*` rates; with `pricing.useModelPricing` on, a
+  note says they apply only to unrecognized models
+- **Badges** — provider, `rateLimitApi.enabled` state, cache TTL in minutes
+- **⚙ Edit pricing & settings** — posts `openSettings`
+- **Status bar format** — the current `statusBar.format` (or *default*) with an inline editor that
+  posts `setFormat`
 
-The card content is re-rendered on every `update` message regardless of open/closed state,
-so it always reflects live settings without requiring a panel reload.
+The card re-renders on every `update`, open or closed, so it always shows the live settings.

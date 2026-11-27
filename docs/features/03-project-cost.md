@@ -1,5 +1,7 @@
 # Feature 03: Project-Level Cost Tracking
 
+Source: [`src/data/projectCost.ts`](../../src/data/projectCost.ts)
+
 ## Purpose
 
 **VSCode-exclusive feature** — tmux has no concept of "which project is open."
@@ -54,27 +56,14 @@ same `CostOptions` as every other view ([PRICING.md](../PRICING.md)), and accumu
 
 ## Status Bar Integration
 
-When a workspace is open, append project cost to the status bar label:
+With `claudeStatus.statusBar.showProjectCost` on (default), today's project cost is appended to
+the label ([Feature 01](01-statusbar.md)):
 
-**Single workspace:**
-```
-🤖 5h:78% 7d:84% | my-app:$3.21
-```
-
-**Multi-root workspace (aggregated):**
-```
-🤖 5h:78% 7d:84% | PJ:$5.43
-```
-
-When no workspace is open (e.g., untitled window):
-```
-🤖 5h:78% 7d:84%
-```
-
-The project name is truncated to 12 characters if longer:
-```typescript
-const shortName = name.length > 12 ? name.slice(0, 11) + '…' : name
-```
+| Workspace | Label |
+|---|---|
+| Single folder | `🤖 5h:78% 7d:84% \| my-app:$3.21` — names longer than 12 characters become `vscode-clau…` |
+| Multi-root | `🤖 5h:78% 7d:84% \| PJ:$5.43` — sum of all folders |
+| No folder / no matching project | `🤖 5h:78% 7d:84%` |
 
 ---
 

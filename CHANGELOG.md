@@ -16,6 +16,11 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   New screenshots of the status bar, tooltip, sidebar and dashboard, localized for each README.
 - **Screenshots are generated** by `npm run screenshots` from the extension's own UI code — see
   [CONTRIBUTING.md](CONTRIBUTING.md#screenshots).
+  With `sharp` installed they are palette-compressed (≈ 550 KB for all six instead of ≈ 2 MB).
+- **Specs slimmed down** — pasted implementation code in `docs/features/` and `docs/DATA.md`
+  replaced by tables, short descriptions and links to the source, so the specs no longer go stale.
+- **Marketplace page** gets a dark gallery banner and a homepage link.
+- **Pull request template** with the documentation / changelog / translation / screenshot checklist.
 
 ### Fixed
 

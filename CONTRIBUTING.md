@@ -65,6 +65,22 @@ Tests live in `src/test/suite/` and run inside VS Code via `npm test`. Pure modu
 budgets, export, heatmap aggregation) have no `vscode` dependency. `docs.test.ts` checks that
 every setting and command is documented and that doc links resolve.
 
+### Screenshots
+
+The images in [docs/screenshots/](docs/screenshots/) are generated, not captured by hand.
+`scripts/screenshots.js` loads the compiled dashboard, status bar and sidebar code with a stubbed
+`vscode` module, feeds it fixed sample data, and renders it with Playwright in the VS Code
+Dark Modern colours — so the pictures always match the current UI, in every README language.
+With `sharp` installed the PNGs are palette-compressed to about a quarter of their size.
+
+```bash
+npm install --no-save playwright sharp && npx playwright install chromium   # once
+npm run screenshots   # → docs/screenshots/{overview,dashboard}{,.ja,.zh}.png
+```
+
+Regenerate them whenever a UI surface or a translation changes. The sample data lives at the
+top of the script.
+
 ---
 
 ## CI / CD
@@ -120,7 +136,7 @@ push tag v*
      the `[X.Y.Z]` compare link at the bottom.
    - Bump `"version"` in `package.json` and `package-lock.json`
      (`npm version X.Y.Z --no-git-tag-version`).
-   - Move the README Roadmap rows (EN / JA / ZH) from *Unreleased* to `vX.Y.Z`.
+   - If a UI surface changed, regenerate the screenshots (`npm run screenshots`, see [Screenshots](#screenshots)).
    - Optionally check the package locally: `npx @vscode/vsce package` → `vscode-claude-status-X.Y.Z.vsix`.
 3. Open a PR `chore: release vX.Y.Z` and merge it once CI is green.
 4. Tag the merged commit on `main` and push the tag:

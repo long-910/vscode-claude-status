@@ -9,6 +9,24 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **README (English / 日本語 / 中文) reorganized** — highlights and a quick start up front, a
+  dashboard card table, a *Privacy & Network Usage* section, examples, and troubleshooting.
+  New screenshots of the status bar, tooltip, sidebar and dashboard, localized for each README.
+- **Screenshots are generated** by `npm run screenshots` from the extension's own UI code — see
+  [CONTRIBUTING.md](CONTRIBUTING.md#screenshots).
+  With `sharp` installed they are palette-compressed (≈ 550 KB for all six instead of ≈ 2 MB).
+- **Specs slimmed down** — pasted implementation code in `docs/features/` and `docs/DATA.md`
+  replaced by tables, short descriptions and links to the source, so the specs no longer go stale.
+- **Marketplace page** gets a dark gallery banner and a homepage link.
+- **Pull request template** with the documentation / changelog / translation / screenshot checklist.
+
+### Fixed
+
+- **Japanese / Chinese dashboard showed a doubled bracket** in the 5h limit prediction
+  (`約1時間35分 (（ 15:55)`); it now reads `(到達予定 15:55)` / `(预计于 15:55)`.
+
 ---
 
 ## [0.9.0] — 2026-11-23

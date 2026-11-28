@@ -1,145 +1,73 @@
 # Feature 01: Status Bar Display
 
+Source: [`src/statusBar.ts`](../../src/statusBar.ts)
+
 ## Purpose
 
 Always-visible Claude Code usage summary in the VSCode status bar (bottom bar).
 Lightweight, non-blocking, updates automatically.
 
+![Status bar item with its tooltip](../screenshots/overview.png)
+
 ---
 
 ## Display Format
 
-### Percent mode (claude-ai provider, `displayMode: "percent"`)
+The label is built by `buildLabel()`. `| my-app:$3.21` is appended whenever
+`statusBar.showProjectCost` is on and the workspace has project data
+([Feature 03](03-project-cost.md)); a multi-root workspace shows the sum as `| PJ:$5.43`.
 
-```
-🤖 5h:78% 7d:84% | my-app:$3.21
-```
+| State | Label |
+|---|---|
+| Percent mode (`claude-ai`, `displayMode: "percent"`) | `🤖 5h:78% 7d:84%` |
+| Warning (≥ 75 % utilization) | `🤖 5h:78%⚠ 7d:84%⚠` |
+| Denied (limit reached) | `🤖 5h:100%✗` |
+| Plan without a 7-day window | `🤖 5h:45%` |
+| Meter (`statusBar.showSparkline: true`, percent mode) | `🤖 5h:▰▰▰▱▱ 62% 7d:41%` |
+| Cost mode (`displayMode: "cost"`, or any non-`claude-ai` provider) | `🤖 5h:$14.21 7d:$53.17` |
+| Pay-as-you-go with `payAsYouGo.showTimeWindows: false` | `🤖 Today:$14.21` |
+| Stale (cache expired, or `rateLimitApi.enabled: false` with a cache) | `🤖 5h:78% 7d:84% [32m ago]` |
+| No data yet | `🤖 Claude: run refresh` |
+| No credentials | `🤖 Not logged in` |
 
-### Warning mode (≥75% utilization)
-```
-🤖 5h:78%⚠ 7d:84%⚠ | my-app:$3.21
-```
+The stale age uses the shared duration format: `32m`, `2h 15m`, `1d 3h`
+([`formatDuration.ts`](../../src/webview/formatDuration.ts)).
 
-### Denied (limit reached)
-```
-🤖 5h:100%✗ | my-app:$3.21
-```
-
-### Stale data (cache expired, or `rateLimitApi.enabled: false` with cached data)
-```
-🤖 5h:78% 7d:84% [32m ago] | my-app:$3.21   ← minutes (< 1 h)
-🤖 5h:78% 7d:84% [2h 15m ago] | my-app:$3.21 ← hours  (1 h – 23 h)
-🤖 5h:78% 7d:84% [1d 3h ago] | my-app:$3.21  ← days   (≥ 24 h)
-```
-
-### Cost mode (non-claude-ai provider, or `displayMode: "cost"`)
-```
-🤖 5h:$14.21 7d:$53.17 | my-app:$3.21
-```
-
-### Pay-as-you-go with `payAsYouGo.showTimeWindows: false`
-```
-🤖 Today:$14.21 | my-app:$3.21
-```
-
-### Meter (`statusBar.showSparkline: true`, percent mode)
-```
-🤖 5h:▰▰▰▱▱ 62% 7d:41%
-```
-
-### No data yet (initial state)
-```
-🤖 Claude: run refresh
-```
-
-### No credentials
-```
-🤖 Not logged in
-```
-
----
-
-## Provider Behavior
-
-Which of the formats above appears for each plan is listed in
+Which of these appears for each plan is listed in
 [PLANS.md](../PLANS.md#what-each-provider-shows). In short: percentages only for `claude-ai`;
 every other provider is always in cost mode.
 
 ---
 
-## Status Bar Item Specification
+## Status Bar Item
 
-```typescript
-const statusBarItem = vscode.window.createStatusBarItem(
-  vscode.StatusBarAlignment.Left,
-  100  // priority — appears near left side
-)
-statusBarItem.name = 'Claude Code Usage'  // for screen readers
-statusBarItem.command = 'vscode-claude-status.openDashboard'
-statusBarItem.tooltip = buildTooltip(data)
-```
-
-### Position
-
-Left side of status bar, priority 100.
-Configurable via `claudeStatus.statusBar.alignment` setting (`'left'` | `'right'`).
+- Created once in `StatusBarManager` with priority 100 on the left (or right, per
+  `claudeStatus.statusBar.alignment`).
+- `name` is *Claude Code Usage* (read by screen readers); clicking runs
+  `vscode-claude-status.openDashboard`.
+- Shows `🤖 Claude: loading...` until the first data arrives.
 
 ---
 
 ## Color Coding
 
-Use VSCode theme color IDs (not hardcoded hex):
+Theme color IDs only, never hex values (`applyColor()`):
 
 | State | Background | Foreground |
 |-------|-----------|------------|
-| Normal (< 75%) | — | — (default) |
-| Warning (≥ 75%) | `statusBarItem.warningBackground` | `statusBarItem.warningForeground` |
-| Denied (100%) | `statusBarItem.errorBackground` | `statusBarItem.errorForeground` |
+| Normal (< 75 %) | — | — (default) |
+| Warning (`limitStatus: allowed_warning`) | `statusBarItem.warningBackground` | `statusBarItem.warningForeground` |
+| Denied (`limitStatus: denied`) | `statusBarItem.errorBackground` | `statusBarItem.errorForeground` |
 | Stale data | — | `descriptionForeground` (dimmed) |
 | No credentials | `statusBarItem.errorBackground` | `statusBarItem.errorForeground` |
-| Non-claude-ai | — | — (default) |
-
-```typescript
-function applyColor(item: vscode.StatusBarItem, data: ClaudeUsageData): void {
-  const { limitStatus, dataSource, providerType } = data
-
-  if (dataSource === 'no-credentials') {
-    item.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground')
-    item.color = new vscode.ThemeColor('statusBarItem.errorForeground')
-    return
-  }
-  if (dataSource === 'stale') {
-    item.backgroundColor = undefined
-    item.color = new vscode.ThemeColor('descriptionForeground')
-    return
-  }
-  // Non-claude-ai providers: no warning/error colors
-  if (providerType !== 'claude-ai') {
-    item.backgroundColor = undefined
-    item.color = undefined
-    return
-  }
-  switch (limitStatus) {
-    case 'denied':
-      item.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground')
-      item.color = new vscode.ThemeColor('statusBarItem.errorForeground')
-      break
-    case 'allowed_warning':
-      item.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground')
-      item.color = new vscode.ThemeColor('statusBarItem.warningForeground')
-      break
-    default:
-      item.backgroundColor = undefined
-      item.color = undefined
-  }
-}
-```
+| Non-`claude-ai` provider | — | — (no rate limits, so never warning / error) |
 
 ---
 
 ## Tooltip (hover text)
 
-### Claude.ai provider
+A `\n`-separated plain-text string built by `buildTooltip()`. For a Claude.ai subscription:
+
 ```
 Claude Code Usage
 ─────────────────────────────
@@ -154,44 +82,19 @@ day:  $14.21
 This month: $121.40 / $400.00 (30%)     ← "/ budget (%)" only with budget.monthlyUsd
 
 Project: my-app
-  Today: $3.21  |  7d: $18.45
+  Today: $3.21  |  7 days: $18.45
 
 Last updated: just now
 Click to open dashboard →
 ```
 
-### Non-claude-ai provider (e.g. AWS Bedrock)
-```
-Claude Code (AWS Bedrock)
-─────────────────────────────
+Differences for other cases:
 
-Token Cost (local)
-─────────────────────────────
-5h:   in:38.5K out:127.8K  $14.21
-day:  $14.21
-7d:   $53.17
-This month: $121.40
-
-Last updated: just now
-Click to open dashboard →
-```
-
-### Pay-as-you-go without time windows (`payAsYouGo.showTimeWindows: false`)
-```
-Claude Code (API Key)
-─────────────────────────────
-
-Token Cost (local)
-─────────────────────────────
-Today: $14.21
-This month: $121.40
-
-Last updated: just now
-Click to open dashboard →
-```
-Applies to every non-`claude-ai` provider; see [PLANS.md](../PLANS.md#pay-as-you-go-usage-based-claudeai-api-key-bedrock).
-
-Build with `\n`-separated string. VSCode renders tooltip as plain text.
+- **Non-`claude-ai` provider** — the rate-limit block is replaced by a `Claude Code (AWS Bedrock)` /
+  `(API Key)` / … header; the cost block is unchanged.
+- **`payAsYouGo.showTimeWindows: false`** — the cost block shows only `Today:` and `This month:`
+  ([PLANS.md](../PLANS.md#pay-as-you-go-usage-based-claudeai-api-key-bedrock)).
+- **No credentials / no data** — a short message (`Run: claude login` / `Click to open dashboard →`).
 
 ---
 
@@ -201,41 +104,28 @@ Build with `\n`-separated string. VSCode renders tooltip as plain text.
 |-------|--------|
 | Extension activation | Read cache → update immediately |
 | JSONL file change (FileWatcher) | `DataManager.refresh()` → update |
-| Timer (every 60 seconds) | `getUsageData()` — re-render from cache; an API call only when one is due (see [PLANS.md](../PLANS.md#rate-limit-api-calls-claude-ai-only)) |
-| User clicks "↻ Refresh" in WebView | `DataManager.forceRefresh()` → update |
-
-Timer implementation (`src/extension.ts`, simplified):
-```typescript
-const timer = setInterval(() => {
-  dataManager.getUsageData().then(data => {
-    if (data.dataSource === 'api') dataManager.republish()  // fresh rate limits → every surface
-    else statusBar.update(data, dataManager.getLastProjectCosts())
-    treeProvider.refresh()                                   // keep "resets in" countdowns current
-  })
-}, 60_000)
-context.subscriptions.push({ dispose: () => clearInterval(timer) })
-```
+| Timer (every 60 seconds, `src/extension.ts`) | `getUsageData()` re-renders from cache and calls the API only when one is due ([PLANS.md](../PLANS.md#rate-limit-api-calls-claude-ai-only)); fresh API data is republished to every surface, and the sidebar is refreshed so "resets in" countdowns stay current |
+| User clicks "↻ Refresh" in the dashboard | `DataManager.forceRefresh()` → update |
 
 ---
 
 ## Custom Format (`claudeStatus.statusBar.format`)
 
-Users can override the auto-generated label with a template string containing placeholders.
+A template string replaces the generated label:
 
-```
-// settings.json
+```jsonc
 "claudeStatus.statusBar.format": "Claude Usage 5h:${usage5h}% 7d:${usage7d}%"
 // → Claude Usage 5h:35% 7d:72%
 ```
 
-Placeholders (`${usage5h}`, `${bar5h}`, `${costDay}`, `${costMonth}`, …) are listed in
+Placeholders (`${usage5h}`, `${bar5h}`, `${costDay}`, `${costMonth}`, `${reset5h}`, …) are listed in
 [SETTINGS.md](../SETTINGS.md#placeholders).
 
 ### Priority and fallback rules
 
 1. `no-credentials` / `no-data` states → always use default messages, format is ignored.
 2. `format` is set and non-empty → `applyFormat()` returns the interpolated string.
-3. `format` is `null` (default) → existing `buildLabel()` logic (mode, provider, stale suffix, project cost).
+3. `format` is `null` (default) → `buildLabel()` (mode, provider, stale suffix, project cost).
 
 The stale-age suffix and project cost suffix are **not** appended in custom format mode.
 Color coding is unaffected — it still follows `limitStatus`.
@@ -244,23 +134,13 @@ Color coding is unaffected — it still follows `limitStatus`.
 
 ## Display Toggle (Cost Mode)
 
-Command: `vscode-claude-status.toggleDisplayMode`
-Keyboard: `Ctrl+Shift+Alt+C` (default, configurable)
-
-In cost mode, replace utilization percentage with dollar amount:
-```
-🤖 5h:$14.21 7d:$53.17 | my-app:$3.21
-```
-
-Toggle state is persisted in `vscode.workspace.getConfiguration()`:
-```typescript
-config.setDisplayMode('cost')  // → claudeStatus.displayMode
-```
+Command `vscode-claude-status.toggleDisplayMode` (`Ctrl+Shift+Alt+C` / `⌘⇧⌥C`) switches between
+percent and cost mode and stores the choice in `claudeStatus.displayMode`, so it survives restarts.
 
 ---
 
 ## Accessibility
 
-- `statusBarItem.name = 'Claude Code Usage'` — for screen readers
-- Tooltip must convey all information shown in the label
-- Do not rely solely on color to convey state (use text indicators ⚠ ✗)
+- `name = 'Claude Code Usage'` for screen readers
+- The tooltip conveys everything shown in the label
+- State is never conveyed by color alone (text indicators ⚠ ✗)

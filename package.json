@@ -26,6 +26,11 @@
     "status-bar"
   ],
   "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#1f1f1f",
+    "theme": "dark"
+  },
+  "homepage": "https://github.com/long-910/vscode-claude-status#readme",
   "repository": {
     "type": "git",
     "url": "https://github.com/long-910/vscode-claude-status"
@@ -300,6 +305,7 @@
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "lint": "eslint src",
+    "screenshots": "npm run compile-tests && node scripts/screenshots.js",
     "test": "vscode-test"
   },
   "devDependencies": {

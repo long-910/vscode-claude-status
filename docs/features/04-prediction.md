@@ -1,5 +1,8 @@
 # Feature 04: Usage Prediction & Budget Alerts
 
+Source: [`src/data/prediction.ts`](../../src/data/prediction.ts),
+[`src/data/budget.ts`](../../src/data/budget.ts), notifications in [`src/extension.ts`](../../src/extension.ts)
+
 ## Purpose
 
 **VSCode-exclusive feature** — predict when the rate limit will be exhausted
@@ -12,60 +15,37 @@ Also supports a user-defined USD budget with its own alert threshold.
 
 ### Burn Rate Calculation
 
-Use a sliding window of the **last 30 minutes** of JSONL entries:
+`calculateBurnRate()` uses a sliding window of the **last 30 minutes** of transcript entries:
+total cost of the entries ÷ hours since the first one = USD/hour. Fewer than two entries → `0`
+(shown as *Calculating…*).
 
-```typescript
-export function calculateBurnRate(
-  entries: ReadonlyArray<{ timestamp: number; cost: number }>
-): number {
-  if (entries.length < 2) return 0  // not enough data
-
-  const totalCost = entries.reduce((sum, e) => sum + e.cost, 0)
-  const spanMs = Date.now() - entries[0].timestamp
-  const spanHours = spanMs / (1000 * 3600)
-
-  return spanHours > 0 ? totalCost / spanHours : 0  // USD/hour
-}
-```
-
-> **Note:** Costs are always calculated from token counts (`entry.message.usage`).
-> There is no `costUSD` field in JSONL.
+> **Note:** Costs are always calculated from token counts (`message.usage`), priced with the same
+> `CostOptions` as every other view ([PRICING.md](../PRICING.md)). There is no `costUSD` field in JSONL.
 
 ### Rate Limit Exhaustion Prediction
 
-```typescript
-export async function computePrediction(
-  utilization5h: number,    // 0.0–1.0
-  resetIn5h: number,        // seconds until reset
-  cost5h: number,           // USD spent in current 5h window
-  costToday: number,        // USD spent today (for budget)
-  dailyBudget: number | null,
-  costOptions: CostOptions,  // same pricing as every other view (PRICING.md)
-): Promise<PredictionData>
-```
+`computePrediction(utilization5h, resetIn5h, cost5h, costToday, dailyBudget, costOptions)`:
 
-**Algorithm:**
+1. Read the transcript entries of the last 30 minutes and compute the burn rate.
+2. `utilization5h >= 1.0` → already exhausted (`estimatedExhaustionIn = 0`).
+3. With a positive burn rate and utilization:
+   - estimated window capacity = `cost5h / utilization5h`
+   - remaining USD = capacity × (1 − `utilization5h`)
+   - time until exhaustion = remaining ÷ burn rate, **capped at `resetIn5h`**
+     (exhaustion cannot happen after the window resets)
+4. `safeToStartHeavyTask` = more than 30 minutes left.
 
-1. Read all JSONL entries from the last 30 minutes
-2. Calculate burn rate (USD/hour) from those entries
-3. If `utilization5h >= 1.0`: already exhausted → `estimatedExhaustionIn = 0`
-4. If `burnRate > 0` and `utilization5h > 0`:
-   - Estimate total capacity: `estimatedCapacityUsd = cost5h / utilization5h`
-   - Remaining USD: `remainingUsd = estimatedCapacityUsd * (1.0 - utilization5h)`
-   - Hours until exhaustion: `remainingUsd / burnRate`
-   - Cap at `resetIn5h` (exhaustion can't happen after the window resets)
-5. `safeToStartHeavyTask = effectiveSeconds > 1800` (30 min threshold)
+### Recommendation
 
-### Recommendation Text
+`recommendationKey` (translated in the dashboard; `recommendation` is the English fallback):
 
-```typescript
-export function buildRecommendation(exhaustionIn: number): string {
-  if (exhaustionIn < 600)   return 'Less than 10 min remaining. Save your work and pause.'
-  if (exhaustionIn < 1800)  return 'Less than 30 min remaining. Wrap up current task.'
-  if (exhaustionIn < 3600)  return 'About 1 hour remaining. Plan your next task accordingly.'
-  return 'Plenty of capacity. Safe to start heavy tasks.'
-}
-```
+| Time left | Key | Text |
+|---|---|---|
+| limit reached | `rate-limit-reached` | Rate limit reached. Wait for reset. |
+| < 10 min | `critical` | Less than 10 min remaining. Save your work and pause. |
+| < 30 min | `warning` | Less than 30 min remaining. Wrap up current task. |
+| < 60 min | `caution` | About 1 hour remaining. Plan your next task accordingly. |
+| otherwise | `safe` | Plenty of capacity. Safe to start heavy tasks. |
 
 ---
 
@@ -73,17 +53,9 @@ export function buildRecommendation(exhaustionIn: number): string {
 
 ### User Configuration
 
-```json
-// settings.json
-{
-  "claudeStatus.budget.dailyUsd": 20.0,
-  "claudeStatus.budget.weeklyUsd": 100.0,
-  "claudeStatus.budget.monthlyUsd": 400.0,
-  "claudeStatus.budget.alertThresholdPercent": 80
-}
-```
-
-Default: no budget set (`null` = disabled).
+`claudeStatus.budget.dailyUsd`, `weeklyUsd` and `monthlyUsd` (USD, `null` = disabled, the default)
+and `alertThresholdPercent` (default 80) — see [SETTINGS.md](../SETTINGS.md). The daily budget can
+also be set with **Claude Status: Set Budget…** or the dashboard's budget form.
 
 | Budget | Period | Compared with | Shown in | Notification |
 |---|---|---|---|---|
@@ -98,19 +70,9 @@ is always covered.
 
 ### Budget Exhaustion Prediction
 
-```typescript
-// In computePrediction():
-if (dailyBudget !== null) {
-  const remaining = dailyBudget - costToday
-  budgetRemaining = Math.max(0, remaining)
-  if (remaining <= 0) {
-    budgetExhaustionTime = new Date()
-  } else if (burnRateUsdPerHour > 0) {
-    const hoursUntil = remaining / burnRateUsdPerHour
-    budgetExhaustionTime = new Date(Date.now() + hoursUntil * 3600 * 1000)
-  }
-}
-```
+With a daily budget, `computePrediction()` sets `budgetRemaining = max(0, budget − costToday)` and
+`budgetExhaustionTime` = now when the budget is used up, or now + remaining ÷ burn rate while
+spending continues.
 
 ---
 
@@ -141,36 +103,12 @@ non-modal and can be turned off in Settings.
 
 ## WebView Display
 
-In the Prediction card of the dashboard:
+The Prediction card of the dashboard ([Feature 02](02-webview.md)) shows, top to bottom:
 
-```html
-<div class="card">
-  <p class="card-title">Prediction</p>
-
-  <div class="prediction-row">Burn rate: $4.2 / hr</div>
-
-  <!-- Rate limit prediction -->
-  <div class="alert warning">
-    ⚠ At this rate, 5h limit reached in ~45 min (at 14:23)
-  </div>
-
-  <!-- Budget (if configured) -->
-  <div class="cost-row">
-    <span class="cost-label">Daily budget</span>
-    <span>$3.21 / $20.00 (16%)</span>
-  </div>
-  <div class="progress-track">
-    <div class="progress-fill" style="width: 16%"></div>
-  </div>
-
-  <div class="prediction-row">💡 Wrap up current task.</div>
-
-  <!-- Budget configure input (always visible in dashboard) -->
-  <div class="budget-configure">
-    <label>Daily budget ($)</label>
-    <input type="number" id="dailyBudget" min="0" step="5">
-    <button id="btn-save-budget">Save</button>
-    <button id="btn-clear-budget">Clear</button>
-  </div>
-</div>
-```
+- the [rate limit timeline chart](02-webview.md#rate-limit-timeline-chart) (Claude.ai only)
+- **Burn rate** in $/hr
+- the 5h exhaustion estimate — plain text, a warning box under 30 min, an error box under 10 min
+- **Daily / Weekly / Monthly budget** progress bars (amber from 60 %, red from 80 %), each with an
+  alert box when nearly or fully used; *💸 Budget exhausted ~ at this rate* for the daily one
+- a *⚙ Set daily budget* / *Configure budget* link that opens an inline form (Save / Disable)
+- 💡 the recommendation
